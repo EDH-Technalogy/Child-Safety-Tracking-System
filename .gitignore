@@ -1,0 +1,30 @@
+# Secrets and local environment
+serviceAccountKey*.json
+.env
+.env.*
+!.env.example
+
+# Node / backend artifacts
+node_modules/
+npm-debug.log*
+server.out.log
+server.err.log
+
+# Flutter / Dart artifacts
+child_tracker/.dart_tool/
+child_tracker/.flutter-plugins
+child_tracker/.flutter-plugins-dependencies
+child_tracker/.pub-cache/
+child_tracker/build/
+child_tracker/android/build/
+child_tracker/coverage/
+child_tracker/android/.gradle/
+
+# IDE / editor files
+.vscode/
+child_tracker/.idea/
+*.iml
+
+# Accidental local files
+child
+child_tracker/l10

@@ -1,0 +1,40 @@
+name: child_tracker
+description: "Child Safety GPS Tracking System - Flutter Frontend"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  provider: ^6.1.1
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+  google_maps_flutter: ^2.5.0
+  geolocator: ^14.0.2
+  intl: ^0.20.2
+  flutter_local_notifications: ^20.1.0
+  connectivity_plus: ^7.0.0
+  image_picker: ^1.0.7
+  firebase_core: ^3.6.0
+  firebase_storage: ^12.3.3
+  url_launcher: ^6.3.0
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  generate: true
+  uses-material-design: true
+  
+  assets:
+    - assets/
+    - assets/images/
+    - assets/icons/
