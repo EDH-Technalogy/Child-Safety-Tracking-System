@@ -265,6 +265,21 @@ class ApiService {
     return Map<String, dynamic>.from(_decodeResponse(response, 'logout'));
   }
 
+  // Delete current account
+  Future<Map<String, dynamic>> deleteAccount(String userId) async {
+    final response = await _sendRequest(
+      http.delete(
+        Uri.parse('$baseUrl${ApiConfig.users}/$userId'),
+        headers: await _buildAuthHeaders(),
+      ),
+      'delete account',
+    );
+
+    return Map<String, dynamic>.from(
+      _decodeResponse(response, 'delete account'),
+    );
+  }
+
   // Verify OTP and Reset Password
   Future<Map<String, dynamic>> verifyOtpAndResetPassword({
     required String email,

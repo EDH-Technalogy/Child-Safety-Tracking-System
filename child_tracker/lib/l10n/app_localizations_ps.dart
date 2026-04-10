@@ -185,6 +185,10 @@ class AppLocalizationsPs extends AppLocalizations {
   String get termsOfService => 'د خدمت شرایط';
 
   @override
+  String get termsOfServiceBody =>
+      'د دې اپلېکېشن په کارولو سره، تاسو موافقه کوئ چې دا به یوازې د ماشومانو د خوندیتوب د قانوني څارنې لپاره کاروئ، د خپل حساب اسناد به خوندي ساتئ، او د ماشومانو او کورنۍ د غړو محرمیت ته به درناوی کوئ. بې اجازې تعقیب، د خبرداریو ناسم استعمال، یا د شخصي موقعیت معلوماتو شریکول منع دي.';
+
+  @override
   String get privacyPolicy => 'د حریم الخصوصیه پالیسي';
 
   @override

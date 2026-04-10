@@ -448,6 +448,12 @@ abstract class AppLocalizations {
   /// **'Terms of Service'**
   String get termsOfService;
 
+  /// No description provided for @termsOfServiceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'By using this application, you agree to use it only for lawful child-safety monitoring, protect your account credentials, and respect the privacy of children and family members. Unauthorized tracking, misuse of alerts, or sharing private location data without permission is prohibited.'**
+  String get termsOfServiceBody;
+
   /// No description provided for @privacyPolicy.
   ///
   /// In en, this message translates to:

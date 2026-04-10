@@ -21,7 +21,7 @@ router.put("/:id", requireAuthenticatedAccess, user.updateProfile);
 // User management routes
 router.patch("/block/:id", requireAdminAccess, user.blockUser);
 router.patch("/unblock/:id", requireAdminAccess, user.unblockUser);
-router.delete("/:id", requireAdminAccess, user.deleteUser);
+router.delete("/:id", requireAuthenticatedAccess, user.deleteUser);
 router.post("/test-user", requireAdminAccess, user.createTestUser);  // TEMP: Create test user
 
 module.exports = router;

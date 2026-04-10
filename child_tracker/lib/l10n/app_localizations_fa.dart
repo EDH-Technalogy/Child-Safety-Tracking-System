@@ -184,6 +184,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get termsOfService => 'شرایط خدمات';
 
   @override
+  String get termsOfServiceBody =>
+      'با استفاده از این برنامه، شما می‌پذیرید که فقط برای نظارت قانونی بر ایمنی کودکان از آن استفاده کنید، معلومات حساب خود را محفوظ نگه دارید، و به حریم خصوصی کودکان و اعضای خانواده احترام بگذارید. ردیابی بدون اجازه، استفاده نادرست از هشدارها، یا شریک‌سازی اطلاعات خصوصی موقعیت بدون اجازه ممنوع است.';
+
+  @override
   String get privacyPolicy => 'سیاست حریم خصوصی';
 
   @override

@@ -11,6 +11,7 @@ import 'providers/locale_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/notification_provider.dart';
 import 'l10n/app_localizations.dart';
+import 'l10n/cupertino_fallback_localizations.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -78,7 +79,7 @@ class MyApp extends StatelessWidget {
               AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
+              FallbackCupertinoLocalizationsDelegate(),
             ],
             builder: (context, child) {
               return Directionality(

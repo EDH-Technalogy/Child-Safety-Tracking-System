@@ -314,10 +314,19 @@ exports.logout = async (req, res) => {
 // DELETE USER
 exports.deleteUser = async (req, res) => {
   try {
-    await firestore.collection("users").doc(req.params.id).delete();
+    ensureCanManageUserRecord(req, req.params.id);
+
+    const userRef = firestore.collection("users").doc(req.params.id);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      throw createHttpError(404, "User not found");
+    }
+
+    await userRef.delete();
     res.json({ message: "User deleted successfully" });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(e.status || 500).json({ error: e.message });
   }
 };
 

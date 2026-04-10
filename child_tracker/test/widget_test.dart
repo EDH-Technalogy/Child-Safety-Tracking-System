@@ -24,11 +24,12 @@ void main() {
     });
 
     await tester.pumpWidget(const MyApp());
-    expect(find.text(l10n.appTitle), findsOneWidget);
+    await tester.pump();
 
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
 
+    expect(find.text(l10n.appTitle), findsOneWidget);
     expect(find.text(l10n.signIn), findsOneWidget);
     expect(find.text(l10n.password), findsOneWidget);
   }

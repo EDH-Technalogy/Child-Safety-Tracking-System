@@ -6,8 +6,11 @@ import '../providers/locale_provider.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 import '../utils/photo_provider.dart';
+import 'location_settings_page.dart';
+import 'notification_settings_page.dart';
 import 'privacy_security_page.dart';
 import 'help_support_page.dart';
+import 'static_content_page.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/image_service.dart';
 import 'dart:io';
@@ -271,7 +274,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => const PrivacySecurityPage()));
+                          builder: (_) => const NotificationSettingsPage()));
                 }),
               ]),
               const SizedBox(height: 16),
@@ -283,7 +286,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => const PrivacySecurityPage()));
+                          builder: (_) => const LocationSettingsPage()));
                 }),
                 _buildTile(context, Icons.security, l10n.privacySecurity, () {
                   Navigator.push(
@@ -299,6 +302,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }),
                 _buildTile(context, Icons.info_outline, l10n.about, () {
                   Navigator.pushNamed(context, '/about');
+                }),
+                _buildTile(context, Icons.description, l10n.termsOfService, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StaticContentPage(
+                        title: l10n.termsOfService,
+                        body: l10n.termsOfServiceBody,
+                      ),
+                    ),
+                  );
+                }),
+                _buildTile(context, Icons.privacy_tip, l10n.privacyPolicy, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StaticContentPage(
+                        title: l10n.privacyPolicy,
+                        body: l10n.privacyPolicyBody,
+                      ),
+                    ),
+                  );
                 }),
               ]),
               const SizedBox(height: 16),
@@ -427,18 +452,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showChangePasswordDialog(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.changePassword),
-        content: Text(l10n.forgotPassword),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context), child: Text(l10n.cancel))
-        ],
-      ),
-    );
+    Navigator.pushNamed(context, '/forgot-password');
   }
 
   Future<void> _showLanguageDialog(BuildContext context) async {

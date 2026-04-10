@@ -16,6 +16,28 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   final _emailController = TextEditingController();
   bool _isSubmitting = false;
 
+  Future<void> _launchSupportUri(Uri uri) async {
+    final l10n = AppLocalizations.of(context)!;
+    bool launched = false;
+    try {
+      launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      launched = false;
+    }
+
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${l10n.error}: ${uri.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   List<Map<String, String>> _faqs(AppLocalizations l10n) => [
         {
           'question': l10n.faqTrackChildQuestion,
@@ -62,19 +84,46 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
     }
 
     setState(() => _isSubmitting = true);
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    final mailUri = Uri(
+      scheme: 'mailto',
+      path: AppConstants.aboutSupportEmail,
+      queryParameters: {
+        'subject': '${AppConstants.appName} - ${l10n.reportIssue}',
+        'body': 'Email: ${_emailController.text.trim()}\n\n'
+            '${_reportController.text.trim()}',
+      },
+    );
+    bool launched = false;
+    try {
+      launched = await launchUrl(
+        mailUri,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      launched = false;
+    }
 
     if (!mounted) return;
 
     setState(() => _isSubmitting = false);
+
+    if (launched) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(l10n.reportSubmittedSuccessfully),
+            backgroundColor: Colors.green),
+      );
+      _reportController.clear();
+      _emailController.clear();
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text(l10n.reportSubmittedSuccessfully),
-          backgroundColor: Colors.green),
+        content: Text('${l10n.error}: ${AppConstants.aboutSupportEmail}'),
+        backgroundColor: Colors.red,
+      ),
     );
-    _reportController.clear();
-    _emailController.clear();
   }
 
   @override
@@ -105,8 +154,12 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () =>
-                                launchUrl(Uri.parse('tel://emergency')),
+                            onPressed: () => _launchSupportUri(
+                              Uri(
+                                scheme: 'tel',
+                                path: AppConstants.aboutSupportPhone,
+                              ),
+                            ),
                             icon: const Icon(Icons.phone),
                             label: Text(l10n.callSupport),
                           ),
@@ -114,8 +167,12 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () => launchUrl(
-                                Uri.parse('mailto:support@childtracker.com')),
+                            onPressed: () => _launchSupportUri(
+                              Uri(
+                                scheme: 'mailto',
+                                path: AppConstants.aboutSupportEmail,
+                              ),
+                            ),
                             icon: const Icon(Icons.email),
                             label: Text(l10n.email),
                           ),

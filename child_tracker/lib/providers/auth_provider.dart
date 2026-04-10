@@ -440,6 +440,31 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> deleteCurrentAccount() async {
+    if (_user == null) return false;
+
+    _setLoading(true);
+    _error = null;
+
+    try {
+      await _apiService.deleteAccount(_user!.id);
+      await _clearPersistedSession();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _formatError(e);
+
+      if (_shouldInvalidatePersistedSession(_error!)) {
+        await _clearPersistedSession();
+        notifyListeners();
+      }
+
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<void> getProfile() async {
     if (_user == null) return;
 

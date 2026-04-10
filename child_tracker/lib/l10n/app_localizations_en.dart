@@ -183,6 +183,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get termsOfService => 'Terms of Service';
 
   @override
+  String get termsOfServiceBody =>
+      'By using this application, you agree to use it only for lawful child-safety monitoring, protect your account credentials, and respect the privacy of children and family members. Unauthorized tracking, misuse of alerts, or sharing private location data without permission is prohibited.';
+
+  @override
   String get privacyPolicy => 'Privacy Policy';
 
   @override

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
-import '../utils/constants.dart';
-
 import 'package:provider/provider.dart';
-import '../providers/settings_provider.dart';
-import '../providers/notification_provider.dart';
+
+import '../l10n/app_localizations.dart';
+import '../providers/auth_provider.dart';
 import '../providers/location_provider.dart';
+import '../providers/notification_provider.dart';
+import '../providers/settings_provider.dart';
+import '../services/location_service.dart';
+import '../utils/constants.dart';
+import '../utils/localization_helpers.dart';
 
 class PrivacySecurityPage extends StatefulWidget {
   const PrivacySecurityPage({super.key});
@@ -16,8 +19,7 @@ class PrivacySecurityPage extends StatefulWidget {
 
 class _PrivacySecurityPageState extends State<PrivacySecurityPage> {
   bool _autoUpdate = true;
-  final _passwordController = TextEditingController();
-  final _searchController = TextEditingController();
+  final LocationService _locationService = LocationService();
 
   @override
   void initState() {
@@ -25,6 +27,44 @@ class _PrivacySecurityPageState extends State<PrivacySecurityPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SettingsProvider>().loadSettings();
     });
+  }
+
+  Future<void> _toggleLocationTracking(bool value) async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final location = context.read<LocationProvider>();
+    final authProvider = context.read<AuthProvider>();
+
+    if (value) {
+      final hasPermission = await _locationService.requestLocationPermission();
+      if (!hasPermission) {
+        await settings.setLocationTrackingEnabled(false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.locationPermissionRequired),
+            backgroundColor: AppColors.errorColor,
+          ),
+        );
+        return;
+      }
+
+      await settings.setLocationTrackingEnabled(true);
+      await location.startLocalTracking(authProvider.user?.id ?? 'device');
+    } else {
+      await settings.setLocationTrackingEnabled(false);
+      await location.stopLocalTracking();
+    }
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          value ? l10n.locationTrackingEnabled : l10n.locationTrackingDisabled,
+        ),
+      ),
+    );
   }
 
   @override
@@ -89,21 +129,7 @@ class _PrivacySecurityPageState extends State<PrivacySecurityPage> {
               builder: (context, settings, location, child) => Card(
                 child: SwitchListTile.adaptive(
                   value: settings.locationTrackingEnabled,
-                  onChanged: (value) async {
-                    await settings.setLocationTrackingEnabled(value);
-                    if (value) {
-                      await location.startLocalTracking('device');
-                    } else {
-                      await location.stopLocalTracking();
-                    }
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text(value
-                              ? l10n.locationTrackingEnabled
-                              : l10n.locationTrackingDisabled)),
-                    );
-                  },
+                  onChanged: _toggleLocationTracking,
                   title: Text(l10n.locationSharing),
                   subtitle: Text(l10n.shareLiveLocationWithEmergencyContacts),
                   secondary: const Icon(Icons.location_on),
@@ -136,7 +162,7 @@ class _PrivacySecurityPageState extends State<PrivacySecurityPage> {
                 title: Text(l10n.changePassword),
                 subtitle: Text(l10n.updateYourAccountPassword),
                 trailing: const Icon(Icons.arrow_forward_ios),
-                onTap: () => _showChangePasswordDialog(l10n),
+                onTap: _openForgotPasswordFlow,
               ),
             ),
             Card(
@@ -179,70 +205,51 @@ class _PrivacySecurityPageState extends State<PrivacySecurityPage> {
     );
   }
 
-  void _showChangePasswordDialog(AppLocalizations l10n) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.changePassword),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: l10n.newPassword,
-                prefixIcon: Icon(Icons.lock),
-              ),
-              maxLength: 20,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            onPressed: _passwordController.text.length < 6
-                ? null
-                : () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n.passwordChangedSuccessfully),
-                      ),
-                    );
-                    _passwordController.clear();
-                  },
-            child: Text(l10n.save),
-          ),
-        ],
-      ),
-    );
+  void _openForgotPasswordFlow() {
+    Navigator.pushNamed(context, '/forgot-password');
   }
 
   void _showDeleteAccountDialog(AppLocalizations l10n) {
+    final authProvider = context.read<AuthProvider>();
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(l10n.deleteAccount),
         content: Text(l10n.deleteAccountConfirm),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              Navigator.pop(context);
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final success = await authProvider.deleteCurrentAccount();
+              if (!mounted) return;
+
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(l10n.accountDeleted),
-                  backgroundColor: Colors.red,
+                  content: Text(
+                    success
+                        ? l10n.accountDeleted
+                        : authProvider.error != null
+                            ? localizeRawMessage(l10n, authProvider.error!)
+                            : l10n.error,
+                  ),
+                  backgroundColor:
+                      success ? AppColors.successColor : AppColors.errorColor,
                 ),
               );
+
+              if (success) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
+              }
             },
             child: Text(l10n.delete),
           ),
@@ -278,8 +285,6 @@ class _PrivacySecurityPageState extends State<PrivacySecurityPage> {
 
   @override
   void dispose() {
-    _passwordController.dispose();
-    _searchController.dispose();
     super.dispose();
   }
 }

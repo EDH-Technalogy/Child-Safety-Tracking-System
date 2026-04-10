@@ -6,6 +6,11 @@ import '../../utils/constants.dart';
 import '../../utils/localization_helpers.dart';
 import '../../utils/photo_provider.dart';
 import '../../widgets/admin_drawer.dart';
+import '../help_support_page.dart';
+import '../location_settings_page.dart';
+import '../notification_settings_page.dart';
+import '../privacy_security_page.dart';
+import '../static_content_page.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({super.key});
@@ -128,21 +133,36 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                     icon: Icons.location_on,
                     title: l10n.locationSettings,
                     onTap: () {
-                      // Navigate to location settings
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const LocationSettingsPage(),
+                        ),
+                      );
                     },
                   ),
                   _SettingsTile(
                     icon: Icons.security,
                     title: l10n.privacySecurity,
                     onTap: () {
-                      // Navigate to privacy settings
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PrivacySecurityPage(),
+                        ),
+                      );
                     },
                   ),
                   _SettingsTile(
                     icon: Icons.help,
                     title: l10n.helpSupport,
                     onTap: () {
-                      // Navigate to help
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const HelpSupportPage(),
+                        ),
+                      );
                     },
                   ),
                 ],
@@ -158,7 +178,12 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                     title: l10n.systemConfiguration,
                     subtitle: l10n.configureDefaultSettings,
                     onTap: () {
-                      // Navigate to system config
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PrivacySecurityPage(),
+                        ),
+                      );
                     },
                   ),
                   _SettingsTile(
@@ -166,7 +191,12 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                     title: l10n.notificationSettings,
                     subtitle: l10n.configureAlertsAndNotifications,
                     onTap: () {
-                      // Navigate to notification settings
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationSettingsPage(),
+                        ),
+                      );
                     },
                   ),
                 ],
@@ -189,14 +219,30 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                     icon: Icons.description,
                     title: l10n.termsOfService,
                     onTap: () {
-                      // Show terms
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StaticContentPage(
+                            title: l10n.termsOfService,
+                            body: l10n.termsOfServiceBody,
+                          ),
+                        ),
+                      );
                     },
                   ),
                   _SettingsTile(
                     icon: Icons.privacy_tip,
                     title: l10n.privacyPolicy,
                     onTap: () {
-                      // Show privacy policy
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StaticContentPage(
+                            title: l10n.privacyPolicy,
+                            body: l10n.privacyPolicyBody,
+                          ),
+                        ),
+                      );
                     },
                   ),
                 ],
