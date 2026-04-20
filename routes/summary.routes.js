@@ -1,5 +1,8 @@
 const router = require("express").Router();
 const summary = require("../controllers/summary.controller");
+const { requireAuthenticatedAccess } = require("../middleware/auth");
+
+router.use(requireAuthenticatedAccess);
 
 // Get Today's Summary
 router.get("/today/:child_id", summary.today);

@@ -7,14 +7,16 @@ import '../services/location_service.dart';
 
 class LocationProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  static const Duration _livePollingInterval = Duration(seconds: 2);
 
   LocationModel? _liveLocation;
   List<LocationModel> _locationHistory = [];
   RouteDataModel? _routeData;
   bool _isLoading = false;
   String? _error;
-  Timer? _refreshTimer;
+  Timer? _livePollingTimer;
   bool _isTracking = false;
+  String? _trackingChildId;
 
   final LocationService _locationService = LocationService();
   bool _localTracking = false;
@@ -27,32 +29,14 @@ class LocationProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isTracking => _isTracking;
+  String? get trackingChildId => _trackingChildId;
 
   Future<bool> getLiveLocation(String childId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
-    try {
-      final response = await _apiService.getLiveLocation(childId);
-      _liveLocation = LocationModel(
-        id: '',
-        childId: childId,
-        latitude: (response['latitude'] ?? 0).toDouble(),
-        longitude: (response['longitude'] ?? 0).toDouble(),
-        speed: (response['speed'] ?? 0).toDouble(),
-        battery: response['battery'] ?? 0,
-        recordedAt: response['recorded_at'] ?? 0,
-      );
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _isLoading = false;
-      _error = e.toString();
-      notifyListeners();
-      return false;
-    }
+    return _loadLiveLocationFromApi(childId);
   }
 
   Future<bool> getLocationHistory(String childId) async {
@@ -116,20 +100,92 @@ class LocationProvider with ChangeNotifier {
   }
 
   void startLiveTracking(String childId, {int intervalSeconds = 30}) {
-    if (_isTracking) return;
+    if (_isTracking && _trackingChildId == childId) {
+      return;
+    }
 
+    stopLiveTracking();
+    _trackingChildId = childId;
     _isTracking = true;
-    _refreshTimer = Timer.periodic(
-      Duration(seconds: intervalSeconds),
-      (_) => getLiveLocation(childId),
-    );
+    _isLoading = true;
+    _error = null;
     notifyListeners();
+
+    unawaited(_startApiPolling(childId));
+  }
+
+  Future<void> _startApiPolling(String childId) async {
+    await _loadLiveLocationFromApi(childId);
+    if (_trackingChildId != childId) {
+      return;
+    }
+
+    _cancelLivePolling();
+    _livePollingTimer = Timer.periodic(_livePollingInterval, (_) {
+      if (_trackingChildId != childId) {
+        _cancelLivePolling();
+        return;
+      }
+
+      unawaited(_loadLiveLocationFromApi(childId, keepLastKnownLocation: true));
+    });
+  }
+
+  Future<bool> _loadLiveLocationFromApi(
+    String childId, {
+    bool keepLastKnownLocation = false,
+  }) async {
+    try {
+      final response = await _apiService.getLiveLocation(childId);
+      if (response.isEmpty) {
+        if (!keepLastKnownLocation) {
+          _liveLocation = null;
+        }
+        _isLoading = false;
+        _error = 'No live location available right now.';
+        notifyListeners();
+        return false;
+      }
+
+      _liveLocation = LocationModel.fromJson({
+        'id': '',
+        'child_id': childId,
+        ...response,
+      });
+      _isLoading = false;
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (apiError) {
+      if (!keepLastKnownLocation) {
+        _liveLocation = null;
+      }
+      _isLoading = false;
+      _error = _formatError(apiError);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void _cancelLivePolling() {
+    _livePollingTimer?.cancel();
+    _livePollingTimer = null;
+  }
+
+  String _formatError(Object? error) {
+    final message =
+        error?.toString().replaceFirst('Exception: ', '').trim() ?? '';
+    if (message.isNotEmpty) {
+      return message;
+    }
+
+    return 'Live tracking is temporarily unavailable.';
   }
 
   void stopLiveTracking() {
     _isTracking = false;
-    _refreshTimer?.cancel();
-    _refreshTimer = null;
+    _trackingChildId = null;
+    _cancelLivePolling();
     notifyListeners();
   }
 
@@ -174,7 +230,7 @@ class LocationProvider with ChangeNotifier {
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _cancelLivePolling();
     stopLiveTracking();
     stopLocalTracking();
     _locationService.dispose();

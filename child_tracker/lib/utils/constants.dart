@@ -70,9 +70,12 @@ class AppConstants {
   static const String aboutWebsite = 'www.childtracker.com';
   static const String aboutCopyrightText = '© 2026 All Rights Reserved.';
 
-  // Google Maps API Key - Replace with your actual API key
-  // Get your API key from Google Cloud Console
-  static const String googleMapsApiKey = 'YOUR_GOOGLE_MAPS_API_KEY';
+  static const String googleMapsApiKey =
+      'AIzaSyDwcvvpzgOthoJ_RkIn_m8-ESRRQSMV0dw';
+  static const String firebaseDatabaseUrl = String.fromEnvironment(
+    'FIREBASE_DATABASE_URL',
+    defaultValue: 'https://child-safety-tracking-default-rtdb.firebaseio.com',
+  );
 
   // Storage keys
   static const String userIdKey = 'user_id';

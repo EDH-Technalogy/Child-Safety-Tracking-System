@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
@@ -93,8 +93,20 @@ class AppDrawer extends StatelessWidget {
             leading: const Icon(Icons.map),
             title: Text(l10n.map),
             onTap: () {
+              final childProvider =
+                  Provider.of<ChildProvider>(context, listen: false);
+              final childId =
+                  (childProvider.selectedChild?.id.trim() ?? '').isNotEmpty
+                      ? childProvider.selectedChild!.id.trim()
+                      : childProvider.children.isNotEmpty
+                          ? childProvider.children.first.id.trim()
+                          : null;
               Navigator.pop(context);
-              Navigator.pushReplacementNamed(context, '/map');
+              Navigator.pushReplacementNamed(
+                context,
+                '/map',
+                arguments: childId,
+              );
             },
           ),
           ListTile(
@@ -307,4 +319,3 @@ class AppDrawer extends StatelessWidget {
     );
   }
 }
-

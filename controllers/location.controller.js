@@ -9,6 +9,7 @@ const {
   buildLocationText,
   createAlertRecord,
 } = require("../utils/alert-service");
+const { getResolvedLiveTrackingSnapshot } = require("../utils/live-tracking");
 
 const SOS_ALERT_COOLDOWN_MS = 60000;
 
@@ -335,12 +336,51 @@ exports.getLiveLocation = async (req, res, next) => {
   try {
     const childId = req.params.child_id?.toString().trim();
     await getChildWithAccessOrThrow(req, childId);
+    res.set("Cache-Control", "no-store");
 
-    const snapshot = await realtimeDB
-      .ref(`live_tracking/${childId}/location`)
-      .once("value");
+    const liveTracking = await getResolvedLiveTrackingSnapshot(childId);
 
-    res.json(snapshot.val() || {});
+    if (!liveTracking?.location) {
+      const failurePayload = {
+        success: false,
+        message: "No live location found for the linked tracking device.",
+      };
+
+      console.info("[location.getLiveLocation]", {
+        childId,
+        trackingKey: liveTracking?.trackingKey || null,
+        rtdbPath: liveTracking?.rtdbPath || null,
+        finalResponse: failurePayload,
+      });
+
+      return res.status(404).json(failurePayload);
+    }
+
+    const successPayload = {
+      success: true,
+      data: {
+        latitude: liveTracking.location.latitude,
+        longitude: liveTracking.location.longitude,
+        speed: liveTracking.location.speed,
+        battery: liveTracking.location.battery,
+        recorded_at: liveTracking.location.recorded_at,
+        latest_timestamp: liveTracking.latestTimestamp,
+        source_key: liveTracking.trackingKey,
+        rtdb_path: liveTracking.rtdbPath,
+        status: liveTracking.latestStatus,
+        signal: liveTracking.latestSignal,
+      },
+    };
+
+    console.info("[location.getLiveLocation]", {
+      childId,
+      trackingKey: liveTracking.trackingKey,
+      rtdbPath: liveTracking.rtdbPath,
+      rawLocationPayload: liveTracking.raw?.location || null,
+      finalResponse: successPayload,
+    });
+
+    return res.json(successPayload);
   } catch (error) {
     next(error);
   }

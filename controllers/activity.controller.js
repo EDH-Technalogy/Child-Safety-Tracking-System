@@ -1,4 +1,5 @@
 const { firestore } = require("../firebase");
+const { getChildWithAccessOrThrow } = require("../utils/child-access");
 
 exports.addLog = async (req,res)=>{
   await firestore.collection("activity_logs").add({
@@ -15,6 +16,8 @@ exports.addLog = async (req,res)=>{
 exports.getLogs = async (req, res) => {
   try {
     const { child_id } = req.params;
+    await getChildWithAccessOrThrow(req, child_id);
+
     const snapshot = await firestore
       .collection("activity_logs")
       .where("child_id", "==", child_id)

@@ -181,12 +181,42 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       return LatLng(location.latitude, location.longitude);
     }
 
-    if (_parentLocation != null) {
-      return LatLng(_parentLocation!.latitude, _parentLocation!.longitude);
-    }
+    return const LatLng(0, 0);
+  }
 
-    return const LatLng(
-        AppConstants.defaultLatitude, AppConstants.defaultLongitude);
+  Widget _buildUnavailableMapState() {
+    return Container(
+      color: Colors.grey[100],
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(
+            Icons.location_off,
+            size: 44,
+            color: AppColors.textSecondary,
+          ),
+          SizedBox(height: 12),
+          Text(
+            'No live location available for this child',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'The map will appear when the linked device sends valid GPS data.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -207,6 +237,15 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         Provider.of<GeofenceProvider>(context, listen: false);
     final location = locationProvider.liveLocation;
 
+    if (location == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No live location available for this child'),
+        ),
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -216,9 +255,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   .selectedChild
                   ?.name ??
               'Child',
-          initialPosition: location != null
-              ? LatLng(location.latitude, location.longitude)
-              : _getInitialPosition(),
+          initialPosition: LatLng(location.latitude, location.longitude),
           markers: _markers,
           circles: _circles,
           isTracking: locationProvider.isTracking,
@@ -402,6 +439,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
           final childModel = childProvider.selectedChild;
           final location = locationProvider.liveLocation;
+          final canRenderLiveMap = location != null;
 
           if (childModel == null) {
             return const Center(child: Text('Child not found'));
@@ -429,19 +467,22 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                     clipBehavior: Clip.antiAlias,
                     child: Stack(
                       children: [
-                        GoogleMap(
-                          onMapCreated: _onMapCreated,
-                          initialCameraPosition: CameraPosition(
-                            target: _getInitialPosition(),
-                            zoom: AppConstants.defaultZoom,
-                          ),
-                          markers: _markers,
-                          circles: _circles,
-                          myLocationEnabled: false,
-                          myLocationButtonEnabled: false,
-                          zoomControlsEnabled: false,
-                          mapToolbarEnabled: false,
-                        ),
+                        if (canRenderLiveMap)
+                          GoogleMap(
+                            onMapCreated: _onMapCreated,
+                            initialCameraPosition: CameraPosition(
+                              target: _getInitialPosition(),
+                              zoom: AppConstants.defaultZoom,
+                            ),
+                            markers: _markers,
+                            circles: _circles,
+                            myLocationEnabled: false,
+                            myLocationButtonEnabled: false,
+                            zoomControlsEnabled: false,
+                            mapToolbarEnabled: false,
+                          )
+                        else
+                          _buildUnavailableMapState(),
                         // Fullscreen toggle button
                         Positioned(
                           top: 8,

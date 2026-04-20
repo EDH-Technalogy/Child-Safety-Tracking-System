@@ -17,15 +17,35 @@ class LocationModel {
     required this.recordedAt,
   });
 
+  static double _parseDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static int _parseInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.round();
+    }
+
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
   factory LocationModel.fromJson(Map<String, dynamic> json) {
     return LocationModel(
-      id: json['id'] ?? '',
-      childId: json['child_id'] ?? '',
-      latitude: (json['latitude'] ?? 0).toDouble(),
-      longitude: (json['longitude'] ?? 0).toDouble(),
-      speed: (json['speed'] ?? 0).toDouble(),
-      battery: json['battery'] ?? 0,
-      recordedAt: json['recorded_at'] ?? 0,
+      id: (json['id'] ?? '').toString(),
+      childId: (json['child_id'] ?? '').toString(),
+      latitude: _parseDouble(json['latitude']),
+      longitude: _parseDouble(json['longitude']),
+      speed: _parseDouble(json['speed']),
+      battery: _parseInt(json['battery']),
+      recordedAt: _parseInt(json['recorded_at']),
     );
   }
 

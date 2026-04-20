@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../l10n/app_localizations.dart';
+import '../models/location_model.dart';
 import '../providers/child_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/alert_provider.dart';
@@ -25,12 +26,44 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   bool _isLoadingParentLocation = false;
   Set<Marker> _markers = {};
   Set<Circle> _circles = {};
+  LocationProvider? _locationProvider;
+  GeofenceProvider? _geofenceProvider;
+  LatLng? _lastFocusedTarget;
 
   @override
   void initState() {
     super.initState();
     _loadData();
     _getParentLocation();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextLocationProvider =
+        Provider.of<LocationProvider>(context, listen: false);
+    if (!identical(_locationProvider, nextLocationProvider)) {
+      _locationProvider?.removeListener(_handleMapDataChanged);
+      _locationProvider = nextLocationProvider;
+      _locationProvider?.addListener(_handleMapDataChanged);
+    }
+
+    final nextGeofenceProvider =
+        Provider.of<GeofenceProvider>(context, listen: false);
+    if (!identical(_geofenceProvider, nextGeofenceProvider)) {
+      _geofenceProvider?.removeListener(_handleMapDataChanged);
+      _geofenceProvider = nextGeofenceProvider;
+      _geofenceProvider?.addListener(_handleMapDataChanged);
+    }
+  }
+
+  void _handleMapDataChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    _updateMarkers();
+    _maybeFocusLiveLocation(_locationProvider?.liveLocation);
   }
 
   Future<void> _getParentLocation() async {
@@ -96,22 +129,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       );
     }
 
-    if (_parentLocation != null) {
-      markers.add(
-        Marker(
-          markerId: const MarkerId('parent'),
-          position:
-              LatLng(_parentLocation!.latitude, _parentLocation!.longitude),
-          infoWindow: InfoWindow(
-            title: l10n.myLocation,
-            snippet: l10n.parentUser,
-          ),
-          icon:
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        ),
-      );
-    }
-
     for (final zone in geofenceProvider.safeZones) {
       circles.add(
         Circle(
@@ -150,6 +167,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   @override
   void dispose() {
+    _locationProvider?.removeListener(_handleMapDataChanged);
+    _geofenceProvider?.removeListener(_handleMapDataChanged);
     final locationProvider =
         Provider.of<LocationProvider>(context, listen: false);
     locationProvider.stopLiveTracking();
@@ -166,12 +185,63 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       return LatLng(location.latitude, location.longitude);
     }
 
-    if (_parentLocation != null) {
-      return LatLng(_parentLocation!.latitude, _parentLocation!.longitude);
+    return const LatLng(0, 0);
+  }
+
+  void _maybeFocusLiveLocation(LocationModel? location) {
+    if (_mapController == null || location == null) {
+      return;
     }
 
-    return const LatLng(
-        AppConstants.defaultLatitude, AppConstants.defaultLongitude);
+    final nextTarget = LatLng(location.latitude, location.longitude);
+    if (_lastFocusedTarget?.latitude == nextTarget.latitude &&
+        _lastFocusedTarget?.longitude == nextTarget.longitude) {
+      return;
+    }
+
+    _lastFocusedTarget = nextTarget;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _mapController == null) {
+        return;
+      }
+
+      _mapController!.animateCamera(CameraUpdate.newLatLng(nextTarget));
+    });
+  }
+
+  Widget _buildUnavailableMapState() {
+    return Container(
+      color: Colors.grey[100],
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.location_off,
+            size: 44,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No live location available for this child',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'The map will appear when the linked device sends valid GPS data.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -342,6 +412,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
           final childModel = childProvider.selectedChild;
           final location = locationProvider.liveLocation;
+          final canRenderLiveMap = location != null;
+
+          if (location != null) {
+            _maybeFocusLiveLocation(location);
+          }
 
           if (childModel == null) {
             return Center(child: Text(l10n.noData));
@@ -366,19 +441,22 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                     clipBehavior: Clip.antiAlias,
                     child: Stack(
                       children: [
-                        GoogleMap(
-                          onMapCreated: _onMapCreated,
-                          initialCameraPosition: CameraPosition(
-                            target: _getInitialPosition(),
-                            zoom: AppConstants.defaultZoom,
-                          ),
-                          markers: _markers,
-                          circles: _circles,
-                          myLocationEnabled: false,
-                          myLocationButtonEnabled: false,
-                          zoomControlsEnabled: false,
-                          mapToolbarEnabled: false,
-                        ),
+                        if (canRenderLiveMap)
+                          GoogleMap(
+                            onMapCreated: _onMapCreated,
+                            initialCameraPosition: CameraPosition(
+                              target: _getInitialPosition(),
+                              zoom: AppConstants.defaultZoom,
+                            ),
+                            markers: _markers,
+                            circles: _circles,
+                            myLocationEnabled: false,
+                            myLocationButtonEnabled: false,
+                            zoomControlsEnabled: false,
+                            mapToolbarEnabled: false,
+                          )
+                        else
+                          _buildUnavailableMapState(),
                         if (locationProvider.isTracking)
                           Positioned(
                             top: 8,

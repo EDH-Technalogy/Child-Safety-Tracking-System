@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/constants.dart';
+import '../utils/session_token_store.dart';
 
 class AdminApiService {
   final String baseUrl = ApiConfig.baseUrl;
@@ -13,7 +14,9 @@ class AdminApiService {
 
   Future<Map<String, String>> _buildHeaders() async {
     final prefs = await SharedPreferences.getInstance();
-    final authToken = token ?? prefs.getString(AppConstants.tokenKey);
+    final authToken = token ??
+        prefs.getString(AppConstants.tokenKey) ??
+        SessionTokenStore.currentToken;
 
     return {
       'Content-Type': 'application/json',

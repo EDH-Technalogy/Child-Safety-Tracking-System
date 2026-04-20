@@ -4,14 +4,16 @@ import '../models/geofence_model.dart';
 
 class GeofenceProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  
+
   List<GeofenceModel> _safeZones = [];
   ZoneCheckResult? _zoneCheckResult;
+  GeofenceModel? _lastSavedZone;
   bool _isLoading = false;
   String? _error;
 
   List<GeofenceModel> get safeZones => _safeZones;
   ZoneCheckResult? get zoneCheckResult => _zoneCheckResult;
+  GeofenceModel? get lastSavedZone => _lastSavedZone;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -22,7 +24,8 @@ class GeofenceProvider with ChangeNotifier {
 
     try {
       final response = await _apiService.getSafeZones(childId);
-      _safeZones = response.map((json) => GeofenceModel.fromJson(json)).toList();
+      _safeZones =
+          response.map((json) => GeofenceModel.fromJson(json)).toList();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -65,10 +68,11 @@ class GeofenceProvider with ChangeNotifier {
   }) async {
     _isLoading = true;
     _error = null;
+    _lastSavedZone = null;
     notifyListeners();
 
     try {
-      await _apiService.createSafeZone(
+      final response = await _apiService.createSafeZone(
         childId: childId,
         userId: userId,
         childName: childName,
@@ -77,9 +81,35 @@ class GeofenceProvider with ChangeNotifier {
         longitude: longitude,
         radius: radius,
       );
-      
+
+      final createdZoneId = (response['zone_id'] ?? '').toString().trim();
+      _lastSavedZone = GeofenceModel(
+        id: createdZoneId,
+        childId: childId,
+        childName: childName ?? '',
+        userId: userId,
+        name: name,
+        latitude: latitude,
+        longitude: longitude,
+        radius: radius ?? 100,
+        status: 'active',
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+      );
+
       // Reload safe zones
       await loadSafeZones(childId);
+      if (createdZoneId.isNotEmpty) {
+        GeofenceModel? persistedZone;
+        for (final zone in _safeZones) {
+          if (zone.id == createdZoneId) {
+            persistedZone = zone;
+            break;
+          }
+        }
+        if (persistedZone != null) {
+          _lastSavedZone = persistedZone;
+        }
+      }
       return true;
     } catch (e) {
       _isLoading = false;
@@ -101,6 +131,7 @@ class GeofenceProvider with ChangeNotifier {
   }) async {
     _isLoading = true;
     _error = null;
+    _lastSavedZone = null;
     notifyListeners();
 
     try {
@@ -114,9 +145,35 @@ class GeofenceProvider with ChangeNotifier {
         childId: childId,
         childName: childName,
       );
-      
+
       if (childId != null && childId.isNotEmpty) {
         await loadSafeZones(childId);
+        GeofenceModel? persistedZone;
+        for (final zone in _safeZones) {
+          if (zone.id == zoneId) {
+            persistedZone = zone;
+            break;
+          }
+        }
+        if (persistedZone != null) {
+          _lastSavedZone = persistedZone;
+        } else if (name != null &&
+            latitude != null &&
+            longitude != null &&
+            childId.isNotEmpty) {
+          _lastSavedZone = GeofenceModel(
+            id: zoneId,
+            childId: childId,
+            childName: childName ?? '',
+            userId: '',
+            name: name,
+            latitude: latitude,
+            longitude: longitude,
+            radius: radius ?? 100,
+            status: status ?? 'active',
+            createdAt: DateTime.now().millisecondsSinceEpoch,
+          );
+        }
       } else {
         await loadAccessibleSafeZones();
       }
@@ -136,7 +193,7 @@ class GeofenceProvider with ChangeNotifier {
 
     try {
       await _apiService.deleteSafeZone(zoneId);
-      
+
       if (childId != null && childId.isNotEmpty) {
         await loadSafeZones(childId);
       } else {
@@ -175,6 +232,7 @@ class GeofenceProvider with ChangeNotifier {
   void clearSafeZones() {
     _safeZones = [];
     _zoneCheckResult = null;
+    _lastSavedZone = null;
     notifyListeners();
   }
 

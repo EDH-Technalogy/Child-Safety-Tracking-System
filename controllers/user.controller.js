@@ -32,8 +32,54 @@ function buildUserResponse(userId, userData = {}) {
     photo: userData.photo || "",
     role: normalizeStoredRole(userData.role),
     status: userData.status || "active",
-    created_at: userData.created_at || Date.now(),
+    created_at: normalizeTimestampValue(userData.created_at, Date.now()),
   };
+}
+
+function buildAdminLoginResponse(adminId, adminData = {}) {
+  return {
+    id: adminId,
+    name: adminData.name || "",
+    phone: adminData.phone || "",
+    email: adminData.email || "",
+    photo: adminData.photo || "",
+    role: "admin",
+    status: adminData.status || "active",
+    created_at: normalizeTimestampValue(adminData.created_at, Date.now()),
+  };
+}
+
+function normalizeTimestampValue(value, fallback = 0) {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  if (typeof value?.toMillis === "function") {
+    return value.toMillis();
+  }
+
+  if (typeof value?._seconds === "number") {
+    const nanoseconds =
+      typeof value._nanoseconds === "number" ? value._nanoseconds : 0;
+    return value._seconds * 1000 + Math.floor(nanoseconds / 1000000);
+  }
+
+  if (typeof value?.seconds === "number") {
+    const nanoseconds =
+      typeof value.nanoseconds === "number" ? value.nanoseconds : 0;
+    return value.seconds * 1000 + Math.floor(nanoseconds / 1000000);
+  }
+
+  return fallback;
 }
 
 function ensureCanManageUserRecord(req, targetUserId) {
@@ -201,60 +247,115 @@ exports.login = async (req, res) => {
         .get();
     }
 
-    if (snap.empty) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    if (!snap.empty) {
+      const userData = snap.docs[0].data();
+      const role = normalizeStoredRole(userData.role);
 
-    const userData = snap.docs[0].data();
-    const role = normalizeStoredRole(userData.role);
-    
-    // Check if user is blocked
-    if (userData.status === "blocked") {
-      return res.status(403).json({ error: "Account is blocked" });
-    }
+      if (userData.status === "blocked") {
+        return res.status(403).json({ error: "Account is blocked" });
+      }
 
-    const userResponse = buildUserResponse(snap.docs[0].id, userData);
-    const token = createAuthToken({
+      const userResponse = buildUserResponse(snap.docs[0].id, userData);
+      const token = createAuthToken({
         subjectId: snap.docs[0].id,
         role,
         subjectType: "user",
         email: userData.email,
       });
 
+      res.json({
+        success: true,
+        message: "Login successful",
+        user: userResponse,
+        token,
+      });
+
+      if (role === "admin") {
+        await logUserAudit({
+          eventType: "admin_login",
+          entityType: "auth",
+          entityId: snap.docs[0].id,
+          title: "Admin login successful",
+          description: `${userData.name || userData.email} signed in as admin.`,
+          performedBy: {
+            id: snap.docs[0].id,
+            name: userData.name || null,
+            email: userData.email || null,
+            role,
+            type: "user",
+          },
+          target: {
+            id: snap.docs[0].id,
+            name: userData.name || null,
+            email: userData.email || null,
+          },
+          status: "success",
+          result: "success",
+          source: inferSource(req, "mobile_app"),
+          metadata: {
+            authProvider: "users_collection",
+          },
+        });
+      }
+
+      return;
+    }
+
+    const adminSnap = await firestore
+      .collection("admins")
+      .where("email", "==", email)
+      .where("password", "==", password)
+      .get();
+
+    if (adminSnap.empty) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const adminData = adminSnap.docs[0].data();
+    if (adminData.status !== "active") {
+      return res.status(403).json({ error: "Admin account is not active" });
+    }
+
+    const adminResponse = buildAdminLoginResponse(adminSnap.docs[0].id, adminData);
+    const adminToken = createAuthToken({
+      subjectId: adminSnap.docs[0].id,
+      role: "admin",
+      subjectType: "admin",
+      email: adminData.email,
+    });
+
     res.json({
       success: true,
       message: "Login successful",
-      user: userResponse,
-      token,
+      user: adminResponse,
+      token: adminToken,
     });
 
-    if (role === "admin") {
-      await logUserAudit({
-        eventType: "admin_login",
-        entityType: "auth",
-        entityId: snap.docs[0].id,
-        title: "Admin login successful",
-        description: `${userData.name || userData.email} signed in as admin.`,
-        performedBy: {
-          id: snap.docs[0].id,
-          name: userData.name || null,
-          email: userData.email || null,
-          role,
-          type: "user",
-        },
-        target: {
-          id: snap.docs[0].id,
-          name: userData.name || null,
-          email: userData.email || null,
-        },
-        status: "success",
-        result: "success",
-        source: inferSource(req, "mobile_app"),
-        metadata: {
-          authProvider: "users_collection",
-        },
-      });
-    }
+    await logUserAudit({
+      eventType: "admin_login",
+      entityType: "auth",
+      entityId: adminSnap.docs[0].id,
+      title: "Admin login successful",
+      description: `${adminData.name || adminData.email} signed in as admin.`,
+      performedBy: {
+        id: adminSnap.docs[0].id,
+        name: adminData.name || null,
+        email: adminData.email || null,
+        role: "admin",
+        type: "admin",
+      },
+      target: {
+        id: adminSnap.docs[0].id,
+        name: adminData.name || null,
+        email: adminData.email || null,
+      },
+      status: "success",
+      result: "success",
+      source: inferSource(req, "mobile_app"),
+      metadata: {
+        authProvider: "admins_collection_via_user_login",
+      },
+    });
   } catch (e) {
     console.error('LOGIN ERROR:', e);
     res.status(500).json({ error: e.message });

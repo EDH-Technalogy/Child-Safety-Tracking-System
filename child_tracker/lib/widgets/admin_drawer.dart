@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
+import '../providers/child_provider.dart';
 import '../providers/locale_provider.dart';
 import '../screens/admin/admin_devices_screen.dart';
 import '../screens/admin/admin_children_screen.dart';
@@ -217,11 +218,19 @@ class AdminDrawer extends StatelessWidget {
             icon: Icons.map,
             title: l10n.map,
             onTap: () {
+              final childProvider =
+                  Provider.of<ChildProvider>(context, listen: false);
+              final childId =
+                  (childProvider.selectedChild?.id.trim() ?? '').isNotEmpty
+                      ? childProvider.selectedChild!.id.trim()
+                      : childProvider.children.isNotEmpty
+                          ? childProvider.children.first.id.trim()
+                          : null;
               Navigator.pop(context);
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const AdminMapScreen(),
+                  builder: (_) => AdminMapScreen(childId: childId),
                 ),
               );
             },

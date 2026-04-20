@@ -1,12 +1,18 @@
 const { firestore, realtimeDB } = require("../firebase");
 const { syncRealtimeState } = require("../utils/realtime-sync");
 const {
+  getChildOrThrow,
+  getChildWithAccessOrThrow,
+  isAdminRequest,
+} = require("../utils/child-access");
+const {
   safeWriteAuditLog,
   buildPerformedByFromRequest,
   inferSource,
   extractChangedFields,
   createSystemActor,
 } = require("../utils/audit-log");
+const { getResolvedLiveTrackingSnapshot } = require("../utils/live-tracking");
 
 function createHttpError(status, message) {
   const error = new Error(message);
@@ -37,19 +43,104 @@ async function logDeviceEvent(req, entry, fallbackActor = null) {
   });
 }
 
+async function getDeviceOrThrow(deviceId) {
+  const deviceRef = firestore.collection("devices").doc(deviceId);
+  const deviceDoc = await deviceRef.get();
+
+  if (!deviceDoc.exists) {
+    throw createHttpError(404, "Device not found");
+  }
+
+  return { deviceRef, deviceDoc };
+}
+
+async function getLiveTrackingSnapshot(childId) {
+  try {
+    return await getResolvedLiveTrackingSnapshot(childId);
+  } catch (_) {
+    return null;
+  }
+}
+
+async function getDeviceWithAccessOrThrow(req, deviceId) {
+  const { deviceRef, deviceDoc } = await getDeviceOrThrow(deviceId);
+  const deviceData = deviceDoc.data() || {};
+  const childId = deviceData.child_id?.toString().trim() || "";
+
+  if (!childId) {
+    throw createHttpError(400, "Device record is missing child_id");
+  }
+
+  const { childDoc } = await getChildWithAccessOrThrow(req, childId);
+
+  return {
+    deviceRef,
+    deviceDoc,
+    deviceData,
+    childDoc,
+    childData: childDoc.data() || {},
+  };
+}
+
+async function buildDeviceResponse(
+  deviceDoc,
+  { childDoc = null, childData = null, liveSnapshot = null } = {}
+) {
+  const deviceData = deviceDoc.data() || {};
+  const resolvedChildData = childData || {};
+  const resolvedLiveSnapshot =
+    liveSnapshot ||
+    (deviceData.child_id ? await getLiveTrackingSnapshot(deviceData.child_id) : null);
+
+  return {
+    id: deviceDoc.id,
+    ...deviceData,
+    battery_level:
+      resolvedLiveSnapshot?.batteryLevel ?? deviceData.battery_level ?? 0,
+    child: childDoc
+      ? {
+          id: childDoc.id,
+          name: resolvedChildData.name || "",
+          user_id: resolvedChildData.user_id || "",
+          status: resolvedChildData.status || "active",
+        }
+      : null,
+    child_name: resolvedChildData.name || "",
+    user_id: resolvedChildData.user_id || "",
+    latest_live_status: resolvedLiveSnapshot?.latestStatus || null,
+    latest_signal: resolvedLiveSnapshot?.latestSignal || null,
+    latest_timestamp: resolvedLiveSnapshot?.latestTimestamp || null,
+    live_tracking_key: resolvedLiveSnapshot?.trackingKey || null,
+    timestamp_inferred: resolvedLiveSnapshot?.timestampInferred || false,
+    live_tracking: resolvedLiveSnapshot?.raw || null,
+  };
+}
+
+async function listAccessibleChildrenById(req) {
+  const childSnap = isAdminRequest(req)
+    ? await firestore.collection("children").get()
+    : await firestore
+        .collection("children")
+        .where("user_id", "==", req.auth?.id || "")
+        .get();
+
+  return new Map(childSnap.docs.map((doc) => [doc.id, doc]));
+}
+
 // Register a new device
 exports.registerDevice = async (req, res, next) => {
   try {
     const { child_id, imei, sim_number, firmware } = req.body;
 
+    if (!isAdminRequest(req)) {
+      throw createHttpError(403, "Admin access required");
+    }
+
     if (!child_id || !imei) {
       throw createHttpError(400, "child_id and imei are required");
     }
 
-    const childDoc = await firestore.collection("children").doc(child_id).get();
-    if (!childDoc.exists) {
-      throw createHttpError(404, "Child not found");
-    }
+    const { childDoc } = await getChildOrThrow(child_id);
 
     // Check if IMEI already exists
     const existingDevice = await firestore
@@ -70,17 +161,6 @@ exports.registerDevice = async (req, res, next) => {
       status: "online",
       created_at: Date.now()
     });
-
-    // Initialize live tracking in Realtime DB
-    await realtimeDB
-      .ref(`live_tracking/${child_id}/location`)
-      .set({
-        latitude: 0,
-        longitude: 0,
-        speed: 0,
-        battery: 100,
-        recorded_at: Date.now()
-      });
 
     await syncRealtimeState(child_id, {
       childStatus: childDoc.data().status || "active",
@@ -153,13 +233,17 @@ exports.registerDevice = async (req, res, next) => {
 // Get device by ID
 exports.getDeviceById = async (req, res, next) => {
   try {
-    const doc = await firestore.collection("devices").doc(req.params.id).get();
-    
-    if (!doc.exists) {
-      throw createHttpError(404, "Device not found");
-    }
-    
-    res.json({ id: doc.id, ...doc.data() });
+    const { deviceDoc, childDoc, childData } = await getDeviceWithAccessOrThrow(
+      req,
+      req.params.id
+    );
+
+    res.json(
+      await buildDeviceResponse(deviceDoc, {
+        childDoc,
+        childData,
+      })
+    );
   } catch (error) {
     next(error);
   }
@@ -168,23 +252,18 @@ exports.getDeviceById = async (req, res, next) => {
 // Update device info
 exports.updateDevice = async (req, res, next) => {
   try {
+    if (!isAdminRequest(req)) {
+      throw createHttpError(403, "Admin access required");
+    }
+
     const { child_id, imei, sim_number, firmware_version } = req.body;
 
-    const deviceRef = firestore.collection("devices").doc(req.params.id);
-    const deviceDoc = await deviceRef.get();
-
-    if (!deviceDoc.exists) {
-      throw createHttpError(404, "Device not found");
-    }
-    const currentDeviceData = deviceDoc.data();
+    const { deviceRef, deviceDoc } = await getDeviceOrThrow(req.params.id);
+    const currentDeviceData = deviceDoc.data() || {};
 
     const updateData = {};
     if (child_id !== undefined && child_id !== "") {
-      const childDoc = await firestore.collection("children").doc(child_id).get();
-
-      if (!childDoc.exists) {
-        throw createHttpError(404, "Child not found");
-      }
+      await getChildOrThrow(child_id);
 
       updateData.child_id = child_id;
     }
@@ -254,14 +333,12 @@ exports.updateDevice = async (req, res, next) => {
 // Deactivate device
 exports.deactivate = async (req, res, next) => {
   try {
-    const deviceRef = firestore.collection("devices").doc(req.params.id);
-    const deviceDoc = await deviceRef.get();
-
-    if (!deviceDoc.exists) {
-      throw createHttpError(404, "Device not found");
+    if (!isAdminRequest(req)) {
+      throw createHttpError(403, "Admin access required");
     }
 
-    const deviceData = deviceDoc.data();
+    const { deviceRef, deviceDoc } = await getDeviceOrThrow(req.params.id);
+    const deviceData = deviceDoc.data() || {};
     await deviceRef.update({
       status: "offline",
       is_disabled: true,
@@ -323,14 +400,12 @@ exports.deactivate = async (req, res, next) => {
 // Activate device
 exports.activate = async (req, res, next) => {
   try {
-    const deviceRef = firestore.collection("devices").doc(req.params.id);
-    const deviceDoc = await deviceRef.get();
-
-    if (!deviceDoc.exists) {
-      throw createHttpError(404, "Device not found");
+    if (!isAdminRequest(req)) {
+      throw createHttpError(403, "Admin access required");
     }
 
-    const deviceData = deviceDoc.data();
+    const { deviceRef, deviceDoc } = await getDeviceOrThrow(req.params.id);
+    const deviceData = deviceDoc.data() || {};
     await deviceRef.update({
       status: "online",
       is_disabled: false,
@@ -392,14 +467,12 @@ exports.activate = async (req, res, next) => {
 // Delete device
 exports.deleteDevice = async (req, res, next) => {
   try {
-    const deviceRef = firestore.collection("devices").doc(req.params.id);
-    const deviceDoc = await deviceRef.get();
-
-    if (!deviceDoc.exists) {
-      throw createHttpError(404, "Device not found");
+    if (!isAdminRequest(req)) {
+      throw createHttpError(403, "Admin access required");
     }
 
-    const deviceData = deviceDoc.data();
+    const { deviceRef, deviceDoc } = await getDeviceOrThrow(req.params.id);
+    const deviceData = deviceDoc.data() || {};
     await deviceRef.delete();
 
     await syncRealtimeState(deviceData.child_id, {
@@ -442,12 +515,32 @@ exports.deleteDevice = async (req, res, next) => {
   }
 };
 
-// Get all devices (for admin)
+// Get all accessible devices
 exports.getAllDevices = async (req, res, next) => {
   try {
+    const childDocsById = await listAccessibleChildrenById(req);
     const snap = await firestore.collection("devices").get();
-    const list = [];
-    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+    const list = await Promise.all(
+      snap.docs
+        .filter((doc) => {
+          const childId = doc.data()?.child_id?.toString().trim() || "";
+          return childDocsById.has(childId);
+        })
+        .map(async (doc) => {
+          const childDoc = childDocsById.get(doc.data()?.child_id?.toString().trim() || "");
+          const childData = childDoc?.data() || {};
+          const liveSnapshot = await getLiveTrackingSnapshot(
+            doc.data()?.child_id?.toString().trim() || ""
+          );
+
+          return buildDeviceResponse(doc, {
+            childDoc,
+            childData,
+            liveSnapshot,
+          });
+        })
+    );
+
     list.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
     res.json(list);
   } catch (error) {
@@ -458,6 +551,7 @@ exports.getAllDevices = async (req, res, next) => {
 // Get device by child ID
 exports.getDeviceByChildId = async (req, res, next) => {
   try {
+    const { childDoc } = await getChildWithAccessOrThrow(req, req.params.child_id);
     const snap = await firestore.collection("devices")
       .where("child_id", "==", req.params.child_id)
       .limit(1)
@@ -466,8 +560,13 @@ exports.getDeviceByChildId = async (req, res, next) => {
     if (snap.empty) {
       throw createHttpError(404, "Device not found for this child");
     }
-    
-    res.json({ id: snap.docs[0].id, ...snap.docs[0].data() });
+
+    res.json(
+      await buildDeviceResponse(snap.docs[0], {
+        childDoc,
+        childData: childDoc.data() || {},
+      })
+    );
   } catch (error) {
     next(error);
   }

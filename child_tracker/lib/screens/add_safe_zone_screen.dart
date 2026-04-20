@@ -10,6 +10,7 @@ import '../providers/geofence_provider.dart';
 import '../services/api_service.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
+import 'safe_zone_detail_screen.dart';
 
 class AddSafeZoneScreen extends StatefulWidget {
   final String childId;
@@ -46,6 +47,14 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
   Set<Marker> _markers = <Marker>{};
   Set<Circle> _circles = <Circle>{};
 
+  double? _parseCoordinate(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -69,7 +78,7 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
     if (_latitude != null && _longitude != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _updateMap());
     } else {
-      _getCurrentLocation();
+      _initializeLocation();
     }
   }
 
@@ -137,6 +146,43 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
     }
   }
 
+  Future<void> _initializeLocation() async {
+    await _loadChildLiveLocation();
+    if (_latitude != null && _longitude != null) {
+      _updateMap();
+      return;
+    }
+
+    await _getCurrentLocation();
+  }
+
+  Future<void> _loadChildLiveLocation() async {
+    try {
+      final response = await _apiService.getLiveLocation(widget.childId);
+      final latitude = _parseCoordinate(response['latitude']);
+      final longitude = _parseCoordinate(response['longitude']);
+      if (latitude == null ||
+          longitude == null ||
+          latitude < -90 ||
+          latitude > 90 ||
+          longitude < -180 ||
+          longitude > 180) {
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _latitude = latitude;
+        _longitude = longitude;
+      });
+    } catch (_) {
+      // Keep the screen usable even when live tracking is temporarily unavailable.
+    }
+  }
+
   Future<void> _getCurrentLocation() async {
     setState(() {
       _isLoadingLocation = true;
@@ -150,7 +196,9 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        _setFallbackLocation();
+        setState(() {
+          _isLoadingLocation = false;
+        });
         return;
       }
 
@@ -168,17 +216,10 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
 
       _updateMap();
     } catch (_) {
-      _setFallbackLocation();
+      setState(() {
+        _isLoadingLocation = false;
+      });
     }
-  }
-
-  void _setFallbackLocation() {
-    setState(() {
-      _latitude ??= AppConstants.defaultLatitude;
-      _longitude ??= AppConstants.defaultLongitude;
-      _isLoadingLocation = false;
-    });
-    _updateMap();
   }
 
   void _updateMap() {
@@ -334,7 +375,30 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
           backgroundColor: AppColors.successColor,
         ),
       );
-      Navigator.pop(context);
+      if (widget.isEditMode) {
+        Navigator.pop(context);
+        return;
+      }
+
+      final resolvedZone = geofenceProvider.lastSavedZone ??
+          GeofenceModel(
+            id: '',
+            childId: resolvedChildId,
+            childName: resolvedChildName,
+            userId: authProvider.user?.id ?? '',
+            name: _nameController.text.trim(),
+            latitude: _latitude!,
+            longitude: _longitude!,
+            radius: _radius,
+            status: 'active',
+            createdAt: DateTime.now().millisecondsSinceEpoch,
+          );
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => SafeZoneDetailScreen(zone: resolvedZone),
+        ),
+      );
       return;
     }
 
@@ -381,26 +445,57 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
                 flex: 2,
                 child: Stack(
                   children: [
-                    GoogleMap(
-                      onMapCreated: (controller) {
-                        _mapController = controller;
-                        _updateMap();
-                      },
-                      onTap: _onMapTap,
-                      initialCameraPosition: CameraPosition(
-                        target: LatLng(
-                          _latitude ?? AppConstants.defaultLatitude,
-                          _longitude ?? AppConstants.defaultLongitude,
+                    if (_latitude != null && _longitude != null)
+                      GoogleMap(
+                        onMapCreated: (controller) {
+                          _mapController = controller;
+                          _updateMap();
+                        },
+                        onTap: _onMapTap,
+                        initialCameraPosition: CameraPosition(
+                          target: LatLng(_latitude!, _longitude!),
+                          zoom: 16,
                         ),
-                        zoom: 16,
+                        markers: _markers,
+                        circles: _circles,
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: false,
+                        zoomControlsEnabled: false,
+                        mapToolbarEnabled: false,
+                      )
+                    else
+                      Container(
+                        color: Colors.grey[100],
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.location_off,
+                              size: 42,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              l10n.noData,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              l10n.useMyLocation,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      markers: _markers,
-                      circles: _circles,
-                      myLocationEnabled: true,
-                      myLocationButtonEnabled: false,
-                      zoomControlsEnabled: false,
-                      mapToolbarEnabled: false,
-                    ),
                     if (_isLoadingLocation)
                       Container(
                         color: Colors.black26,

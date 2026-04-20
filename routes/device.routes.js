@@ -1,5 +1,8 @@
 const router = require("express").Router();
 const device = require("../controllers/device.controller");
+const { requireAuthenticatedAccess } = require("../middleware/auth");
+
+router.use(requireAuthenticatedAccess);
 
 // Register a new device
 router.post("/register", device.registerDevice);

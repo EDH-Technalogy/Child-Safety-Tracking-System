@@ -36,6 +36,25 @@ class _AdminAccountScreenState extends State<AdminAccountScreen> {
   String _photoUrl = '';
   Map<String, dynamic>? _profile;
 
+  Map<String, dynamic>? _buildProfileFromSession() {
+    final authUser = Provider.of<AuthProvider>(context, listen: false).user;
+    if (authUser == null) {
+      return null;
+    }
+
+    return {
+      'id': authUser.id,
+      'name': authUser.name,
+      'email': authUser.email,
+      'phone': authUser.phone,
+      'photo': authUser.photo ?? '',
+      'role': authUser.role,
+      'status': authUser.status,
+      'created_at': authUser.createdAt,
+      'username': _profile?['username']?.toString() ?? '',
+    };
+  }
+
   @override
   void initState() {
     super.initState();
@@ -103,8 +122,12 @@ class _AdminAccountScreenState extends State<AdminAccountScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      final sessionProfile = _buildProfileFromSession();
       if (!mounted) return;
       setState(() {
+        if (sessionProfile != null) {
+          _applyProfile(sessionProfile);
+        }
         _error = localizeErrorMessage(context.l10n, e);
         _isLoading = false;
       });
@@ -271,7 +294,8 @@ class _AdminAccountScreenState extends State<AdminAccountScreen> {
   }
 
   Future<void> _getImage(ImageSource source) async {
-    final adminId = (_profile?['id'] ?? '').toString();
+    final authUser = Provider.of<AuthProvider>(context, listen: false).user;
+    final adminId = (_profile?['id'] ?? authUser?.id ?? '').toString();
     if (adminId.isEmpty) {
       return;
     }
@@ -359,9 +383,10 @@ class _AdminAccountScreenState extends State<AdminAccountScreen> {
             ? authUser!.photo!.toString()
             : (profile?['photo']?.toString() ?? ''));
     final photoProvider = buildPhotoProvider(photoUrl);
-    final displayName = (profile?['name']?.toString().trim().isNotEmpty ?? false)
-        ? profile!['name'].toString().trim()
-        : (authUser?.name ?? '');
+    final displayName =
+        (profile?['name']?.toString().trim().isNotEmpty ?? false)
+            ? profile!['name'].toString().trim()
+            : (authUser?.name ?? '');
     final role = profile?['role']?.toString() ?? authUser?.role ?? 'admin';
     final status =
         profile?['status']?.toString() ?? authUser?.status ?? 'active';

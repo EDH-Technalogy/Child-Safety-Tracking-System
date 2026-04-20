@@ -7,6 +7,7 @@ import 'providers/location_provider.dart';
 import 'providers/alert_provider.dart';
 import 'providers/geofence_provider.dart';
 import 'providers/activity_provider.dart';
+import 'providers/device_live_tracking_provider.dart';
 import 'providers/locale_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/notification_provider.dart';
@@ -59,6 +60,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AlertProvider()),
         ChangeNotifierProvider(create: (_) => GeofenceProvider()),
         ChangeNotifierProvider(create: (_) => ActivityProvider()),
+        ChangeNotifierProvider(create: (_) => DeviceLiveTrackingProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),

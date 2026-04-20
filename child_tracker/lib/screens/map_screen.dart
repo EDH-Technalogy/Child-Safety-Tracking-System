@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:provider/provider.dart';
+
 import '../l10n/app_localizations.dart';
+import '../models/location_model.dart';
 import '../providers/child_provider.dart';
-import '../providers/location_provider.dart';
+import '../providers/device_live_tracking_provider.dart';
 import '../providers/geofence_provider.dart';
+import '../providers/location_provider.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 import '../widgets/app_drawer.dart';
@@ -21,10 +26,11 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _mapController;
+  final TextEditingController _deviceIdController = TextEditingController();
   Position? _currentPosition;
+  LatLng? _lastFocusedTarget;
+  String? _activeChildId;
   bool _isLoading = true;
-  Set<Marker> _markers = {};
-  Set<Circle> _circles = {};
   bool _showLiveTracking = true;
   bool _showSafeZones = true;
   bool _showChildLocation = true;
@@ -38,9 +44,15 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _initializeMap() async {
     await _getCurrentLocation();
-    if (widget.childId != null) {
+    _activeChildId = _resolveInitialChildId();
+    if (_activeChildId != null) {
       await _loadChildData();
     }
+
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
       _isLoading = false;
     });
@@ -64,16 +76,23 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
 
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _currentPosition = position;
       });
-    } catch (e) {
-      // Handle error
+    } catch (_) {
+      // Keep the map usable even when current location is unavailable.
     }
   }
 
   Future<void> _loadChildData() async {
-    if (widget.childId == null) return;
+    final childId = _activeChildId;
+    if (childId == null) {
+      return;
+    }
 
     final childProvider = Provider.of<ChildProvider>(context, listen: false);
     final locationProvider =
@@ -81,32 +100,102 @@ class _MapScreenState extends State<MapScreen> {
     final geofenceProvider =
         Provider.of<GeofenceProvider>(context, listen: false);
 
-    await childProvider.getChildWithDevice(widget.childId!);
-    await locationProvider.getLiveLocation(widget.childId!);
-    await geofenceProvider.loadSafeZones(widget.childId!);
+    await childProvider.getChildWithDevice(childId);
+    await locationProvider.getLiveLocation(childId);
+    await geofenceProvider.loadSafeZones(childId);
 
-    locationProvider.startLiveTracking(widget.childId!);
-    _updateMarkers();
+    locationProvider.startLiveTracking(childId);
   }
 
-  void _updateMarkers() {
+  String? _resolveInitialChildId() {
+    if (widget.childId != null && widget.childId!.trim().isNotEmpty) {
+      return widget.childId!.trim();
+    }
+
+    final childProvider = Provider.of<ChildProvider>(context, listen: false);
+    final selectedChildId = childProvider.selectedChild?.id.trim() ?? '';
+    if (selectedChildId.isNotEmpty) {
+      return selectedChildId;
+    }
+
+    if (childProvider.children.isNotEmpty) {
+      final firstChildId = childProvider.children.first.id.trim();
+      if (firstChildId.isNotEmpty) {
+        return firstChildId;
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> _submitDeviceLookup() async {
+    final trackingProvider = Provider.of<DeviceLiveTrackingProvider>(
+      context,
+      listen: false,
+    );
+
+    FocusScope.of(context).unfocus();
+    final success = await trackingProvider.trackDeviceById(
+      _deviceIdController.text,
+    );
+
+    if (!mounted || success) {
+      return;
+    }
+
+    if (trackingProvider.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${context.l10n.error}: ${trackingProvider.error!}'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _resetDeviceLookup() async {
+    _deviceIdController.clear();
+    FocusScope.of(context).unfocus();
+
+    await Provider.of<DeviceLiveTrackingProvider>(
+      context,
+      listen: false,
+    ).clearTracking();
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  LocationModel? _resolveActiveLocation({
+    required LocationProvider locationProvider,
+    required DeviceLiveTrackingProvider trackingProvider,
+  }) {
+    if (trackingProvider.hasSelection) {
+      return trackingProvider.liveLocation;
+    }
+
+    return locationProvider.liveLocation;
+  }
+
+  Set<Marker> _buildMarkers({
+    required LocationModel? activeLocation,
+    required DeviceLiveTrackingProvider trackingProvider,
+  }) {
     final l10n = context.l10n;
-    final locationProvider =
-        Provider.of<LocationProvider>(context, listen: false);
-    final geofenceProvider =
-        Provider.of<GeofenceProvider>(context, listen: false);
-    final location = locationProvider.liveLocation;
+    final markers = <Marker>{};
+    final shouldShowOnlyTrackedMarker = activeLocation != null ||
+        trackingProvider.hasSelection ||
+        _activeChildId != null;
 
-    Set<Marker> markers = {};
-    Set<Circle> circles = {};
-
-    if (_showChildLocation && location != null) {
+    if (_showLiveTracking && _showChildLocation && activeLocation != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('child'),
-          position: LatLng(location.latitude, location.longitude),
+          position: LatLng(activeLocation.latitude, activeLocation.longitude),
           infoWindow: InfoWindow(
-            title: l10n.childLocation,
+            title: trackingProvider.child?.name.isNotEmpty == true
+                ? trackingProvider.child!.name
+                : l10n.childLocation,
             snippet: l10n.liveTracking,
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
@@ -114,7 +203,7 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    if (_currentPosition != null) {
+    if (!shouldShowOnlyTrackedMarker && _currentPosition != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('current'),
@@ -130,50 +219,122 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    if (_showSafeZones) {
-      for (final zone in geofenceProvider.safeZones) {
-        final isActive = zone.status == 'active';
-        final color = isActive ? AppColors.successColor : Colors.grey;
+    return markers;
+  }
 
-        circles.add(
-          Circle(
-            circleId: CircleId(zone.id),
-            center: LatLng(zone.latitude, zone.longitude),
-            radius: zone.radius.toDouble(),
-            fillColor: color.withValues(alpha: isActive ? 0.15 : 0.08),
-            strokeColor: color,
-            strokeWidth: isActive ? 2 : 1,
-          ),
-        );
-      }
+  Set<Circle> _buildCircles({
+    required GeofenceProvider geofenceProvider,
+    required DeviceLiveTrackingProvider trackingProvider,
+  }) {
+    if (!_showSafeZones || trackingProvider.hasSelection) {
+      return const <Circle>{};
     }
 
-    setState(() {
-      _markers = markers;
-      _circles = circles;
+    return geofenceProvider.safeZones.map((zone) {
+      final isActive = zone.status == 'active';
+      final color = isActive ? AppColors.successColor : Colors.grey;
+
+      return Circle(
+        circleId: CircleId(zone.id),
+        center: LatLng(zone.latitude, zone.longitude),
+        radius: zone.radius.toDouble(),
+        fillColor: color.withValues(alpha: isActive ? 0.15 : 0.08),
+        strokeColor: color,
+        strokeWidth: isActive ? 2 : 1,
+      );
+    }).toSet();
+  }
+
+  LatLng _getInitialPosition(LocationModel? activeLocation) {
+    if (activeLocation != null) {
+      return LatLng(activeLocation.latitude, activeLocation.longitude);
+    }
+
+    if (widget.childId == null && _currentPosition != null) {
+      return LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+    }
+
+    return const LatLng(0, 0);
+  }
+
+  bool _shouldRenderMap({
+    required LocationModel? activeLocation,
+    required DeviceLiveTrackingProvider trackingProvider,
+  }) {
+    if (_activeChildId != null || trackingProvider.hasSelection) {
+      return activeLocation != null;
+    }
+
+    return _currentPosition != null;
+  }
+
+  Widget _buildUnavailableMapState({
+    required String title,
+    required String message,
+  }) {
+    return Container(
+      color: Colors.grey[100],
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.location_off,
+            size: 44,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _maybeFocusTrackedLocation(LocationModel? activeLocation) {
+    if (_mapController == null || activeLocation == null) {
+      return;
+    }
+
+    final nextTarget = LatLng(
+      activeLocation.latitude,
+      activeLocation.longitude,
+    );
+
+    if (_lastFocusedTarget?.latitude == nextTarget.latitude &&
+        _lastFocusedTarget?.longitude == nextTarget.longitude) {
+      return;
+    }
+
+    _lastFocusedTarget = nextTarget;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _mapController == null) {
+        return;
+      }
+
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLng(nextTarget),
+      );
     });
   }
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
-    _updateMarkers();
-  }
-
-  LatLng _getInitialPosition() {
-    final locationProvider =
-        Provider.of<LocationProvider>(context, listen: false);
-    final location = locationProvider.liveLocation;
-
-    if (location != null) {
-      return LatLng(location.latitude, location.longitude);
-    }
-
-    if (_currentPosition != null) {
-      return LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
-    }
-
-    return const LatLng(
-        AppConstants.defaultLatitude, AppConstants.defaultLongitude);
   }
 
   void _showMapSettings() {
@@ -205,10 +366,10 @@ class _MapScreenState extends State<MapScreen> {
                   _showLiveTracking = value;
                 });
                 Navigator.pop(context);
-                if (value && widget.childId != null) {
+                if (value && _activeChildId != null) {
                   final locationProvider =
                       Provider.of<LocationProvider>(context, listen: false);
-                  locationProvider.startLiveTracking(widget.childId!);
+                  locationProvider.startLiveTracking(_activeChildId!);
                 }
               },
             ),
@@ -221,7 +382,6 @@ class _MapScreenState extends State<MapScreen> {
                 setState(() {
                   _showSafeZones = value;
                 });
-                _updateMarkers();
                 Navigator.pop(context);
               },
             ),
@@ -234,7 +394,6 @@ class _MapScreenState extends State<MapScreen> {
                 setState(() {
                   _showChildLocation = value;
                 });
-                _updateMarkers();
                 Navigator.pop(context);
               },
             ),
@@ -271,6 +430,260 @@ class _MapScreenState extends State<MapScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildDeviceSearchPanel(DeviceLiveTrackingProvider trackingProvider) {
+    final l10n = context.l10n;
+    final waitingForLiveData = trackingProvider.hasSelection &&
+        trackingProvider.liveTracking == null &&
+        trackingProvider.isListening &&
+        trackingProvider.error == null;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.liveTracking,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _deviceIdController,
+                enabled: !trackingProvider.isLoading,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: l10n.deviceId,
+                  prefixIcon: const Icon(Icons.phone_android),
+                  suffixIcon: _deviceIdController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: _resetDeviceLookup,
+                        ),
+                ),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _submitDeviceLookup(),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: trackingProvider.isLoading
+                          ? null
+                          : _submitDeviceLookup,
+                      icon: trackingProvider.isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.search),
+                      label: Text(l10n.search),
+                    ),
+                  ),
+                  if (trackingProvider.hasSelection ||
+                      trackingProvider.hasSearched ||
+                      _deviceIdController.text.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    TextButton(
+                      onPressed: trackingProvider.isLoading
+                          ? null
+                          : _resetDeviceLookup,
+                      child: Text(l10n.cancel),
+                    ),
+                  ],
+                ],
+              ),
+              if (trackingProvider.error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  trackingProvider.error!,
+                  style: const TextStyle(
+                    color: AppColors.errorColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ] else if (waitingForLiveData) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Connected to the child record. Waiting for live location updates.',
+                  style: TextStyle(
+                    color: Colors.orange[800],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendCard() {
+    final l10n = context.l10n;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(l10n.child, style: const TextStyle(fontSize: 12)),
+                const SizedBox(width: 16),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: AppColors.successColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(l10n.myLocation, style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+            if (_showSafeZones) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: AppColors.successColor.withValues(alpha: 0.3),
+                      border: Border.all(color: AppColors.successColor),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(l10n.safeZones, style: const TextStyle(fontSize: 12)),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrackingSummaryCard(
+      DeviceLiveTrackingProvider trackingProvider) {
+    final l10n = context.l10n;
+    final liveTracking = trackingProvider.liveTracking;
+    final statusValue = liveTracking?.effectiveDeviceStatus ??
+        trackingProvider.device?.status ??
+        l10n.unknown;
+    final batteryValue = liveTracking?.location != null
+        ? '${liveTracking!.location!.battery}%'
+        : '${trackingProvider.device?.batteryLevel ?? 0}%';
+    final latestTimestamp = liveTracking?.latestTimestamp;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              trackingProvider.child?.name ?? l10n.child,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildLabelValueRow(
+              l10n.deviceId,
+              trackingProvider.device?.id ?? l10n.unknown,
+            ),
+            _buildLabelValueRow(
+              l10n.name,
+              trackingProvider.child?.name ?? l10n.unknown,
+            ),
+            _buildLabelValueRow(
+              l10n.status,
+              localizeStatusLabel(l10n, statusValue),
+            ),
+            _buildLabelValueRow(
+              l10n.battery,
+              batteryValue,
+            ),
+            _buildLabelValueRow(
+              l10n.lastSeen,
+              latestTimestamp != null
+                  ? _formatTimestamp(latestTimestamp)
+                  : l10n.noData,
+            ),
+            if ((liveTracking?.connection?.reason ?? '').isNotEmpty)
+              _buildLabelValueRow(
+                'Signal',
+                liveTracking!.connection!.reason,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabelValueRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(int timestamp) {
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:$minute';
   }
 
   @override
@@ -310,8 +723,10 @@ class _MapScreenState extends State<MapScreen> {
               if (_currentPosition != null && _mapController != null) {
                 _mapController!.animateCamera(
                   CameraUpdate.newLatLng(
-                    LatLng(_currentPosition!.latitude,
-                        _currentPosition!.longitude),
+                    LatLng(
+                      _currentPosition!.latitude,
+                      _currentPosition!.longitude,
+                    ),
                   ),
                 );
               }
@@ -322,100 +737,102 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                GoogleMap(
-                  onMapCreated: _onMapCreated,
-                  initialCameraPosition: CameraPosition(
-                    target: _getInitialPosition(),
-                    zoom: _defaultZoom,
-                  ),
-                  markers: _markers,
-                  circles: _circles,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: false,
-                  zoomControlsEnabled: false,
-                  mapToolbarEnabled: false,
-                  compassEnabled: true,
-                ),
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  right: 16,
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          : Consumer3<LocationProvider, GeofenceProvider,
+              DeviceLiveTrackingProvider>(
+              builder: (
+                context,
+                locationProvider,
+                geofenceProvider,
+                trackingProvider,
+                child,
+              ) {
+                final activeLocation = _resolveActiveLocation(
+                  locationProvider: locationProvider,
+                  trackingProvider: trackingProvider,
+                );
+                final markers = _buildMarkers(
+                  activeLocation: activeLocation,
+                  trackingProvider: trackingProvider,
+                );
+                final circles = _buildCircles(
+                  geofenceProvider: geofenceProvider,
+                  trackingProvider: trackingProvider,
+                );
+
+                if ((_activeChildId != null || trackingProvider.hasSelection) &&
+                    activeLocation != null) {
+                  _maybeFocusTrackedLocation(activeLocation);
+                }
+                final canRenderMap = _shouldRenderMap(
+                  activeLocation: activeLocation,
+                  trackingProvider: trackingProvider,
+                );
+                final unavailableTitle = trackingProvider.hasSelection
+                    ? 'No live location available for this device'
+                    : _activeChildId != null
+                        ? 'No live location available for this child'
+                        : 'Location unavailable';
+                final unavailableMessage = trackingProvider.hasSelection
+                    ? 'The map will appear when this device sends valid GPS data.'
+                    : _activeChildId != null
+                        ? 'The child map will appear when the linked device sends valid GPS data.'
+                        : 'Allow location access to center the map on your current position.';
+
+                return Column(
+                  children: [
+                    if (_activeChildId == null)
+                      _buildDeviceSearchPanel(trackingProvider),
+                    Expanded(
+                      child: Stack(
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primaryColor,
-                                  shape: BoxShape.circle,
-                                ),
+                          if (canRenderMap)
+                            GoogleMap(
+                              onMapCreated: _onMapCreated,
+                              initialCameraPosition: CameraPosition(
+                                target: _getInitialPosition(activeLocation),
+                                zoom: _defaultZoom,
                               ),
-                              const SizedBox(width: 8),
-                              Text(l10n.child,
-                                  style: const TextStyle(fontSize: 12)),
-                              const SizedBox(width: 16),
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.successColor,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(l10n.myLocation,
-                                  style: const TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                          if (_showSafeZones) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.successColor.withValues(
-                                      alpha: 0.3,
-                                    ),
-                                    border: Border.all(
-                                        color: AppColors.successColor),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(l10n.safeZones,
-                                    style: const TextStyle(fontSize: 12)),
-                              ],
+                              markers: markers,
+                              circles: circles,
+                              myLocationEnabled: true,
+                              myLocationButtonEnabled: false,
+                              zoomControlsEnabled: false,
+                              mapToolbarEnabled: false,
+                              compassEnabled: true,
+                            )
+                          else
+                            _buildUnavailableMapState(
+                              title: unavailableTitle,
+                              message: unavailableMessage,
                             ),
-                          ],
+                          Positioned(
+                            bottom: 16,
+                            left: 16,
+                            right: 16,
+                            child: trackingProvider.hasSelection
+                                ? _buildTrackingSummaryCard(trackingProvider)
+                                : _buildLegendCard(),
+                          ),
+                          Positioned(
+                            top: 16,
+                            right: 16,
+                            child: FloatingActionButton(
+                              mini: true,
+                              heroTag: 'settings',
+                              onPressed: _showMapSettings,
+                              backgroundColor: Colors.white,
+                              child: const Icon(
+                                Icons.layers,
+                                color: AppColors.primaryColor,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  top: 16,
-                  right: 16,
-                  child: FloatingActionButton(
-                    mini: true,
-                    heroTag: 'settings',
-                    onPressed: _showMapSettings,
-                    backgroundColor: Colors.white,
-                    child:
-                        const Icon(Icons.layers, color: AppColors.primaryColor),
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
@@ -431,5 +848,19 @@ class _MapScreenState extends State<MapScreen> {
         child: const Icon(Icons.my_location),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _deviceIdController.dispose();
+    Provider.of<LocationProvider>(context, listen: false).stopLiveTracking();
+    unawaited(
+      Provider.of<DeviceLiveTrackingProvider>(
+        context,
+        listen: false,
+      ).clearTracking(),
+    );
+    _mapController?.dispose();
+    super.dispose();
   }
 }

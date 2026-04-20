@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/constants.dart';
+import '../utils/session_token_store.dart';
 
 class ApiService {
   final String baseUrl = ApiConfig.baseUrl;
@@ -15,7 +16,8 @@ class ApiService {
 
   Future<Map<String, String>> _buildAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
-    final authToken = prefs.getString(AppConstants.tokenKey);
+    final authToken = prefs.getString(AppConstants.tokenKey) ??
+        SessionTokenStore.currentToken;
 
     return {
       'Content-Type': 'application/json',
@@ -64,8 +66,12 @@ class ApiService {
     String? extractedError;
     try {
       final body = jsonDecode(response.body);
-      if (body is Map<String, dynamic> && body['error'] != null) {
-        extractedError = body['error'].toString();
+      if (body is Map<String, dynamic>) {
+        if (body['error'] != null) {
+          extractedError = body['error'].toString();
+        } else if (body['message'] != null) {
+          extractedError = body['message'].toString();
+        }
       }
     } catch (_) {
       // Fall through to raw response.
@@ -483,16 +489,28 @@ class ApiService {
   // Get Live Location
   Future<Map<String, dynamic>> getLiveLocation(String childId) async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl${ApiConfig.locations}/live/$childId'),
-        headers: await _buildAuthHeaders(),
+      final response = await _sendRequest(
+        http.get(
+          Uri.parse('$baseUrl${ApiConfig.locations}/live/$childId'),
+          headers: await _buildAuthHeaders(),
+        ),
+        'get live location',
       );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception(response.body);
+      final decoded = _decodeResponse(response, 'get live location');
+      if (decoded is! Map) {
+        throw Exception('Invalid live location response format');
       }
+
+      final body = Map<String, dynamic>.from(decoded);
+      final data = body['data'];
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+      if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+      return body;
     } catch (e) {
       throw Exception('Failed to get live location: $e');
     }

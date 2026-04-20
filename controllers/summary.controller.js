@@ -1,4 +1,5 @@
 const { firestore } = require("../firebase");
+const { getChildWithAccessOrThrow } = require("../utils/child-access");
 
 async function listChildSummaryRecords(childId) {
   const snap = await firestore
@@ -37,6 +38,7 @@ async function listChildAlerts(childId) {
 
 // Get Today's Summary
 exports.today = async (req,res)=>{
+  await getChildWithAccessOrThrow(req, req.params.child_id);
   const today=new Date().toISOString().slice(0,10);
 
   const snap = await firestore.collection("daily_summary")
@@ -52,6 +54,7 @@ exports.today = async (req,res)=>{
 // Get Summary by Date
 exports.getByDate = async (req,res)=>{
   const { child_id, date } = req.params;
+  await getChildWithAccessOrThrow(req, child_id);
 
   const snap = await firestore.collection("daily_summary")
     .where("child_id","==",child_id)
@@ -66,6 +69,7 @@ exports.getByDate = async (req,res)=>{
 // Get Weekly Summary
 exports.weekly = async (req,res)=>{
   const { child_id } = req.params;
+  await getChildWithAccessOrThrow(req, child_id);
   const today = new Date();
   const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -97,6 +101,7 @@ exports.weekly = async (req,res)=>{
 // Get SOS Count
 exports.getSosCount = async (req,res)=>{
   const { child_id } = req.params;
+  await getChildWithAccessOrThrow(req, child_id);
   const { start_date, end_date } = req.query;
   const alerts = (await listChildAlerts(child_id)).filter((alert) => {
     if (alert.type !== "SOS") {
@@ -119,6 +124,7 @@ exports.getSosCount = async (req,res)=>{
 // Get Zone Exit Count
 exports.getZoneExitCount = async (req,res)=>{
   const { child_id } = req.params;
+  await getChildWithAccessOrThrow(req, child_id);
   const { start_date, end_date } = req.query;
   const alerts = (await listChildAlerts(child_id)).filter((alert) => {
     if (alert.type !== "OUT_ZONE") {
@@ -142,6 +148,7 @@ exports.getZoneExitCount = async (req,res)=>{
 exports.generateDailySummary = async (req,res)=>{
   try {
     const { child_id, date } = req.body;
+    await getChildWithAccessOrThrow(req, child_id);
     const targetDate = date || new Date().toISOString().slice(0,10);
 
     // Get locations for the day

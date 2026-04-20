@@ -6,6 +6,7 @@ import '../services/admin_api_service.dart';
 import '../services/api_service.dart';
 import '../models/user_model.dart';
 import '../utils/constants.dart';
+import '../utils/session_token_store.dart';
 
 class AuthProvider with ChangeNotifier {
   static const String _sessionUserStorageKey = 'user';
@@ -23,6 +24,7 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _user != null;
   bool get isAdmin => _user?.role == 'admin';
+  String? get sessionToken => SessionTokenStore.currentToken;
 
   AuthProvider();
 
@@ -66,6 +68,28 @@ class AuthProvider with ChangeNotifier {
     return user;
   }
 
+  bool _isInvalidCredentialsError(Object error) {
+    final message = _formatError(error).toLowerCase();
+    return message.contains('invalid credentials') ||
+        message.contains('invalid admin credentials');
+  }
+
+  Map<String, dynamic> _normalizeAdminSessionData(
+    Map<String, dynamic> response, {
+    required String fallbackEmail,
+  }) {
+    return {
+      'id': response['id']?.toString() ?? '',
+      'name': response['name']?.toString() ?? 'Admin',
+      'email': response['email']?.toString() ?? fallbackEmail,
+      'phone': response['phone']?.toString() ?? '',
+      'photo': response['photo']?.toString() ?? '',
+      'role': response['role']?.toString() ?? 'admin',
+      'status': response['status']?.toString() ?? 'active',
+      'created_at': response['created_at'] ?? 0,
+    };
+  }
+
   Future<void> _persistSession(
     SharedPreferences prefs,
     Map<String, dynamic> userData,
@@ -102,6 +126,7 @@ class AuthProvider with ChangeNotifier {
 
     _user = null;
     _error = null;
+    SessionTokenStore.clear();
   }
 
   bool _shouldInvalidatePersistedSession(String message) {
@@ -186,10 +211,14 @@ class AuthProvider with ChangeNotifier {
     required Map<String, dynamic> userData,
     required String token,
   }) async {
+    final normalizedToken =
+        token.isNotEmpty ? token : (SessionTokenStore.currentToken ?? '');
     final prefs = await SharedPreferences.getInstance();
-    await _persistSession(prefs, userData, token);
+    await _persistSession(prefs, userData, normalizedToken);
     _user = UserModel.fromJson(userData);
     _error = null;
+    SessionTokenStore.currentToken =
+        normalizedToken.isNotEmpty ? normalizedToken : null;
 
     if (kDebugMode) {
       debugPrint(
@@ -241,6 +270,7 @@ class AuthProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString(AppConstants.tokenKey) ?? '';
+      SessionTokenStore.currentToken = token.isNotEmpty ? token : null;
       final storedUserData = _readStoredUserData(prefs);
 
       if (storedUserData == null || token.isEmpty) {
@@ -337,7 +367,29 @@ class AuthProvider with ChangeNotifier {
     _error = null;
 
     try {
-      final result = await _apiService.login(email: email, password: password);
+      late final Map<String, dynamic> result;
+
+      try {
+        result = await _apiService.login(email: email, password: password);
+      } catch (error) {
+        if (!_isInvalidCredentialsError(error)) {
+          rethrow;
+        }
+
+        final adminResult = await _adminApiService.login(
+          email: email,
+          password: password,
+        );
+
+        await setAuthenticatedSession(
+          userData: _normalizeAdminSessionData(
+            adminResult,
+            fallbackEmail: email,
+          ),
+          token: adminResult['token']?.toString() ?? '',
+        );
+        return true;
+      }
 
       if (result['success'] == false) {
         _error = result['message'] ?? "Login failed";
@@ -415,15 +467,24 @@ class AuthProvider with ChangeNotifier {
     _error = null;
 
     try {
-      final result = await _apiService.updateProfile(
-        userId: _user!.id,
-        name: name,
-        phone: phone,
-        photo: photo,
-      );
+      final result = isAdmin
+          ? await _adminApiService.updateAdminProfile(
+              name: name,
+              email: _user!.email,
+              phone: phone,
+              photo: photo,
+            )
+          : await _apiService.updateProfile(
+              userId: _user!.id,
+              name: name,
+              phone: phone,
+              photo: photo,
+            );
 
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey) ?? '';
+      final token = prefs.getString(AppConstants.tokenKey) ??
+          SessionTokenStore.currentToken ??
+          '';
       await setAuthenticatedSession(userData: result, token: token);
       return true;
     } catch (e) {
@@ -469,9 +530,13 @@ class AuthProvider with ChangeNotifier {
     if (_user == null) return;
 
     try {
-      final result = await _apiService.getProfile(_user!.id);
+      final result = isAdmin
+          ? await _adminApiService.getAdminProfile()
+          : await _apiService.getProfile(_user!.id);
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey) ?? '';
+      final token = prefs.getString(AppConstants.tokenKey) ??
+          SessionTokenStore.currentToken ??
+          '';
       await setAuthenticatedSession(userData: result, token: token);
     } catch (e) {
       _error = _formatError(e);

@@ -54,9 +54,42 @@ function buildAdminResponse(adminId, adminData = {}) {
     photo: adminData.photo || "",
     role: adminData.role || "admin",
     status: adminData.status || "active",
-    created_at: adminData.created_at || 0,
-    updated_at: adminData.updated_at || null,
+    created_at: normalizeTimestampValue(adminData.created_at, 0),
+    updated_at: normalizeTimestampValue(adminData.updated_at, null),
   };
+}
+
+function normalizeTimestampValue(value, fallback = 0) {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  if (typeof value?.toMillis === "function") {
+    return value.toMillis();
+  }
+
+  if (typeof value?._seconds === "number") {
+    const nanoseconds =
+      typeof value._nanoseconds === "number" ? value._nanoseconds : 0;
+    return value._seconds * 1000 + Math.floor(nanoseconds / 1000000);
+  }
+
+  if (typeof value?.seconds === "number") {
+    const nanoseconds =
+      typeof value.nanoseconds === "number" ? value.nanoseconds : 0;
+    return value.seconds * 1000 + Math.floor(nanoseconds / 1000000);
+  }
+
+  return fallback;
 }
 
 async function logAdminAudit(req, entry) {

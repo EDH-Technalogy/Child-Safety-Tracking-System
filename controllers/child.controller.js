@@ -1,4 +1,4 @@
-const { firestore, realtimeDB } = require("../firebase");
+const { firestore } = require("../firebase");
 const {
   syncRealtimeState,
   removeRealtimeState,
@@ -9,6 +9,7 @@ const {
   inferSource,
   extractChangedFields,
 } = require("../utils/audit-log");
+const { getResolvedLiveTrackingSnapshot } = require("../utils/live-tracking");
 
 function createHttpError(status, message) {
   const error = new Error(message);
@@ -281,27 +282,6 @@ exports.addChild = async (req, res, next) => {
         status: "online",
       };
     }
-
-    const initialLat = 40.7128;
-    const initialLng = -74.0060;
-    const recordedAt = Date.now();
-
-    await firestore.collection("locations_history").add({
-      child_id: child.id,
-      latitude: initialLat,
-      longitude: initialLng,
-      speed: 0,
-      battery: 100,
-      recorded_at: recordedAt,
-    });
-
-    await realtimeDB.ref(`live_tracking/${child.id}/location`).set({
-      latitude: initialLat,
-      longitude: initialLng,
-      speed: 0,
-      battery: 100,
-      recorded_at: recordedAt,
-    });
 
     await syncRealtimeState(child.id, {
       childStatus: "active",
@@ -694,6 +674,22 @@ exports.getChildWithDevice = async (req, res, next) => {
     let deviceData = null;
     if (!deviceSnap.empty) {
       deviceData = { id: deviceSnap.docs[0].id, ...deviceSnap.docs[0].data() };
+    }
+
+    const liveTracking = await getResolvedLiveTrackingSnapshot(req.params.child_id);
+    if (deviceData && liveTracking) {
+      deviceData = {
+        ...deviceData,
+        battery_level:
+          liveTracking.batteryLevel ?? deviceData.battery_level ?? 0,
+        status: liveTracking.latestStatus || deviceData.status || "offline",
+        latest_live_status: liveTracking.latestStatus || null,
+        latest_signal: liveTracking.latestSignal || null,
+        latest_timestamp: liveTracking.latestTimestamp || null,
+        live_tracking_key: liveTracking.trackingKey || null,
+        timestamp_inferred: liveTracking.timestampInferred || false,
+        live_tracking: liveTracking.raw || null,
+      };
     }
 
     res.json({

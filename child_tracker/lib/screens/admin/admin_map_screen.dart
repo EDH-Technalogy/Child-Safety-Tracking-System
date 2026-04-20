@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../models/location_model.dart';
 import '../../providers/child_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/geofence_provider.dart';
@@ -21,6 +22,7 @@ class AdminMapScreen extends StatefulWidget {
 class _AdminMapScreenState extends State<AdminMapScreen> {
   GoogleMapController? _mapController;
   Position? _currentPosition;
+  String? _activeChildId;
   bool _isLoading = true;
   Set<Marker> _markers = {};
   Set<Circle> _circles = {};
@@ -28,6 +30,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   bool _showSafeZones = true;
   bool _showChildLocation = true;
   double _defaultZoom = 16.0;
+  LocationProvider? _locationProvider;
+  GeofenceProvider? _geofenceProvider;
+  LatLng? _lastFocusedTarget;
 
   @override
   void initState() {
@@ -35,9 +40,39 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     _initializeMap();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextLocationProvider =
+        Provider.of<LocationProvider>(context, listen: false);
+    if (!identical(_locationProvider, nextLocationProvider)) {
+      _locationProvider?.removeListener(_handleMapDataChanged);
+      _locationProvider = nextLocationProvider;
+      _locationProvider?.addListener(_handleMapDataChanged);
+    }
+
+    final nextGeofenceProvider =
+        Provider.of<GeofenceProvider>(context, listen: false);
+    if (!identical(_geofenceProvider, nextGeofenceProvider)) {
+      _geofenceProvider?.removeListener(_handleMapDataChanged);
+      _geofenceProvider = nextGeofenceProvider;
+      _geofenceProvider?.addListener(_handleMapDataChanged);
+    }
+  }
+
+  void _handleMapDataChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    _updateMarkers();
+    _maybeFocusLiveLocation(_locationProvider?.liveLocation);
+  }
+
   Future<void> _initializeMap() async {
     await _getCurrentLocation();
-    if (widget.childId != null) {
+    _activeChildId = _resolveInitialChildId();
+    if (_activeChildId != null) {
       await _loadChildData();
     }
     setState(() {
@@ -72,7 +107,8 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   }
 
   Future<void> _loadChildData() async {
-    if (widget.childId == null) return;
+    final childId = _activeChildId;
+    if (childId == null) return;
 
     final childProvider = Provider.of<ChildProvider>(context, listen: false);
     final locationProvider =
@@ -80,12 +116,33 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     final geofenceProvider =
         Provider.of<GeofenceProvider>(context, listen: false);
 
-    await childProvider.getChildWithDevice(widget.childId!);
-    await locationProvider.getLiveLocation(widget.childId!);
-    await geofenceProvider.loadSafeZones(widget.childId!);
+    await childProvider.getChildWithDevice(childId);
+    await locationProvider.getLiveLocation(childId);
+    await geofenceProvider.loadSafeZones(childId);
 
-    locationProvider.startLiveTracking(widget.childId!);
+    locationProvider.startLiveTracking(childId);
     _updateMarkers();
+  }
+
+  String? _resolveInitialChildId() {
+    if (widget.childId != null && widget.childId!.trim().isNotEmpty) {
+      return widget.childId!.trim();
+    }
+
+    final childProvider = Provider.of<ChildProvider>(context, listen: false);
+    final selectedChildId = childProvider.selectedChild?.id.trim() ?? '';
+    if (selectedChildId.isNotEmpty) {
+      return selectedChildId;
+    }
+
+    if (childProvider.children.isNotEmpty) {
+      final firstChildId = childProvider.children.first.id.trim();
+      if (firstChildId.isNotEmpty) {
+        return firstChildId;
+      }
+    }
+
+    return null;
   }
 
   void _updateMarkers() {
@@ -94,6 +151,8 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     final geofenceProvider =
         Provider.of<GeofenceProvider>(context, listen: false);
     final location = locationProvider.liveLocation;
+    final shouldShowOnlyTrackedMarker =
+        location != null || _activeChildId != null;
 
     Set<Marker> markers = {};
     Set<Circle> circles = {};
@@ -112,7 +171,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       );
     }
 
-    if (_currentPosition != null) {
+    if (!shouldShowOnlyTrackedMarker && _currentPosition != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('current'),
@@ -166,12 +225,75 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       return LatLng(location.latitude, location.longitude);
     }
 
-    if (_currentPosition != null) {
+    if (_activeChildId == null && _currentPosition != null) {
       return LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
     }
 
-    return const LatLng(
-        AppConstants.defaultLatitude, AppConstants.defaultLongitude);
+    return const LatLng(0, 0);
+  }
+
+  void _maybeFocusLiveLocation(LocationModel? location) {
+    if (_mapController == null || location == null) {
+      return;
+    }
+
+    final nextTarget = LatLng(location.latitude, location.longitude);
+    if (_lastFocusedTarget?.latitude == nextTarget.latitude &&
+        _lastFocusedTarget?.longitude == nextTarget.longitude) {
+      return;
+    }
+
+    _lastFocusedTarget = nextTarget;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _mapController == null) {
+        return;
+      }
+
+      _mapController!.animateCamera(CameraUpdate.newLatLng(nextTarget));
+    });
+  }
+
+  bool _shouldRenderMap(LocationModel? location) {
+    if (_activeChildId != null) {
+      return location != null;
+    }
+
+    return _currentPosition != null;
+  }
+
+  Widget _buildUnavailableMapState() {
+    return Container(
+      color: Colors.grey[100],
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(
+            Icons.location_off,
+            size: 44,
+            color: AppColors.textSecondary,
+          ),
+          SizedBox(height: 12),
+          Text(
+            'No live location available for this child',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'The map will appear when the linked device sends valid GPS data.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showMapSettings() {
@@ -202,10 +324,10 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                   _showLiveTracking = value;
                 });
                 Navigator.pop(context);
-                if (value && widget.childId != null) {
+                if (value && _activeChildId != null) {
                   final locationProvider =
                       Provider.of<LocationProvider>(context, listen: false);
-                  locationProvider.startLiveTracking(widget.childId!);
+                  locationProvider.startLiveTracking(_activeChildId!);
                 }
               },
             ),
@@ -273,6 +395,11 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final liveLocation = _locationProvider?.liveLocation;
+    final canRenderMap = _shouldRenderMap(liveLocation);
+    if (liveLocation != null) {
+      _maybeFocusLiveLocation(liveLocation);
+    }
     return Scaffold(
       drawer: const AdminDrawer(),
       appBar: AppBar(
@@ -305,20 +432,23 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Stack(
               children: [
-                GoogleMap(
-                  onMapCreated: _onMapCreated,
-                  initialCameraPosition: CameraPosition(
-                    target: _getInitialPosition(),
-                    zoom: _defaultZoom,
-                  ),
-                  markers: _markers,
-                  circles: _circles,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: false,
-                  zoomControlsEnabled: false,
-                  mapToolbarEnabled: false,
-                  compassEnabled: true,
-                ),
+                if (canRenderMap)
+                  GoogleMap(
+                    onMapCreated: _onMapCreated,
+                    initialCameraPosition: CameraPosition(
+                      target: _getInitialPosition(),
+                      zoom: _defaultZoom,
+                    ),
+                    markers: _markers,
+                    circles: _circles,
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                    mapToolbarEnabled: false,
+                    compassEnabled: true,
+                  )
+                else
+                  _buildUnavailableMapState(),
                 Positioned(
                   bottom: 16,
                   left: 16,
@@ -411,5 +541,14 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
         child: const Icon(Icons.my_location),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _locationProvider?.removeListener(_handleMapDataChanged);
+    _geofenceProvider?.removeListener(_handleMapDataChanged);
+    Provider.of<LocationProvider>(context, listen: false).stopLiveTracking();
+    _mapController?.dispose();
+    super.dispose();
   }
 }

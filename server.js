@@ -3,6 +3,7 @@ const cors = require("cors");
 const { realtimeDB } = require("./firebase");
 const requestLogger = require("./middleware/requestLogger");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
+const { initLiveGeofenceMonitor } = require("./utils/live-geofence-monitor");
 
 const app = express();
 
@@ -66,6 +67,7 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
+initLiveGeofenceMonitor();
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     console.log("API Endpoints:");
