@@ -1,3 +1,5 @@
+import '../utils/timestamp_utils.dart';
+
 class AlertModel {
   final String id;
   final String childId;
@@ -33,9 +35,10 @@ class AlertModel {
       childName: (json['child_name'] ?? '').toString(),
       type: (json['type'] ?? '').toString(),
       message: (json['message'] ?? '').toString(),
-      createdAt: json['created_at'] is int
-          ? json['created_at'] as int
-          : int.tryParse((json['created_at'] ?? '').toString()) ?? 0,
+      createdAt: TimestampUtils.normalizeEpochMilliseconds(
+            json['created_at'],
+          ) ??
+          0,
       isRead: json['is_read'] == true || status == 'read',
       zoneName: json['zone_name']?.toString(),
       locationText: json['location_text']?.toString(),

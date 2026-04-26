@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/child_model.dart';
 import '../models/live_tracking_model.dart';
+import 'api_service.dart';
 import '../utils/constants.dart';
 import '../utils/firebase_bootstrap.dart';
 
@@ -21,6 +23,8 @@ class DeviceLookupResult {
 }
 
 class DeviceLiveTrackingService {
+  final ApiService _apiService = ApiService();
+
   String _normalizeTrackingKey(String rawValue) {
     final originalValue = rawValue.trim();
     if (originalValue.isEmpty) {
@@ -63,52 +67,41 @@ class DeviceLiveTrackingService {
       throw StateError('Child ID is required.');
     }
 
-    await FirebaseBootstrap.ensureInitialized();
-
-    try {
-      final childSnapshot = await FirebaseFirestore.instance
-          .collection('children')
-          .doc(normalizedChildId)
-          .get();
-
-      if (!childSnapshot.exists || childSnapshot.data() == null) {
-        throw StateError('The linked child record could not be found.');
-      }
-
-      final childData = childSnapshot.data()!;
-      await _ensureAuthorizedChildAccess(childData);
-
-      final deviceSnapshot = await FirebaseFirestore.instance
-          .collection('devices')
-          .where('child_id', isEqualTo: normalizedChildId)
-          .limit(1)
-          .get();
-
-      final resolvedDevice = deviceSnapshot.docs.isEmpty
-          ? DeviceModel(
-              id: '',
-              childId: normalizedChildId,
-              imei: '',
-              simNumber: '',
-              batteryLevel: 0,
-              firmwareVersion: '',
-              status: 'offline',
-            )
-          : _toDeviceModel(deviceSnapshot.docs.first);
-
-      final resolvedChild = ChildModel.fromJson({
-        'id': childSnapshot.id,
-        ...childData,
-        if (deviceSnapshot.docs.isNotEmpty) 'device': resolvedDevice.toJson(),
-      });
-
-      return DeviceLookupResult(
-        device: resolvedDevice,
-        child: resolvedChild,
-      );
-    } on FirebaseException catch (error) {
-      throw StateError(_formatFirebaseError(error));
+    final response = await _apiService.getChildWithDevice(normalizedChildId);
+    final childPayload = response['child'];
+    if (childPayload is! Map) {
+      throw StateError('The linked child record could not be found.');
     }
+
+    final childData = Map<String, dynamic>.from(childPayload);
+    final devicePayload = response['device'];
+    final resolvedDevice = devicePayload is Map
+        ? DeviceModel.fromJson(Map<String, dynamic>.from(devicePayload))
+        : DeviceModel(
+            id: '',
+            childId: normalizedChildId,
+            imei: '',
+            simNumber: '',
+            batteryLevel: 0,
+            firmwareVersion: '',
+            status: 'no_data',
+          );
+
+    if (kDebugMode) {
+      debugPrint(
+        '[DeviceLiveTrackingService.resolveChildTracking] childId=$normalizedChildId roleScopedBackend=true resolvedDevice=${resolvedDevice.id} trackingKey=${resolvedDevice.liveTrackingKey}',
+      );
+    }
+
+    final resolvedChild = ChildModel.fromJson({
+      ...childData,
+      'device': resolvedDevice.toJson(),
+    });
+
+    return DeviceLookupResult(
+      device: resolvedDevice,
+      child: resolvedChild,
+    );
   }
 
   Future<DeviceLookupResult> lookupDevice(String rawDeviceId) async {
@@ -166,12 +159,17 @@ class DeviceLiveTrackingService {
 
     try {
       final trackingKey = resolveRealtimeTrackingKey(device);
+      final rtdbPath = 'live_tracking/$trackingKey/location';
+      if (kDebugMode) {
+        debugPrint(
+          '[DeviceLiveTrackingService.get] childId=$childId trackingKey=$trackingKey rtdbPath=/$rtdbPath',
+        );
+      }
       final database = FirebaseDatabase.instanceFor(
         app: Firebase.app(),
         databaseURL: AppConstants.firebaseDatabaseUrl,
       );
-      final snapshot =
-          await database.ref('live_tracking/$trackingKey/location').get();
+      final snapshot = await database.ref(rtdbPath).get();
 
       return _buildLiveTracking(
         childId: childId,
@@ -193,14 +191,24 @@ class DeviceLiveTrackingService {
       try {
         await FirebaseBootstrap.ensureInitialized();
         final trackingKey = resolveRealtimeTrackingKey(device);
+        final rtdbPath = 'live_tracking/$trackingKey/location';
+        if (kDebugMode) {
+          debugPrint(
+            '[DeviceLiveTrackingService.watch] connected childId=$childId trackingKey=$trackingKey rtdbPath=/$rtdbPath',
+          );
+        }
         final database = FirebaseDatabase.instanceFor(
           app: Firebase.app(),
           databaseURL: AppConstants.firebaseDatabaseUrl,
         );
 
-        final subscription =
-            database.ref('live_tracking/$trackingKey/location').onValue.listen(
+        final subscription = database.ref(rtdbPath).onValue.listen(
           (event) {
+            if (kDebugMode) {
+              debugPrint(
+                '[DeviceLiveTrackingService.watch] snapshot childId=$childId trackingKey=$trackingKey raw=${event.snapshot.value}',
+              );
+            }
             controller.add(
               _buildLiveTracking(
                 childId: childId,
@@ -209,6 +217,11 @@ class DeviceLiveTrackingService {
             );
           },
           onError: (error) {
+            if (kDebugMode) {
+              debugPrint(
+                '[DeviceLiveTrackingService.watch] error childId=$childId trackingKey=$trackingKey error=$error',
+              );
+            }
             if (error is FirebaseException) {
               controller.addError(StateError(_formatFirebaseError(error)));
               return;
@@ -237,20 +250,97 @@ class DeviceLiveTrackingService {
     return DeviceModel.fromJson({
       'id': deviceSnapshot.id,
       ...data,
+      'status': _safeStoredConnectivityStatus(data['status']),
       'imei': _normalizeTrackingKey((data['imei'] ?? '').toString()),
     });
+  }
+
+  String _safeStoredConnectivityStatus(Object? rawStatus) {
+    final status = rawStatus?.toString().trim().toLowerCase() ?? '';
+    if (status.isEmpty || status == 'online') {
+      return 'no_data';
+    }
+
+    return status;
   }
 
   LiveTrackingModel _buildLiveTracking({
     required String childId,
     required Object? rawLocation,
   }) {
+    final locationData = _asMap(rawLocation);
+    final latitude = _parseCoordinate(locationData, 'latitude', 'lat');
+    final longitude = _parseCoordinate(locationData, 'longitude', 'lng');
+    if (!_isValidCoordinate(latitude, longitude)) {
+      if (kDebugMode) {
+        debugPrint(
+          '[DeviceLiveTrackingService.parse] ignored invalid location childId=$childId raw=$rawLocation',
+        );
+      }
+      return const LiveTrackingModel();
+    }
+
+    final recordedAt = _normalizeTimestamp(
+          locationData['recorded_at'],
+        ) ??
+        _normalizeTimestamp(locationData['timestamp']) ??
+        0;
+
     return LiveTrackingModel.fromRealtimeDatabase(
       childId,
       {
-        'location': _asMap(rawLocation),
+        'location': {
+          ...locationData,
+          'latitude': latitude,
+          'longitude': longitude,
+          'recorded_at': recordedAt,
+        },
       },
     );
+  }
+
+  double? _parseCoordinate(
+      Map<String, dynamic> payload, String primaryKey, String fallbackKey) {
+    final primaryValue = _parseDouble(payload[primaryKey]);
+    if (primaryValue != null) {
+      return primaryValue;
+    }
+
+    return _parseDouble(payload[fallbackKey]);
+  }
+
+  double? _parseDouble(Object? value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '');
+  }
+
+  int? _normalizeTimestamp(Object? value) {
+    final numericValue = _parseDouble(value);
+    if (numericValue == null || numericValue <= 0) {
+      return null;
+    }
+
+    if (numericValue >= 1000000000000) {
+      return numericValue.round();
+    }
+
+    if (numericValue >= 1000000000) {
+      return (numericValue * 1000).round();
+    }
+
+    return null;
+  }
+
+  bool _isValidCoordinate(double? latitude, double? longitude) {
+    return latitude != null &&
+        longitude != null &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180;
   }
 
   String _formatFirebaseError(FirebaseException error) {

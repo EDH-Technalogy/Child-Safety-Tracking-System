@@ -1,7 +1,7 @@
-const { realtimeDB, firestore } = require("../firebase");
+const { realtimeDB } = require("../firebase");
 const {
   createHttpError,
-  getChildOrThrow,
+  ensureCanWriteChildEvent,
   getChildWithAccessOrThrow,
 } = require("../utils/child-access");
 const {
@@ -9,7 +9,17 @@ const {
   buildLocationText,
   createAlertRecord,
 } = require("../utils/alert-service");
-const { getResolvedLiveTrackingSnapshot } = require("../utils/live-tracking");
+const {
+  getResolvedLiveTrackingSnapshot,
+  getTrackingContextForChild,
+} = require("../utils/live-tracking");
+const { normalizeRealtimeLocationTimestamps } = require("../utils/live-timestamp");
+const {
+  appendLocationHistory,
+  listChildLocationHistory,
+  parseTimezoneOffsetMinutes,
+} = require("../utils/location-history");
+const { listChildLogs } = require("../utils/child-logs");
 
 const SOS_ALERT_COOLDOWN_MS = 60000;
 
@@ -62,139 +72,8 @@ function parseBooleanFlag(...values) {
   });
 }
 
-async function listChildLocationHistory(childId) {
-  const snap = await firestore
-    .collection("locations_history")
-    .where("child_id", "==", childId)
-    .get();
-
-  const history = [];
-  snap.forEach((doc) => history.push({ id: doc.id, ...doc.data() }));
-  history.sort((a, b) => (a.recorded_at || 0) - (b.recorded_at || 0));
-
-  return history;
-}
-
-async function evaluateSafeZoneTransition({
-  childId,
-  latitude,
-  longitude,
-  locationText,
-}) {
-  const safeZoneSnap = await firestore
-    .collection("safe_zones")
-    .where("child_id", "==", childId)
-    .where("status", "==", "active")
-    .get();
-
-  const stateRef = realtimeDB.ref(`live_tracking/${childId}/geofence`);
-  const previousStateSnapshot = await stateRef.once("value");
-  const previousState = previousStateSnapshot.val() || {};
-
-  if (safeZoneSnap.empty) {
-    await stateRef.set({
-      status: "no_zone",
-      last_location_text: locationText,
-      latitude,
-      longitude,
-      updated_at: Date.now(),
-    });
-    return {
-      previousStatus: previousState.status || "unknown",
-      currentStatus: "no_zone",
-      activeZoneId: null,
-      activeZoneName: null,
-    };
-  }
-
-  let insideZone = false;
-  let matchedZone = null;
-  let nearestZone = null;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-
-  safeZoneSnap.forEach((doc) => {
-    const zone = { id: doc.id, ...doc.data() };
-    const distance = calculateDistance(
-      latitude,
-      longitude,
-      zone.latitude,
-      zone.longitude
-    );
-
-    if (distance < nearestDistance) {
-      nearestDistance = distance;
-      nearestZone = zone;
-    }
-
-    if (!insideZone && distance <= zone.radius) {
-      insideZone = true;
-      matchedZone = zone;
-    }
-  });
-
-  const currentStatus = insideZone ? "inside" : "outside";
-  const activeZone = matchedZone || nearestZone;
-
-  await stateRef.set({
-    status: currentStatus,
-    zone_id: activeZone?.id || null,
-    zone_name: activeZone?.name || null,
-    last_location_text: locationText,
-    latitude,
-    longitude,
-    updated_at: Date.now(),
-  });
-
-  const previousStatus = previousState.status || "unknown";
-
-  console.info("[location.evaluateSafeZone]", {
-    childId,
-    latitude,
-    longitude,
-    previousStatus,
-    currentStatus,
-    activeZoneId: activeZone?.id || null,
-    activeZoneName: activeZone?.name || null,
-  });
-
-  if (previousStatus === "inside" && currentStatus === "outside") {
-    await createAlertRecord({
-      childId,
-      type: "OUT_ZONE",
-      zoneName: activeZone?.name || null,
-      locationText,
-      latitude,
-      longitude,
-      message: buildAlertMessage({
-        type: "OUT_ZONE",
-        zoneName: activeZone?.name || null,
-        locationText,
-      }),
-    });
-  }
-
-  if (previousStatus === "outside" && currentStatus === "inside") {
-    await createAlertRecord({
-      childId,
-      type: "IN_ZONE",
-      zoneName: matchedZone?.name || null,
-      locationText,
-      latitude,
-      longitude,
-      message: buildAlertMessage({
-        type: "IN_ZONE",
-        zoneName: matchedZone?.name || null,
-        locationText,
-      }),
-    });
-  }
-
-  return {
-    previousStatus,
-    currentStatus,
-    activeZoneId: activeZone?.id || null,
-    activeZoneName: activeZone?.name || null,
-  };
+function parseClientTimezoneOffsetMinutes(value) {
+  return parseTimezoneOffsetMinutes(value);
 }
 
 async function handleSosTrigger({
@@ -260,15 +139,25 @@ exports.updateLocation = async (req, res, next) => {
       throw createHttpError(400, "child_id is required");
     }
 
-    await getChildOrThrow(childId);
+    const accessResult = await ensureCanWriteChildEvent(req, childId);
 
     const latitude = parseCoordinate(req.body.latitude, "latitude");
     const longitude = parseCoordinate(req.body.longitude, "longitude");
     validateCoordinates(latitude, longitude);
 
     const speed = parseOptionalNumber(req.body.speed, 0);
+    const accuracy = parseOptionalNumber(req.body.accuracy, 0);
+    const heading = parseOptionalNumber(req.body.heading, 0);
+    const altitude = parseOptionalNumber(req.body.altitude, 0);
     const battery = Math.max(0, Math.round(parseOptionalNumber(req.body.battery, 0)));
-    const recordedAt = Date.now();
+    const recordedAt =
+      normalizeRealtimeLocationTimestamps(
+        {
+          timestamp: req.body.timestamp,
+          recorded_at: req.body.recorded_at,
+        },
+        Date.now()
+      ).normalizedRecordedAt;
     const locationText = buildLocationText({
       locationText: req.body.location_text,
       area: req.body.area,
@@ -277,23 +166,74 @@ exports.updateLocation = async (req, res, next) => {
       longitude,
     });
 
-    await realtimeDB.ref(`live_tracking/${childId}/location`).set({
+    const trackingContext = await getTrackingContextForChild(childId);
+    const trackingKey = trackingContext?.trackingKey || childId;
+    const rtdbPath = `live_tracking/${trackingKey}/location`;
+    const rawLivePayload = {
       latitude,
       longitude,
       speed,
       battery,
       location_text: locationText,
+      accuracy,
+      heading,
+      altitude,
+      source: req.body.source?.toString().trim() || "device",
       recorded_at: recordedAt,
+      timestamp: recordedAt,
+    };
+    const { payload: livePayload, rawTimestamp, rawRecordedAt } =
+      normalizeRealtimeLocationTimestamps(rawLivePayload, recordedAt);
+
+    const statusPath = `live_tracking/${trackingKey}/status`;
+    const network =
+      req.body.network?.toString().trim() ||
+      req.body.network_status?.toString().trim() ||
+      req.body.signal?.toString().trim() ||
+      "unknown";
+    await realtimeDB.ref().update({
+      [rtdbPath]: livePayload,
+      [statusPath]: {
+        online: true,
+        lastSeen: livePayload.recorded_at,
+        deviceStatus: "active",
+        network,
+        updatedAt: livePayload.recorded_at,
+        child_id: childId,
+        tracking_key: trackingKey,
+      },
     });
 
-    await firestore.collection("locations_history").add({
-      child_id: childId,
+    console.info("[location.updateLocation.rtdb-write]", {
+      childId,
+      accessMode: accessResult.mode,
+      resolvedDeviceId: accessResult.deviceId || null,
+      resolvedTrackingKey: trackingKey,
+      rtdbPath: `/${rtdbPath}`,
+      rawIncomingTimestamp: req.body.timestamp ?? null,
+      rawIncomingRecordedAt: req.body.recorded_at ?? null,
+      rawTimestamp,
+      rawRecordedAt,
+      normalizedTimestamp: livePayload.timestamp,
+      normalizedRecordedAt: livePayload.recorded_at,
+      statusPath: `/${statusPath}`,
+      payload: livePayload,
+      timestamp: recordedAt,
+    });
+
+    const historyResult = await appendLocationHistory({
+      childId,
+      trackingKey,
       latitude,
       longitude,
       speed,
       battery,
-      location_text: locationText,
-      recorded_at: recordedAt,
+      locationText,
+      accuracy,
+      heading,
+      altitude,
+      source: livePayload.source,
+      recordedAt,
     });
 
     console.info("[location.updateLocation]", {
@@ -302,13 +242,14 @@ exports.updateLocation = async (req, res, next) => {
       longitude,
       battery,
       locationText,
+      historyDateKey: historyResult.dateKey,
+      historyTimestamp: historyResult.timestamp,
     });
 
-    await evaluateSafeZoneTransition({
+    console.info("[location.updateLocation.geofence]", {
       childId,
-      latitude,
-      longitude,
-      locationText,
+      trackingKey,
+      status: "delegated_to_live_geofence_monitor",
     });
 
     const sosTriggered = parseBooleanFlag(
@@ -391,7 +332,11 @@ exports.getHistory = async (req, res, next) => {
     const childId = req.params.child_id?.toString().trim();
     await getChildWithAccessOrThrow(req, childId);
 
-    const history = await listChildLocationHistory(childId);
+    const history = await listChildLocationHistory(childId, {
+      timezoneOffsetMinutes: parseClientTimezoneOffsetMinutes(
+        req.query.timezone_offset_minutes ?? req.query.timezoneOffsetMinutes
+      ),
+    });
     const recentHistory = history.reverse().slice(0, 100);
 
     res.json(recentHistory);
@@ -405,16 +350,11 @@ exports.getHistoryByDate = async (req, res, next) => {
     const childId = req.params.child_id?.toString().trim();
     await getChildWithAccessOrThrow(req, childId);
 
-    const startDate = new Date(req.params.date);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(req.params.date);
-    endDate.setHours(23, 59, 59, 999);
-
-    const history = (await listChildLocationHistory(childId)).filter((entry) => {
-      const recordedAt = entry.recorded_at || 0;
-      return (
-        recordedAt >= startDate.getTime() && recordedAt <= endDate.getTime()
-      );
+    const history = await listChildLocationHistory(childId, {
+      dateKey: req.params.date?.toString().trim(),
+      timezoneOffsetMinutes: parseClientTimezoneOffsetMinutes(
+        req.query.timezone_offset_minutes ?? req.query.timezoneOffsetMinutes
+      ),
     });
 
     res.json(history);
@@ -427,20 +367,20 @@ exports.getRouteData = async (req, res, next) => {
   try {
     const childId = req.params.child_id?.toString().trim();
     await getChildWithAccessOrThrow(req, childId);
+    const dateKey = req.params.date?.toString().trim();
+    const timezoneOffsetMinutes = parseClientTimezoneOffsetMinutes(
+      req.query.timezone_offset_minutes ?? req.query.timezoneOffsetMinutes
+    );
 
-    const startDate = new Date(req.params.date);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(req.params.date);
-    endDate.setHours(23, 59, 59, 999);
-
-    const locations = (await listChildLocationHistory(childId))
-      .filter((entry) => {
-        const recordedAt = entry.recorded_at || 0;
-        return (
-          recordedAt >= startDate.getTime() && recordedAt <= endDate.getTime()
-        );
-      })
+    const locations = (await listChildLocationHistory(childId, {
+      dateKey,
+      timezoneOffsetMinutes,
+    }))
       .map(({ id, ...data }) => data);
+    const historyLogs = await listChildLogs(childId, {
+      dateKey,
+      timezoneOffsetMinutes,
+    });
 
     const coordinates = [];
     let totalDistance = 0;
@@ -464,6 +404,8 @@ exports.getRouteData = async (req, res, next) => {
     }
 
     res.json({
+      selected_date: dateKey,
+      timezone_offset_minutes: timezoneOffsetMinutes,
       coordinates,
       first_location_time: locations.length > 0 ? locations[0].recorded_at : null,
       last_location_time:
@@ -473,6 +415,8 @@ exports.getRouteData = async (req, res, next) => {
       total_distance_meters: Math.round(totalDistance),
       total_distance_km: (totalDistance / 1000).toFixed(2),
       location_count: locations.length,
+      event_count: historyLogs.length,
+      logs: historyLogs,
     });
   } catch (error) {
     next(error);

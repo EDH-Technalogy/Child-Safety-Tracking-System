@@ -17,6 +17,7 @@ router.post("/verify-otp-reset", user.verifyOtpAndResetPassword);
 // Profile routes (Flutter calls: /api/users/{userId})
 router.get("/:id", requireAuthenticatedAccess, user.getProfile);
 router.put("/:id", requireAuthenticatedAccess, user.updateProfile);
+router.patch("/:id/password", requireAuthenticatedAccess, user.changePassword);
 
 // User management routes
 router.patch("/block/:id", requireAdminAccess, user.blockUser);

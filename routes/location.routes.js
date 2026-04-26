@@ -1,9 +1,12 @@
 const router = require("express").Router();
 const location = require("../controllers/location.controller");
-const { requireAuthenticatedAccess } = require("../middleware/auth");
+const {
+  attachOptionalAuth,
+  requireAuthenticatedAccess,
+} = require("../middleware/auth");
 
 // Update Live Location
-router.post("/update", location.updateLocation);
+router.post("/update", attachOptionalAuth, location.updateLocation);
 
 // Get Live Location
 router.get("/live/:child_id", requireAuthenticatedAccess, location.getLiveLocation);

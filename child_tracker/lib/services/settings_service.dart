@@ -10,7 +10,7 @@ class SettingsService {
 
   Future<bool> getNotificationEnabled() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_notificationKey) ?? false;
+    return prefs.getBool(_notificationKey) ?? true;
   }
 
   Future<void> setNotificationEnabled(bool value) async {
@@ -32,7 +32,7 @@ class SettingsService {
   Future<Map<String, bool>> getAllSettings() async {
     final prefs = await SharedPreferences.getInstance();
     return {
-      'notifications': prefs.getBool(_notificationKey) ?? false,
+      'notifications': prefs.getBool(_notificationKey) ?? true,
       'locationTracking': prefs.getBool(_locationTrackingKey) ?? false,
     };
   }

@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/activity_provider.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
+import '../utils/timestamp_utils.dart';
 
 class ActivityScreen extends StatefulWidget {
   final String childId;
@@ -364,8 +365,12 @@ class _ActivityScreenState extends State<ActivityScreen>
       case 'location_update':
         return Icons.location_on;
       case 'zone_entry':
+      case 'safe_zone_enter':
+      case 'in_zone':
         return Icons.check_circle;
       case 'zone_exit':
+      case 'safe_zone_exit':
+      case 'out_zone':
         return Icons.exit_to_app;
       case 'low_battery':
         return Icons.battery_alert;
@@ -383,8 +388,12 @@ class _ActivityScreenState extends State<ActivityScreen>
       case 'location_update':
         return AppColors.primaryColor;
       case 'zone_entry':
+      case 'safe_zone_enter':
+      case 'in_zone':
         return AppColors.successColor;
       case 'zone_exit':
+      case 'safe_zone_exit':
+      case 'out_zone':
         return AppColors.warningColor;
       case 'low_battery':
         return Colors.orange;
@@ -396,22 +405,20 @@ class _ActivityScreenState extends State<ActivityScreen>
   }
 
   String _formatTimestamp(dynamic timestamp) {
-    if (timestamp == null) return '';
-    try {
-      final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
+    final date = TimestampUtils.toLocalDateTime(timestamp);
+    if (date == null) {
       return '';
     }
+
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   String _formatTime(dynamic timestamp) {
-    if (timestamp == null) return '-';
-    try {
-      final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      return '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
+    final date = TimestampUtils.toLocalDateTime(timestamp);
+    if (date == null) {
       return '-';
     }
+
+    return '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

@@ -4,6 +4,10 @@ const {
   removeRealtimeState,
 } = require("../utils/realtime-sync");
 const {
+  removeDeviceRegistry,
+  upsertDeviceRegistry,
+} = require("../utils/device-registry");
+const {
   safeWriteAuditLog,
   buildPerformedByFromRequest,
   inferSource,
@@ -27,17 +31,33 @@ function isAdminRequest(req) {
   return req.auth?.role === "admin";
 }
 
+function logOwnershipValidation(req, targetUserId, result, reason) {
+  console.info("[child.ownership]", {
+    method: req.method,
+    path: req.originalUrl || req.path,
+    role: req.auth?.role || "anonymous",
+    authType: req.auth?.type || null,
+    authId: req.auth?.id || null,
+    targetUserId: targetUserId || null,
+    result,
+    reason,
+  });
+}
+
 function ensureCanManageUserChildren(req, targetUserId) {
   ensureAuthenticated(req);
 
   if (isAdminRequest(req)) {
+    logOwnershipValidation(req, targetUserId, "allowed", "admin");
     return;
   }
 
   if (req.auth?.type === "user" && req.auth.id === targetUserId) {
+    logOwnershipValidation(req, targetUserId, "allowed", "owner");
     return;
   }
 
+  logOwnershipValidation(req, targetUserId, "denied", "not_owner");
   throw createHttpError(403, "You do not have permission to manage this child");
 }
 
@@ -143,6 +163,348 @@ async function getDeviceDocsForChild(childId) {
   return firestore.collection("devices").where("child_id", "==", childId).get();
 }
 
+function hasOwnBodyField(body, field) {
+  return Object.prototype.hasOwnProperty.call(body || {}, field);
+}
+
+function hasDeviceUpdateInstruction(body = {}) {
+  return [
+    "register_device",
+    "device_id",
+    "imei",
+    "sim_number",
+    "firmware",
+    "firmware_version",
+  ].some((field) => hasOwnBodyField(body, field));
+}
+
+function parseBooleanFlag(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "on"].includes(
+      value.trim().toLowerCase()
+    );
+  }
+
+  return Boolean(value);
+}
+
+async function getDeviceForChild(childId, requestedDeviceId = null) {
+  const normalizedDeviceId = requestedDeviceId?.toString().trim() || "";
+
+  if (normalizedDeviceId) {
+    const deviceRef = firestore.collection("devices").doc(normalizedDeviceId);
+    const deviceDoc = await deviceRef.get();
+
+    if (!deviceDoc.exists) {
+      throw createHttpError(404, "Device not found");
+    }
+
+    const deviceData = deviceDoc.data() || {};
+    if (deviceData.child_id !== childId) {
+      throw createHttpError(403, "Device is not linked to this child");
+    }
+
+    return { deviceRef, deviceDoc, deviceData };
+  }
+
+  const snap = await firestore
+    .collection("devices")
+    .where("child_id", "==", childId)
+    .limit(1)
+    .get();
+
+  if (snap.empty) {
+    return null;
+  }
+
+  return {
+    deviceRef: snap.docs[0].ref,
+    deviceDoc: snap.docs[0],
+    deviceData: snap.docs[0].data() || {},
+  };
+}
+
+async function getSafeResolvedLiveTrackingSnapshot(childId) {
+  try {
+    return await getResolvedLiveTrackingSnapshot(childId);
+  } catch (error) {
+    console.warn("[child.deviceStatus] live tracking lookup failed", {
+      childId,
+      error: error.message,
+    });
+    return null;
+  }
+}
+
+function buildDeviceDataWithLiveStatus(childId, deviceData, liveTracking) {
+  if (!deviceData) {
+    return null;
+  }
+
+  const status = liveTracking?.latestStatus || "no_data";
+  const statusReason = liveTracking?.statusReason || "missing_live_tracking";
+  const now = liveTracking?.now || Date.now();
+
+  console.info("[child.deviceStatus] computed", {
+    childId,
+    deviceId: deviceData.id || null,
+    trackingKey: liveTracking?.trackingKey || null,
+    rawLiveTimestamp: liveTracking?.latestTimestamp || null,
+    now,
+    ageMs: liveTracking?.latestAgeMs ?? null,
+    status,
+    reason: statusReason,
+    rawLiveStatus: liveTracking?.rawLatestStatus || deviceData.status || null,
+  });
+
+  return {
+    ...deviceData,
+    battery_level: liveTracking?.batteryLevel ?? deviceData.battery_level ?? 0,
+    status,
+    latest_live_status: status,
+    raw_live_status: liveTracking?.rawLatestStatus || deviceData.status || null,
+    latest_signal: liveTracking?.latestSignal || statusReason,
+    latest_timestamp: liveTracking?.latestTimestamp || null,
+    latest_status_timestamp: liveTracking?.latestStatusTimestamp || null,
+    latest_age_ms: liveTracking?.latestAgeMs ?? null,
+    live_tracking_key: liveTracking?.trackingKey || null,
+    timestamp_inferred: liveTracking?.timestampInferred || false,
+    status_reason: statusReason,
+    online_threshold_ms: liveTracking?.onlineThresholdMs || null,
+    delayed_threshold_ms: liveTracking?.delayedThresholdMs || null,
+    live_tracking: liveTracking?.raw || null,
+  };
+}
+
+async function getDeviceDataWithLiveStatusForChild(childId) {
+  const existingDevice = await getDeviceForChild(childId);
+  if (!existingDevice) {
+    console.info("[child.deviceStatus] no device linked", {
+      childId,
+      status: "no_data",
+      reason: "missing_device",
+    });
+    return null;
+  }
+
+  const liveTracking = await getSafeResolvedLiveTrackingSnapshot(childId);
+  return buildDeviceDataWithLiveStatus(
+    childId,
+    {
+      id: existingDevice.deviceDoc.id,
+      ...existingDevice.deviceData,
+    },
+    liveTracking
+  );
+}
+
+async function ensureDeviceImeiIsAvailable(imei, existingDeviceId = null) {
+  const duplicateImei = await firestore
+    .collection("devices")
+    .where("imei", "==", imei)
+    .get();
+
+  const duplicateExists = duplicateImei.docs.some(
+    (doc) => doc.id !== existingDeviceId
+  );
+
+  if (duplicateExists) {
+    throw createHttpError(400, "Device with this IMEI already exists");
+  }
+}
+
+async function applyDeviceUpdateForChild(req, childId, childData = {}) {
+  if (!hasDeviceUpdateInstruction(req.body)) {
+    return { changed: false, deviceData: null };
+  }
+
+  const existingDevice = await getDeviceForChild(childId, req.body.device_id);
+  const shouldRegister = hasOwnBodyField(req.body, "register_device")
+    ? parseBooleanFlag(req.body.register_device)
+    : true;
+  const role = isAdminRequest(req) ? "admin" : "user";
+
+  console.info("[child.updateChild.device] request", {
+    role,
+    authId: req.auth?.id || null,
+    childId,
+    existingDeviceId: existingDevice?.deviceDoc.id || null,
+    registerDevice: shouldRegister,
+  });
+
+  if (!shouldRegister) {
+    if (!existingDevice) {
+      return { changed: false, deviceData: null };
+    }
+
+    await existingDevice.deviceRef.delete();
+    await removeDeviceRegistry(existingDevice.deviceDoc.id, {
+      childId,
+    });
+    await syncRealtimeState(childId, {
+      childStatus: childData.status || "active",
+      deviceStatus: "offline",
+      disabled: true,
+      blocked: childData.status === "blocked",
+      reason: "device_deleted_from_child_form",
+    });
+
+    const deletedDeviceData = {
+      id: existingDevice.deviceDoc.id,
+      ...existingDevice.deviceData,
+    };
+
+    await logChildEvent(req, {
+      eventType: "device_deleted",
+      entityType: "device",
+      entityId: existingDevice.deviceDoc.id,
+      title: "Device deleted",
+      description: `Device ${existingDevice.deviceData.imei || existingDevice.deviceDoc.id} was removed from ${childData.name || "child"}.`,
+      target: {
+        id: existingDevice.deviceDoc.id,
+        imei: existingDevice.deviceData.imei || null,
+        child_id: childId,
+        sim_number: existingDevice.deviceData.sim_number || null,
+        firmware_version: existingDevice.deviceData.firmware_version || null,
+        status: existingDevice.deviceData.status || null,
+      },
+      status: "success",
+      result: "success",
+      metadata: {
+        oldValues: deletedDeviceData,
+      },
+    });
+
+    return { changed: true, deviceData: null };
+  }
+
+  const nextImei =
+    req.body.imei?.toString().trim() || existingDevice?.deviceData.imei || "";
+  if (!nextImei) {
+    throw createHttpError(400, "imei is required when registering a device");
+  }
+
+  await ensureDeviceImeiIsAvailable(
+    nextImei,
+    existingDevice?.deviceDoc.id || null
+  );
+
+  const nextDeviceData = {
+    child_id: childId,
+    imei: nextImei,
+    sim_number: hasOwnBodyField(req.body, "sim_number")
+      ? req.body.sim_number || ""
+      : existingDevice?.deviceData.sim_number || "",
+    firmware_version:
+      req.body.firmware?.toString().trim() ||
+      req.body.firmware_version?.toString().trim() ||
+      existingDevice?.deviceData.firmware_version ||
+      "1.0.0",
+    updated_at: Date.now(),
+  };
+
+  if (existingDevice) {
+    await existingDevice.deviceRef.update(nextDeviceData);
+    await upsertDeviceRegistry(existingDevice.deviceDoc.id, {
+      ...existingDevice.deviceData,
+      ...nextDeviceData,
+      user_id: childData.user_id || "",
+    });
+
+    const mergedDeviceData = {
+      ...existingDevice.deviceData,
+      ...nextDeviceData,
+    };
+
+    await logChildEvent(req, {
+      eventType: "device_updated",
+      entityType: "device",
+      entityId: existingDevice.deviceDoc.id,
+      title: "Device updated",
+      description: `Device ${nextImei} was updated for ${childData.name || "child"}.`,
+      target: {
+        id: existingDevice.deviceDoc.id,
+        ...mergedDeviceData,
+      },
+      status: "success",
+      result: "success",
+      metadata: {
+        oldValues: existingDevice.deviceData,
+        newValues: mergedDeviceData,
+        changedFields: extractChangedFields(
+          existingDevice.deviceData,
+          mergedDeviceData
+        ),
+      },
+    });
+
+    return {
+      changed: true,
+      deviceData: {
+        id: existingDevice.deviceDoc.id,
+        ...mergedDeviceData,
+      },
+    };
+  }
+
+  const createdDeviceData = {
+    ...nextDeviceData,
+    battery_level: 100,
+    status: "offline",
+    created_at: Date.now(),
+  };
+  delete createdDeviceData.updated_at;
+
+  const device = await firestore.collection("devices").add(createdDeviceData);
+  await upsertDeviceRegistry(device.id, {
+    ...createdDeviceData,
+    user_id: childData.user_id || "",
+  });
+  await syncRealtimeState(childId, {
+    childStatus: childData.status || "active",
+    deviceStatus: "offline",
+    disabled: false,
+    blocked: childData.status === "blocked",
+    reason: "device_registered_from_child_form_waiting_for_live_data",
+  });
+
+  const responseDeviceData = {
+    id: device.id,
+    ...createdDeviceData,
+  };
+
+  await logChildEvent(req, {
+    eventType: "device_registered",
+    entityType: "device",
+    entityId: device.id,
+    title: "Device registered",
+    description: `Device ${nextImei} was registered for ${childData.name || "child"}.`,
+    target: responseDeviceData,
+    status: "success",
+    result: "success",
+    metadata: {
+      newValues: responseDeviceData,
+      changedFields: [
+        "child_id",
+        "imei",
+        "sim_number",
+        "firmware_version",
+        "status",
+      ],
+    },
+  });
+
+  return { changed: true, deviceData: responseDeviceData };
+}
+
 async function setChildDeviceState(
   childId,
   {
@@ -155,6 +517,7 @@ async function setChildDeviceState(
 ) {
   const deviceSnap = await getDeviceDocsForChild(childId);
   const updates = [];
+  const registryUpdates = [];
 
   deviceSnap.forEach((doc) => {
     const payload = {
@@ -170,6 +533,13 @@ async function setChildDeviceState(
     }
 
     updates.push(doc.ref.update(payload));
+    registryUpdates.push(
+      upsertDeviceRegistry(doc.id, {
+        ...doc.data(),
+        ...payload,
+        user_id: doc.data()?.user_id || "",
+      })
+    );
   });
 
   if (childStatus !== undefined) {
@@ -189,7 +559,7 @@ async function setChildDeviceState(
     });
   }
 
-  await Promise.all(updates);
+  await Promise.all([...updates, ...registryUpdates]);
 }
 
 // ADD CHILD (with optional device registration)
@@ -197,9 +567,39 @@ exports.addChild = async (req, res, next) => {
   try {
     const { user_id, name, age, photo, imei, sim_number, firmware } = req.body;
     const requestedUserId = user_id?.toString().trim();
+    const isAdmin = isAdminRequest(req);
+    const effectiveUserIdentifier = isAdmin ? requestedUserId : req.auth?.id;
 
-    if (!requestedUserId || !name || age === undefined || age === null) {
-      throw createHttpError(400, "user_id, name, and age are required");
+    console.info("[child.addChild] request", {
+      role: isAdmin ? "admin" : req.auth?.role || "user",
+      authId: req.auth?.id || null,
+      requestedUserId: requestedUserId || null,
+      effectiveUserIdentifier: effectiveUserIdentifier || null,
+      mode: "add",
+      hasPhoto: Boolean(photo),
+      registerDevice: Boolean(imei && imei.trim() !== ""),
+    });
+
+    if (!isAdmin && requestedUserId && requestedUserId !== req.auth?.id) {
+      logOwnershipValidation(
+        req,
+        requestedUserId,
+        "denied",
+        "manual_parent_assignment"
+      );
+      throw createHttpError(
+        403,
+        "You cannot assign a child to another parent"
+      );
+    }
+
+    if (!effectiveUserIdentifier || !name || age === undefined || age === null) {
+      throw createHttpError(
+        400,
+        isAdmin
+          ? "user_id, name, and age are required"
+          : "name and age are required"
+      );
     }
 
     const parsedAge = Number(age);
@@ -208,11 +608,12 @@ exports.addChild = async (req, res, next) => {
     }
 
     console.info("[child.addChild] resolving user", {
-      requestedUserId,
+      requestedUserId: requestedUserId || null,
+      effectiveUserIdentifier,
       lookupCollection: "users",
     });
 
-    const resolvedUser = await resolveUserByIdentifier(requestedUserId);
+    const resolvedUser = await resolveUserByIdentifier(effectiveUserIdentifier);
     if (!resolvedUser) {
       throw createHttpError(404, "User not found");
     }
@@ -262,33 +663,36 @@ exports.addChild = async (req, res, next) => {
     let deviceData = null;
 
     if (imei && imei.trim() !== "") {
-      const device = await firestore.collection("devices").add({
+      const createdDeviceAt = Date.now();
+      const createdDeviceData = {
         child_id: child.id,
         imei: imei.trim(),
         sim_number: sim_number || "",
         battery_level: 100,
         firmware_version: firmware || "1.0.0",
-        status: "online",
-        created_at: Date.now(),
+        status: "offline",
+        created_at: createdDeviceAt,
+      };
+      const device = await firestore.collection("devices").add(createdDeviceData);
+      await upsertDeviceRegistry(device.id, {
+        ...createdDeviceData,
+        user_id: resolvedUserId,
       });
 
       deviceData = {
         id: device.id,
-        child_id: child.id,
-        imei: imei.trim(),
-        sim_number: sim_number || "",
-        battery_level: 100,
-        firmware_version: firmware || "1.0.0",
-        status: "online",
+        ...createdDeviceData,
       };
     }
 
     await syncRealtimeState(child.id, {
       childStatus: "active",
-      deviceStatus: deviceData ? "online" : "offline",
+      deviceStatus: "offline",
       disabled: !deviceData,
       blocked: false,
-      reason: deviceData ? "child_and_device_created" : "child_created",
+      reason: deviceData
+        ? "child_and_device_created_waiting_for_live_data"
+        : "child_created",
     });
 
     await logChildEvent(
@@ -394,7 +798,13 @@ exports.addChild = async (req, res, next) => {
             : null,
         },
       },
-      req.body?.user_id
+      req.auth?.id
+        ? {
+            id: req.auth.id,
+            role: req.auth.role || req.auth.type || "user",
+            type: req.auth.type || "user",
+          }
+        : req.body?.user_id
         ? {
             id: req.body.user_id,
             role: "user",
@@ -429,8 +839,13 @@ exports.getChildren = async (req, res, next) => {
       .where("user_id", "==", req.params.user_id)
       .get();
 
-    const list = [];
-    snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+    const list = await Promise.all(
+      snap.docs.map(async (d) => ({
+        id: d.id,
+        ...d.data(),
+        device: await getDeviceDataWithLiveStatusForChild(d.id),
+      }))
+    );
 
     res.json(list);
   } catch (error) {
@@ -456,19 +871,56 @@ exports.updateChild = async (req, res, next) => {
     const currentChildData = childDoc.data();
     ensureCanAccessChildRecord(req, currentChildData);
     const updates = {};
+    const isAdmin = isAdminRequest(req);
+    const hasDeviceInstruction = hasDeviceUpdateInstruction(req.body);
+
+    console.info("[child.updateChild] request", {
+      role: isAdmin ? "admin" : req.auth?.role || "user",
+      authId: req.auth?.id || null,
+      childId: req.params.child_id,
+      ownerUserId: currentChildData.user_id || null,
+      requestedUserId:
+        req.body.user_id !== undefined ? req.body.user_id || null : null,
+      mode: "edit",
+      hasDeviceInstruction,
+      registerDevice:
+        req.body.register_device !== undefined
+          ? parseBooleanFlag(req.body.register_device)
+          : null,
+    });
 
     if (req.body.user_id !== undefined) {
       if (!req.body.user_id) {
         throw createHttpError(400, "user_id is required");
       }
 
-      const resolvedUser = await resolveUserByIdentifier(req.body.user_id);
-      if (!resolvedUser) {
-        throw createHttpError(404, "User not found");
-      }
+      if (!isAdmin) {
+        if (req.body.user_id.toString().trim() !== req.auth?.id) {
+          logOwnershipValidation(
+            req,
+            req.body.user_id.toString().trim(),
+            "denied",
+            "manual_parent_assignment"
+          );
+          throw createHttpError(
+            403,
+            "You cannot assign a child to another parent"
+          );
+        }
 
-      ensureCanManageUserChildren(req, resolvedUser.resolvedUserId);
-      updates.user_id = resolvedUser.resolvedUserId;
+        console.info("[child.updateChild] ignored user_id from owner request", {
+          childId: req.params.child_id,
+          authId: req.auth?.id || null,
+        });
+      } else {
+        const resolvedUser = await resolveUserByIdentifier(req.body.user_id);
+        if (!resolvedUser) {
+          throw createHttpError(404, "User not found");
+        }
+
+        ensureCanManageUserChildren(req, resolvedUser.resolvedUserId);
+        updates.user_id = resolvedUser.resolvedUserId;
+      }
     }
 
     if (req.body.name !== undefined) {
@@ -487,36 +939,50 @@ exports.updateChild = async (req, res, next) => {
       updates.photo = req.body.photo;
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && !hasDeviceInstruction) {
       throw createHttpError(400, "No child fields provided to update");
     }
 
-    updates.updated_at = Date.now();
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = Date.now();
 
-    await childRef.update(updates);
+      await childRef.update(updates);
+    }
 
     const nextChildData = {
       ...currentChildData,
       ...updates,
     };
 
-    await logChildEvent(req, {
-      eventType: "child_updated",
-      entityType: "child",
-      entityId: req.params.child_id,
-      title: "Child updated",
-      description: `${nextChildData.name || "Child"} profile was updated.`,
-      target: buildChildTarget(req.params.child_id, nextChildData),
-      status: "success",
-      result: "success",
-      metadata: {
-        oldValues: currentChildData,
-        newValues: nextChildData,
-        changedFields: extractChangedFields(currentChildData, nextChildData),
-      },
-    });
+    const deviceUpdate = await applyDeviceUpdateForChild(
+      req,
+      req.params.child_id,
+      nextChildData
+    );
 
-    res.json({ message: "Child updated successfully" });
+    if (Object.keys(updates).length > 0) {
+      await logChildEvent(req, {
+        eventType: "child_updated",
+        entityType: "child",
+        entityId: req.params.child_id,
+        title: "Child updated",
+        description: `${nextChildData.name || "Child"} profile was updated.`,
+        target: buildChildTarget(req.params.child_id, nextChildData),
+        status: "success",
+        result: "success",
+        metadata: {
+          oldValues: currentChildData,
+          newValues: nextChildData,
+          changedFields: extractChangedFields(currentChildData, nextChildData),
+          deviceChanged: deviceUpdate.changed,
+        },
+      });
+    }
+
+    res.json({
+      message: "Child updated successfully",
+      device: deviceUpdate.deviceData,
+    });
   } catch (error) {
     await logChildEvent(req, {
       eventType: "child_updated",
@@ -552,6 +1018,13 @@ exports.removeChild = async (req, res, next) => {
       batch.delete(doc.ref);
     });
     await batch.commit();
+    await Promise.all(
+      relatedDeviceIds.map((deviceId) =>
+        removeDeviceRegistry(deviceId, {
+          childId,
+        })
+      )
+    );
 
     await removeRealtimeState(childId);
 
@@ -665,32 +1138,9 @@ exports.getChildWithDevice = async (req, res, next) => {
     const { childDoc } = await getChildOrThrow(req.params.child_id);
     ensureCanAccessChildRecord(req, childDoc.data());
 
-    const deviceSnap = await firestore
-      .collection("devices")
-      .where("child_id", "==", req.params.child_id)
-      .limit(1)
-      .get();
-
-    let deviceData = null;
-    if (!deviceSnap.empty) {
-      deviceData = { id: deviceSnap.docs[0].id, ...deviceSnap.docs[0].data() };
-    }
-
-    const liveTracking = await getResolvedLiveTrackingSnapshot(req.params.child_id);
-    if (deviceData && liveTracking) {
-      deviceData = {
-        ...deviceData,
-        battery_level:
-          liveTracking.batteryLevel ?? deviceData.battery_level ?? 0,
-        status: liveTracking.latestStatus || deviceData.status || "offline",
-        latest_live_status: liveTracking.latestStatus || null,
-        latest_signal: liveTracking.latestSignal || null,
-        latest_timestamp: liveTracking.latestTimestamp || null,
-        live_tracking_key: liveTracking.trackingKey || null,
-        timestamp_inferred: liveTracking.timestampInferred || false,
-        live_tracking: liveTracking.raw || null,
-      };
-    }
+    const deviceData = await getDeviceDataWithLiveStatusForChild(
+      req.params.child_id
+    );
 
     res.json({
       child: { id: childDoc.id, ...childDoc.data() },

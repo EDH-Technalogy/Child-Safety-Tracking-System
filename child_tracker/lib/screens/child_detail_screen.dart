@@ -10,6 +10,7 @@ import '../providers/alert_provider.dart';
 import '../providers/geofence_provider.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
+import '../utils/timestamp_utils.dart';
 
 class ChildDetailScreen extends StatefulWidget {
   final String childId;
@@ -29,6 +30,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   LocationProvider? _locationProvider;
   GeofenceProvider? _geofenceProvider;
   LatLng? _lastFocusedTarget;
+  String get _alertMonitorOwnerId => 'child_detail:${widget.childId}';
 
   @override
   void initState() {
@@ -159,6 +161,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     await childProvider.getChildWithDevice(widget.childId);
     await locationProvider.getLiveLocation(widget.childId);
     await alertProvider.getUnreadCount(widget.childId);
+    await alertProvider.startMonitoring(
+      widget.childId,
+      ownerId: _alertMonitorOwnerId,
+    );
     await geofenceProvider.loadSafeZones(widget.childId);
 
     locationProvider.startLiveTracking(widget.childId);
@@ -169,6 +175,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   void dispose() {
     _locationProvider?.removeListener(_handleMapDataChanged);
     _geofenceProvider?.removeListener(_handleMapDataChanged);
+    Provider.of<AlertProvider>(context, listen: false)
+        .stopMonitoring(ownerId: _alertMonitorOwnerId);
     final locationProvider =
         Provider.of<LocationProvider>(context, listen: false);
     locationProvider.stopLiveTracking();
@@ -190,6 +198,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
   void _maybeFocusLiveLocation(LocationModel? location) {
     if (_mapController == null || location == null) {
+      return;
+    }
+
+    if (_locationProvider?.isAnimatingLiveLocation == true) {
       return;
     }
 
@@ -778,7 +790,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   }
 
   String _formatTimestamp(int timestamp) {
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final date = TimestampUtils.toLocalDateTime(timestamp);
+    if (date == null) {
+      return '--';
+    }
+
     return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

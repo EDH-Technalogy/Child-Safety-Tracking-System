@@ -459,9 +459,21 @@ class AuthProvider with ChangeNotifier {
   Future<bool> updateProfile({
     required String name,
     required String phone,
+    String? email,
     String? photo,
   }) async {
     if (_user == null) return false;
+
+    if (kDebugMode) {
+      debugPrint(
+        '[AuthProvider.updateProfile] userId=${_user!.id} role=${_user!.role} fields=${[
+          'name',
+          'phone',
+          if (email != null) 'email',
+          if (photo != null) 'photo',
+        ]}',
+      );
+    }
 
     _setLoading(true);
     _error = null;
@@ -470,7 +482,7 @@ class AuthProvider with ChangeNotifier {
       final result = isAdmin
           ? await _adminApiService.updateAdminProfile(
               name: name,
-              email: _user!.email,
+              email: email ?? _user!.email,
               phone: phone,
               photo: photo,
             )
@@ -478,6 +490,7 @@ class AuthProvider with ChangeNotifier {
               userId: _user!.id,
               name: name,
               phone: phone,
+              email: email ?? _user!.email,
               photo: photo,
             );
 
@@ -486,6 +499,44 @@ class AuthProvider with ChangeNotifier {
           SessionTokenStore.currentToken ??
           '';
       await setAuthenticatedSession(userData: result, token: token);
+      return true;
+    } catch (e) {
+      _error = _formatError(e);
+
+      if (_shouldInvalidatePersistedSession(_error!)) {
+        await _clearPersistedSession();
+        notifyListeners();
+      }
+
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    if (_user == null) return false;
+
+    if (kDebugMode) {
+      debugPrint(
+        '[AuthProvider.changePassword] userId=${_user!.id} role=${_user!.role} passwordLengths=current:${currentPassword.length},new:${newPassword.length},confirm:${confirmPassword.length}',
+      );
+    }
+
+    _setLoading(true);
+    _error = null;
+
+    try {
+      await _apiService.changePassword(
+        userId: _user!.id,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      );
       return true;
     } catch (e) {
       _error = _formatError(e);

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../services/admin_api_service.dart';
 import '../../utils/localization_helpers.dart';
+import '../../utils/timestamp_utils.dart';
 import '../../widgets/admin_drawer.dart';
 
 class AdminLogsScreen extends StatefulWidget {
@@ -253,8 +254,7 @@ class _AdminLogsScreenState extends State<AdminLogsScreen> {
 
     final confirmed = await _confirmAction(
       title: l10n.deleteSelectedLogs,
-      message:
-          '${l10n.deleteSelectedLogsConfirm} (${selectedLogs.length})',
+      message: '${l10n.deleteSelectedLogsConfirm} (${selectedLogs.length})',
       confirmLabel: l10n.deleteSelected,
     );
     if (!confirmed) return;
@@ -321,16 +321,12 @@ class _AdminLogsScreenState extends State<AdminLogsScreen> {
   }
 
   String _formatTimestamp(dynamic timestamp) {
-    if (timestamp == null) return 'N/A';
-    try {
-      final millis = timestamp is int
-          ? timestamp
-          : int.tryParse(timestamp.toString()) ?? 0;
-      final date = DateTime.fromMillisecondsSinceEpoch(millis);
-      return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}';
-    } catch (e) {
+    final date = TimestampUtils.toLocalDateTime(timestamp);
+    if (date == null) {
       return 'N/A';
     }
+
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}';
   }
 
   String _formatActor(dynamic actor) {
@@ -416,8 +412,10 @@ class _AdminLogsScreenState extends State<AdminLogsScreen> {
                   context.l10n.dateTime,
                   _formatTimestamp(log['timestamp'] ?? log['created_at']),
                 ),
-                _buildDetailRow(context.l10n.actor, _formatActor(log['performedBy'])),
-                _buildDetailRow(context.l10n.target, _formatTarget(log['target'])),
+                _buildDetailRow(
+                    context.l10n.actor, _formatActor(log['performedBy'])),
+                _buildDetailRow(
+                    context.l10n.target, _formatTarget(log['target'])),
                 _buildDetailRow(context.l10n.status, _status(log)),
                 _buildDetailRow(
                   context.l10n.source,
@@ -460,9 +458,8 @@ class _AdminLogsScreenState extends State<AdminLogsScreen> {
               icon: Icon(
                 _allVisibleSelected ? Icons.deselect : Icons.select_all,
               ),
-              tooltip: _allVisibleSelected
-                  ? l10n.clearSelection
-                  : l10n.selectAll,
+              tooltip:
+                  _allVisibleSelected ? l10n.clearSelection : l10n.selectAll,
               onPressed: _isLoading || _isMutatingLogs
                   ? null
                   : _toggleSelectAllVisible,
@@ -470,9 +467,7 @@ class _AdminLogsScreenState extends State<AdminLogsScreen> {
           if (_logs.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep),
-              tooltip: _hasSelectedLogs
-                  ? l10n.deleteSelected
-                  : l10n.deleteAll,
+              tooltip: _hasSelectedLogs ? l10n.deleteSelected : l10n.deleteAll,
               onPressed: _isLoading || _isMutatingLogs
                   ? null
                   : (_hasSelectedLogs ? _deleteSelectedLogs : _deleteAllLogs),

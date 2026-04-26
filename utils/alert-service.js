@@ -1,5 +1,7 @@
 const { realtimeDB, firestore } = require("../firebase");
 const { createHttpError, getChildOrThrow } = require("./child-access");
+const { getTrackingContextForChild } = require("./live-tracking");
+const { appendChildLog, normalizeLogType } = require("./child-logs");
 
 function isFiniteNumber(value) {
   return Number.isFinite(Number(value));
@@ -50,8 +52,12 @@ function buildAlertMessage({
     case "SOS":
       return `Emergency Alert: SOS button triggered from child device. Current location: ${safeLocationText}.`;
     case "OUT_ZONE":
+    case "SAFE_ZONE_EXIT":
+    case "ZONE_EXIT":
       return `Child out of Safe Zone. Current location: ${safeLocationText}.`;
     case "IN_ZONE":
+    case "SAFE_ZONE_ENTER":
+    case "ZONE_ENTER":
       return `Your child has returned to the configured safe zone and is currently located in ${safeLocationText}.`;
     case "LOW_BATTERY":
       return `Low battery alert! Battery level: ${batteryLevel ?? "Unknown"}%`;
@@ -100,7 +106,13 @@ async function createAlertRecord({
     ...extraFields,
   };
 
+  const alertDoc = firestore.collection("alerts").doc();
+  const alertId = alertDoc.id;
   const livePayload = {
+    alert_id: alertId,
+    child_id: childId,
+    user_id: childData.user_id || "",
+    child_name: childData.name || "",
     type: normalizedType,
     message,
     location_text: locationText,
@@ -109,22 +121,66 @@ async function createAlertRecord({
     longitude: alertPayload.longitude,
     battery_level: batteryLevel,
     created_at: time,
+    status: "unread",
+    ...extraFields,
+  };
+  const adminLivePayload = {
+    ...livePayload,
+    parent_user_id: childData.user_id || "",
+  };
+  const realtimeUpdates = {
+    [`alerts_by_child/${childId}/${alertId}`]: livePayload,
+    [`admin_alerts/${alertId}`]: adminLivePayload,
+    [`alerts_live/${childId}`]: livePayload,
   };
 
-  await realtimeDB.ref(`alerts_live/${childId}`).set(livePayload);
-  const alertDoc = await firestore.collection("alerts").add(alertPayload);
+  if (childData.user_id?.toString().trim()) {
+    realtimeUpdates[`alerts/${childData.user_id}/${alertId}`] = livePayload;
+  }
+
+  await alertDoc.set(alertPayload);
+  await realtimeDB.ref().update(realtimeUpdates);
+
+  const trackingContext = await getTrackingContextForChild(childId);
+  const resolvedTrackingKey =
+    extraFields.tracking_key?.toString().trim() ||
+    trackingContext?.trackingKey ||
+    "";
+  const normalizedLogType = normalizeLogType(normalizedType);
+  await appendChildLog({
+    childId,
+    trackingKey: resolvedTrackingKey,
+    parentUserId: childData.user_id || "",
+    type: normalizedLogType,
+    message,
+    timestamp: time,
+    metadata: {
+      source: "alert_service",
+      alertId,
+      zoneName,
+      locationText,
+      latitude: alertPayload.latitude,
+      longitude: alertPayload.longitude,
+      batteryLevel,
+      originalType: normalizedType,
+    },
+  });
 
   console.info("[alerts.createAlertRecord]", {
     childId,
     userId: childData.user_id || "",
     type: normalizedType,
-    alertId: alertDoc.id,
+    alertId,
+    livePath: childData.user_id
+      ? `/alerts/${childData.user_id}/${alertId}`
+      : `/alerts_by_child/${childId}/${alertId}`,
+    adminLivePath: `/admin_alerts/${alertId}`,
     zoneName,
     locationText,
   });
 
   return {
-    alertId: alertDoc.id,
+    alertId,
     time,
     alertData: alertPayload,
     childData,

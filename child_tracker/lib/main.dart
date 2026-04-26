@@ -43,12 +43,15 @@ Future<void> main() async {
   // );
   // Firebase.init commented to avoid errors until configured
   // await Firebase.initializeApp();
+  final localeProvider = await LocaleProvider.load();
   await NotificationService().init();
-  runApp(const MyApp());
+  runApp(MyApp(localeProvider: localeProvider));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final LocaleProvider? localeProvider;
+
+  const MyApp({super.key, this.localeProvider});
 
   @override
   Widget build(BuildContext context) {
@@ -61,9 +64,12 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GeofenceProvider()),
         ChangeNotifierProvider(create: (_) => ActivityProvider()),
         ChangeNotifierProvider(create: (_) => DeviceLiveTrackingProvider()),
-        ChangeNotifierProvider(create: (_) => LocaleProvider()),
+        if (localeProvider != null)
+          ChangeNotifierProvider.value(value: localeProvider!)
+        else
+          ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()..init()),
       ],
       child: Consumer<LocaleProvider>(
         builder: (context, localeProvider, child) {
@@ -72,11 +78,7 @@ class MyApp extends StatelessWidget {
                 AppLocalizations.of(context)!.appTitle,
             debugShowCheckedModeBanner: false,
             locale: localeProvider.locale,
-            supportedLocales: const [
-              Locale('en'),
-              Locale('ps'),
-              Locale('fa'),
-            ],
+            supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: const [
               AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,

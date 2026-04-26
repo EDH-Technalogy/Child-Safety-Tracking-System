@@ -31,6 +31,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
   }
 
+  Future<void> _openAddChild() async {
+    final didChange = await Navigator.pushNamed(context, '/add-child');
+    if (!mounted || didChange != true) return;
+
+    await _loadChildren();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -74,9 +81,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/add-child');
-                    },
+                    onPressed: _openAddChild,
                     icon: const Icon(Icons.add),
                     label: Text(l10n.addChild),
                   ),
@@ -99,9 +104,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, '/add-child');
-        },
+        onPressed: _openAddChild,
         backgroundColor: AppColors.primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -182,11 +185,22 @@ class _ChildCard extends StatelessWidget {
                         IconButton(
                           icon: const Icon(Icons.edit,
                               color: AppColors.primaryColor),
-                          onPressed: () {
+                          onPressed: () async {
                             Provider.of<ChildProvider>(context, listen: false)
                                 .selectChild(child);
-                            Navigator.pushNamed(context, '/edit-child',
+                            final didChange = await Navigator.pushNamed(
+                                context, '/edit-child',
                                 arguments: child.id);
+                            if (!context.mounted || didChange != true) return;
+
+                            final authProvider = Provider.of<AuthProvider>(
+                                context,
+                                listen: false);
+                            if (authProvider.user == null) return;
+
+                            await Provider.of<ChildProvider>(context,
+                                    listen: false)
+                                .loadChildren(authProvider.user!.id);
                           },
                         ),
                       ],

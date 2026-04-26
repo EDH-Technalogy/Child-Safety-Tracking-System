@@ -1,3 +1,5 @@
+import '../utils/timestamp_utils.dart';
+
 class GeofenceModel {
   final String id;
   final String childId;
@@ -36,8 +38,9 @@ class GeofenceModel {
       longitude: (json['longitude'] ?? 0).toDouble(),
       radius: json['radius'] ?? 100,
       status: json['status'] ?? 'active',
-      createdAt: json['created_at'] ?? 0,
-      updatedAt: json['updated_at'],
+      createdAt:
+          TimestampUtils.normalizeEpochMilliseconds(json['created_at']) ?? 0,
+      updatedAt: TimestampUtils.normalizeEpochMilliseconds(json['updated_at']),
     );
   }
 

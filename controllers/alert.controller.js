@@ -1,4 +1,4 @@
-const { firestore } = require("../firebase");
+const { firestore, realtimeDB } = require("../firebase");
 const {
   safeWriteAuditLog,
   buildPerformedByFromRequest,
@@ -7,6 +7,7 @@ const {
 } = require("../utils/audit-log");
 const {
   createHttpError,
+  ensureCanWriteChildEvent,
   getChildWithAccessOrThrow,
 } = require("../utils/child-access");
 const {
@@ -41,6 +42,24 @@ async function getAlertOrThrow(alertId) {
   }
 
   return { alertRef, alertDoc };
+}
+
+async function syncRealtimeAlertStatus(alertId, alertData = {}, status = "read") {
+  const childId = alertData.child_id?.toString().trim() || "";
+  const userId = alertData.user_id?.toString().trim() || "";
+  const updates = {};
+
+  if (userId) {
+    updates[`alerts/${userId}/${alertId}/status`] = status;
+  }
+  if (childId) {
+    updates[`alerts_by_child/${childId}/${alertId}/status`] = status;
+  }
+  updates[`admin_alerts/${alertId}/status`] = status;
+
+  if (Object.keys(updates).length > 0) {
+    await realtimeDB.ref().update(updates);
+  }
 }
 
 async function createAndLogAlert(
@@ -99,7 +118,7 @@ async function createAndLogAlert(
     createSystemActor("Alert Service")
   );
 
-  if (type === "OUT_ZONE") {
+  if (["OUT_ZONE", "SAFE_ZONE_EXIT", "ZONE_EXIT"].includes(type)) {
     await updateDailySummaryCounter(childId, "zone_exit_count");
   }
 
@@ -139,6 +158,20 @@ async function updateDailySummaryCounter(childId, fieldName) {
   }
 }
 
+async function authorizeAlertWrite(req, childId) {
+  const accessResult = await ensureCanWriteChildEvent(req, childId);
+  console.info("[alerts.write-access]", {
+    childId,
+    type: req.body?.type || null,
+    accessMode: accessResult.mode,
+    deviceId: accessResult.deviceId || null,
+    authId: req.auth?.id || null,
+    role: req.auth?.role || null,
+  });
+
+  return accessResult;
+}
+
 exports.sendAlert = async (req, res) => {
   const childId = req.body.child_id?.toString().trim();
   const type = req.body.type?.toString().trim().toUpperCase();
@@ -147,6 +180,8 @@ exports.sendAlert = async (req, res) => {
     if (!childId || !type) {
       throw createHttpError(400, "child_id and type are required");
     }
+
+    await authorizeAlertWrite(req, childId);
 
     const locationText = buildLocationText({
       locationText: req.body.location_text,
@@ -196,6 +231,8 @@ exports.sosAlert = async (req, res) => {
     if (!childId) {
       throw createHttpError(400, "child_id is required");
     }
+
+    await authorizeAlertWrite(req, childId);
 
     const locationText = buildLocationText({
       locationText: req.body.location_text,
@@ -250,6 +287,7 @@ exports.markAsRead = async (req, res, next) => {
       status: "read",
       updated_at: Date.now(),
     });
+    await syncRealtimeAlertStatus(req.params.alert_id, alertData, "read");
 
     await logAlertEvent(req, {
       eventType: "alert_acknowledged",
@@ -296,6 +334,8 @@ exports.lowBatteryAlert = async (req, res) => {
       throw createHttpError(400, "child_id is required");
     }
 
+    await authorizeAlertWrite(req, childId);
+
     const result = await createAndLogAlert(req, {
       childId,
       type: "LOW_BATTERY",
@@ -315,6 +355,8 @@ exports.deviceOffAlert = async (req, res) => {
       throw createHttpError(400, "child_id is required");
     }
 
+    await authorizeAlertWrite(req, childId);
+
     const result = await createAndLogAlert(req, {
       childId,
       type: "DEVICE_OFF",
@@ -333,6 +375,8 @@ exports.deviceOnlineAlert = async (req, res) => {
       throw createHttpError(400, "child_id is required");
     }
 
+    await authorizeAlertWrite(req, childId);
+
     const result = await createAndLogAlert(req, {
       childId,
       type: "DEVICE_ONLINE",
@@ -350,6 +394,8 @@ exports.safeZoneExitAlert = async (req, res) => {
     if (!childId) {
       throw createHttpError(400, "child_id is required");
     }
+
+    await authorizeAlertWrite(req, childId);
 
     const locationText = buildLocationText({
       locationText: req.body.location_text,
@@ -380,6 +426,8 @@ exports.safeZoneEnterAlert = async (req, res) => {
     if (!childId) {
       throw createHttpError(400, "child_id is required");
     }
+
+    await authorizeAlertWrite(req, childId);
 
     const locationText = buildLocationText({
       locationText: req.body.location_text,
@@ -445,6 +493,20 @@ exports.markAllAsRead = async (req, res, next) => {
       });
     });
     await batch.commit();
+
+    const realtimeUpdates = {};
+    unreadDocs.forEach((doc) => {
+      const alertData = doc.data() || {};
+      const userId = alertData.user_id?.toString().trim() || "";
+      if (userId) {
+        realtimeUpdates[`alerts/${userId}/${doc.id}/status`] = "read";
+      }
+      realtimeUpdates[`alerts_by_child/${childId}/${doc.id}/status`] = "read";
+      realtimeUpdates[`admin_alerts/${doc.id}/status`] = "read";
+    });
+    if (Object.keys(realtimeUpdates).length > 0) {
+      await realtimeDB.ref().update(realtimeUpdates);
+    }
 
     await logAlertEvent(req, {
       eventType: "alert_acknowledged",

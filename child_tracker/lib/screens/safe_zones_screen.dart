@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/geofence_provider.dart';
 import '../providers/location_provider.dart';
 import '../utils/constants.dart';
+import '../utils/timestamp_utils.dart';
 import '../models/geofence_model.dart';
 import '../models/location_model.dart';
 import 'add_safe_zone_screen.dart';
@@ -127,6 +128,12 @@ class _SafeZonesScreenState extends State<SafeZonesScreen> {
 
   void _maybeFocusLiveLocation(LocationModel? liveLocation) {
     if (_mapController == null || liveLocation == null) {
+      return;
+    }
+
+    final locationProvider =
+        Provider.of<LocationProvider>(context, listen: false);
+    if (locationProvider.isAnimatingLiveLocation) {
       return;
     }
 
@@ -313,11 +320,11 @@ class _SafeZonesScreenState extends State<SafeZonesScreen> {
   }
 
   String _formatTimestamp(int timestamp) {
-    if (timestamp <= 0) {
+    final date = TimestampUtils.toLocalDateTime(timestamp);
+    if (date == null) {
       return '--';
     }
 
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
     return '${date.day}/${date.month}/${date.year} '
         '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }

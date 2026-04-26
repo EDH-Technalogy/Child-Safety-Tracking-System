@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/alert_provider.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
+import '../utils/timestamp_utils.dart';
 import '../models/alert_model.dart';
 import 'package:intl/intl.dart';
 
@@ -19,21 +18,12 @@ class AlertsScreen extends StatefulWidget {
 }
 
 class _AlertsScreenState extends State<AlertsScreen> {
-  Timer? _refreshTimer;
+  String get _monitorOwnerId => 'alerts_screen:${widget.childId}';
 
   @override
   void initState() {
     super.initState();
-    _loadAlerts();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (!mounted) {
-        return;
-      }
-      final alertProvider = Provider.of<AlertProvider>(context, listen: false);
-      if (!alertProvider.isLoading) {
-        _loadAlerts();
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startMonitoring());
   }
 
   Future<void> _loadAlerts() async {
@@ -42,9 +32,18 @@ class _AlertsScreenState extends State<AlertsScreen> {
     await alertProvider.getUnreadCount(widget.childId);
   }
 
+  Future<void> _startMonitoring() async {
+    final alertProvider = Provider.of<AlertProvider>(context, listen: false);
+    await alertProvider.startMonitoring(
+      widget.childId,
+      ownerId: _monitorOwnerId,
+    );
+  }
+
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    Provider.of<AlertProvider>(context, listen: false)
+        .stopMonitoring(ownerId: _monitorOwnerId);
     super.dispose();
   }
 
@@ -351,7 +350,11 @@ class _AlertCard extends StatelessWidget {
   }
 
   String _formatTimestamp(int timestamp) {
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final date = TimestampUtils.toLocalDateTime(timestamp);
+    if (date == null) {
+      return '--';
+    }
+
     return DateFormat('MMM dd, yyyy - HH:mm').format(date);
   }
 }

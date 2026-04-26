@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+
+import '../firebase_options.dart';
 
 class FirebaseBootstrap {
   static Future<void>? _initialization;
@@ -14,7 +17,11 @@ class FirebaseBootstrap {
 
   static Future<void> _initialize() async {
     try {
-      await Firebase.initializeApp();
+      if (kIsWeb) {
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
+      } else {
+        await Firebase.initializeApp();
+      }
     } on FirebaseException catch (error) {
       _initialization = null;
       throw StateError(_formatError(error));

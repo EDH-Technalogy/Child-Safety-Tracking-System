@@ -1,6 +1,10 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/alert_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/child_provider.dart';
 import '../utils/constants.dart';
@@ -17,19 +21,67 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const String _backgroundAlertMonitorOwnerId = 'home_screen';
+  Timer? _statusRefreshTimer;
+
   @override
   void initState() {
     super.initState();
     _loadChildren();
+    _statusRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _loadChildren(showLoading: false),
+    );
   }
 
-  Future<void> _loadChildren() async {
+  @override
+  void dispose() {
+    _statusRefreshTimer?.cancel();
+    unawaited(
+      Provider.of<AlertProvider>(
+        context,
+        listen: false,
+      ).stopBackgroundMonitoring(
+        ownerId: _backgroundAlertMonitorOwnerId,
+      ),
+    );
+    super.dispose();
+  }
+
+  Future<void> _loadChildren({bool showLoading = true}) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final alertProvider = Provider.of<AlertProvider>(context, listen: false);
     final childProvider = Provider.of<ChildProvider>(context, listen: false);
 
     if (authProvider.user != null) {
-      await childProvider.loadChildren(authProvider.user!.id);
+      if (!showLoading && childProvider.isLoading) {
+        return;
+      }
+
+      if (kDebugMode) {
+        debugPrint(
+          '[HomeScreen.children] load userId=${authProvider.user!.id} '
+          'role=${authProvider.user!.role} showLoading=$showLoading',
+        );
+      }
+
+      await childProvider.loadChildren(
+        authProvider.user!.id,
+        showLoading: showLoading,
+      );
+
+      await alertProvider.syncBackgroundMonitoring(
+        ownerId: _backgroundAlertMonitorOwnerId,
+        childIds: childProvider.children.map((child) => child.id),
+      );
     }
+  }
+
+  Future<void> _openAddChild() async {
+    final didChange = await Navigator.pushNamed(context, '/add-child');
+    if (!mounted || didChange != true) return;
+
+    await _loadChildren();
   }
 
   @override
@@ -60,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Consumer2<AuthProvider, ChildProvider>(
         builder: (context, authProvider, childProvider, child) {
-          if (childProvider.isLoading) {
+          if (childProvider.isLoading && childProvider.children.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -92,9 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/add-child');
-                    },
+                    onPressed: _openAddChild,
                     icon: const Icon(Icons.add),
                     label: Text(l10n.addChild),
                   ),
@@ -104,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: _loadChildren,
+            onRefresh: () => _loadChildren(),
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: childProvider.children.length,
@@ -117,9 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, '/add-child');
-        },
+        onPressed: _openAddChild,
         backgroundColor: AppColors.primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -131,6 +179,57 @@ class _ChildCard extends StatelessWidget {
   final ChildModel child;
 
   const _ChildCard({required this.child});
+
+  Color _deviceStatusColor(DeviceModel device) {
+    switch (device.status.trim().toLowerCase()) {
+      case 'online':
+        return AppColors.successColor;
+      case 'delayed':
+      case 'weak_connection':
+        return AppColors.warningColor;
+      case 'offline':
+      case 'disconnected':
+        return AppColors.deviceOfflineColor;
+      case 'no_data':
+      case 'no_recent_data':
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _deviceStatusIcon(DeviceModel device) {
+    switch (device.status.trim().toLowerCase()) {
+      case 'online':
+        return Icons.wifi;
+      case 'delayed':
+      case 'weak_connection':
+        return Icons.wifi_tethering_error;
+      case 'offline':
+      case 'disconnected':
+        return Icons.wifi_off;
+      case 'no_data':
+      case 'no_recent_data':
+      default:
+        return Icons.info_outline;
+    }
+  }
+
+  String _lastSeenLabel(
+    BuildContext context,
+    AppLocalizations l10n,
+    DeviceModel device,
+  ) {
+    final lastSeen = DateTime.fromMillisecondsSinceEpoch(
+      device.latestTimestamp,
+    ).toLocal();
+    final materialLocalizations = MaterialLocalizations.of(context);
+    final date = materialLocalizations.formatCompactDate(lastSeen);
+    final time = materialLocalizations.formatTimeOfDay(
+      TimeOfDay.fromDateTime(lastSeen),
+    );
+
+    return '${l10n.lastSeen}: $date $time';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -200,11 +299,22 @@ class _ChildCard extends StatelessWidget {
                         IconButton(
                           icon: const Icon(Icons.edit,
                               color: AppColors.primaryColor),
-                          onPressed: () {
+                          onPressed: () async {
                             Provider.of<ChildProvider>(context, listen: false)
                                 .selectChild(child);
-                            Navigator.pushNamed(context, '/edit-child',
+                            final didChange = await Navigator.pushNamed(
+                                context, '/edit-child',
                                 arguments: child.id);
+                            if (!context.mounted || didChange != true) return;
+
+                            final authProvider = Provider.of<AuthProvider>(
+                                context,
+                                listen: false);
+                            if (authProvider.user == null) return;
+
+                            await Provider.of<ChildProvider>(context,
+                                    listen: false)
+                                .loadChildren(authProvider.user!.id);
                           },
                         ),
                       ],
@@ -218,51 +328,39 @@ class _ChildCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: child.status == 'active'
-                                ? AppColors.successColor.withValues(alpha: 0.1)
-                                : Colors.grey.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            localizeStatusLabel(l10n, child.status),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: child.status == 'active'
-                                  ? AppColors.successColor
-                                  : Colors.grey,
-                            ),
-                          ),
+                        _StatusBadge(
+                          label: localizeStatusLabel(l10n, child.status),
+                          color: child.status == 'active'
+                              ? AppColors.successColor
+                              : Colors.grey,
                         ),
                         if (child.device != null) ...[
-                          const SizedBox(width: 8),
-                          Icon(
-                            child.device!.status == 'online'
-                                ? Icons.battery_full
-                                : Icons.battery_alert,
-                            size: 16,
-                            color: child.device!.status == 'online'
-                                ? AppColors.successColor
-                                : AppColors.warningColor,
+                          _StatusBadge(
+                            label:
+                                localizeStatusLabel(l10n, child.device!.status),
+                            color: _deviceStatusColor(child.device!),
+                            icon: _deviceStatusIcon(child.device!),
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${child.device!.batteryLevel}%',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
+                          _BatteryLevel(device: child.device!),
                         ],
                       ],
                     ),
+                    if (child.device != null &&
+                        child.device!.hasLiveTimestamp) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _lastSeenLabel(context, l10n, child.device!),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -274,6 +372,81 @@ class _ChildCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData? icon;
+
+  const _StatusBadge({
+    required this.label,
+    required this.color,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BatteryLevel extends StatelessWidget {
+  final DeviceModel device;
+
+  const _BatteryLevel({required this.device});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = device.batteryLevel <= 20
+        ? AppColors.warningColor
+        : Colors.grey.shade700;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          device.batteryLevel <= 20 ? Icons.battery_alert : Icons.battery_full,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '${device.batteryLevel}%',
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 }

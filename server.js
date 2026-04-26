@@ -4,6 +4,7 @@ const { realtimeDB } = require("./firebase");
 const requestLogger = require("./middleware/requestLogger");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 const { initLiveGeofenceMonitor } = require("./utils/live-geofence-monitor");
+const { syncRealtimeMirrorsFromFirestore } = require("./utils/realtime-bootstrap");
 
 const app = express();
 
@@ -67,29 +68,42 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-initLiveGeofenceMonitor();
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log("API Endpoints:");
-    console.log("- POST   /api/users/register");
-    console.log("- POST   /api/users/login");
-    console.log("- GET    /api/users/:id");
-    console.log("- PUT    /api/users/:id");
-    console.log("- POST   /api/children/add");
-    console.log("- GET    /api/children/:user_id");
-    console.log("- GET    /api/children/child/:child_id");
-    console.log("- PUT    /api/children/:child_id");
-    console.log("- DELETE /api/children/:child_id");
-    console.log("- POST   /api/devices/register");
-    console.log("- POST   /api/locations/update");
-    console.log("- GET    /api/locations/live/:child_id");
-    console.log("- GET    /api/locations/history/:child_id");
-    console.log("- GET    /api/locations/route/:child_id/:date");
-    console.log("- POST   /api/alerts/send");
-    console.log("- GET    /api/alerts/:child_id");
-    console.log("- POST   /api/geofence/safe-zone");
-    console.log("- GET    /api/geofence/safe-zones/:child_id");
-    console.log("- POST   /api/geofence/check-location");
-    console.log("- POST   /api/admin/login");
-    console.log("- GET    /api/admin/stats/system");
-});
+
+async function startServer() {
+    try {
+        await syncRealtimeMirrorsFromFirestore();
+    } catch (error) {
+        console.error("[server.realtime-bootstrap] failed", {
+            reason: error.message,
+        });
+    }
+
+    initLiveGeofenceMonitor();
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+        console.log("API Endpoints:");
+        console.log("- POST   /api/users/register");
+        console.log("- POST   /api/users/login");
+        console.log("- GET    /api/users/:id");
+        console.log("- PUT    /api/users/:id");
+        console.log("- POST   /api/children/add");
+        console.log("- GET    /api/children/:user_id");
+        console.log("- GET    /api/children/child/:child_id");
+        console.log("- PUT    /api/children/:child_id");
+        console.log("- DELETE /api/children/:child_id");
+        console.log("- POST   /api/devices/register");
+        console.log("- POST   /api/locations/update");
+        console.log("- GET    /api/locations/live/:child_id");
+        console.log("- GET    /api/locations/history/:child_id");
+        console.log("- GET    /api/locations/route/:child_id/:date");
+        console.log("- POST   /api/alerts/send");
+        console.log("- GET    /api/alerts/:child_id");
+        console.log("- POST   /api/geofence/safe-zone");
+        console.log("- GET    /api/geofence/safe-zones/:child_id");
+        console.log("- POST   /api/geofence/check-location");
+        console.log("- POST   /api/admin/login");
+        console.log("- GET    /api/admin/stats/system");
+    });
+}
+
+startServer();

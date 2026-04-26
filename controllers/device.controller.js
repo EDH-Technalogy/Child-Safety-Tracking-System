@@ -13,6 +13,10 @@ const {
   createSystemActor,
 } = require("../utils/audit-log");
 const { getResolvedLiveTrackingSnapshot } = require("../utils/live-tracking");
+const {
+  upsertDeviceRegistry,
+  removeDeviceRegistry,
+} = require("../utils/device-registry");
 
 function createHttpError(status, message) {
   const error = new Error(message);
@@ -29,6 +33,15 @@ function buildDeviceTarget(deviceId, deviceData = {}) {
     firmware_version: deviceData.firmware_version || null,
     status: deviceData.status || null,
   };
+}
+
+function resolveDeviceStatusForResponse(deviceData = {}, liveSnapshot = null) {
+  if (liveSnapshot?.latestStatus) {
+    return liveSnapshot.latestStatus;
+  }
+
+  const storedStatus = deviceData.status?.toString().trim().toLowerCase() || "";
+  return storedStatus === "online" ? "no_data" : storedStatus || "no_data";
 }
 
 function buildDeviceActor(req, fallback = null) {
@@ -97,6 +110,7 @@ async function buildDeviceResponse(
     ...deviceData,
     battery_level:
       resolvedLiveSnapshot?.batteryLevel ?? deviceData.battery_level ?? 0,
+    status: resolveDeviceStatusForResponse(deviceData, resolvedLiveSnapshot),
     child: childDoc
       ? {
           id: childDoc.id,
@@ -108,10 +122,16 @@ async function buildDeviceResponse(
     child_name: resolvedChildData.name || "",
     user_id: resolvedChildData.user_id || "",
     latest_live_status: resolvedLiveSnapshot?.latestStatus || null,
+    raw_live_status: resolvedLiveSnapshot?.rawLatestStatus || deviceData.status || null,
     latest_signal: resolvedLiveSnapshot?.latestSignal || null,
     latest_timestamp: resolvedLiveSnapshot?.latestTimestamp || null,
+    latest_status_timestamp: resolvedLiveSnapshot?.latestStatusTimestamp || null,
+    latest_age_ms: resolvedLiveSnapshot?.latestAgeMs ?? null,
     live_tracking_key: resolvedLiveSnapshot?.trackingKey || null,
     timestamp_inferred: resolvedLiveSnapshot?.timestampInferred || false,
+    status_reason: resolvedLiveSnapshot?.statusReason || null,
+    online_threshold_ms: resolvedLiveSnapshot?.onlineThresholdMs || null,
+    delayed_threshold_ms: resolvedLiveSnapshot?.delayedThresholdMs || null,
     live_tracking: resolvedLiveSnapshot?.raw || null,
   };
 }
@@ -141,6 +161,7 @@ exports.registerDevice = async (req, res, next) => {
     }
 
     const { childDoc } = await getChildOrThrow(child_id);
+    const childData = childDoc.data() || {};
 
     // Check if IMEI already exists
     const existingDevice = await firestore
@@ -158,16 +179,29 @@ exports.registerDevice = async (req, res, next) => {
       sim_number: sim_number || "",
       battery_level: 100,
       firmware_version: firmware || "1.0.0",
-      status: "online",
+      status: "offline",
       created_at: Date.now()
     });
+    const createdDeviceData = {
+      child_id,
+      user_id: childData.user_id || "",
+      imei,
+      sim_number: sim_number || "",
+      battery_level: 100,
+      firmware_version: firmware || "1.0.0",
+      status: "offline",
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    };
+
+    await upsertDeviceRegistry(device.id, createdDeviceData);
 
     await syncRealtimeState(child_id, {
       childStatus: childDoc.data().status || "active",
-      deviceStatus: "online",
+      deviceStatus: "offline",
       disabled: false,
       blocked: false,
-      reason: "device_registered",
+      reason: "device_registered_waiting_for_live_data",
     });
 
     await logDeviceEvent(
@@ -183,7 +217,7 @@ exports.registerDevice = async (req, res, next) => {
           imei,
           sim_number: sim_number || "",
           firmware_version: firmware || "1.0.0",
-          status: "online",
+          status: "offline",
         }),
         status: "success",
         result: "success",
@@ -193,7 +227,7 @@ exports.registerDevice = async (req, res, next) => {
             imei,
             sim_number: sim_number || "",
             firmware_version: firmware || "1.0.0",
-            status: "online",
+            status: "offline",
           },
           changedFields: [
             "child_id",
@@ -260,10 +294,12 @@ exports.updateDevice = async (req, res, next) => {
 
     const { deviceRef, deviceDoc } = await getDeviceOrThrow(req.params.id);
     const currentDeviceData = deviceDoc.data() || {};
+    let resolvedOwnerUserId = currentDeviceData.user_id || "";
 
     const updateData = {};
     if (child_id !== undefined && child_id !== "") {
-      await getChildOrThrow(child_id);
+      const { childDoc } = await getChildOrThrow(child_id);
+      resolvedOwnerUserId = childDoc.data()?.user_id || "";
 
       updateData.child_id = child_id;
     }
@@ -294,6 +330,11 @@ exports.updateDevice = async (req, res, next) => {
       ...currentDeviceData,
       ...updateData,
     };
+
+    await upsertDeviceRegistry(req.params.id, {
+      ...nextDeviceData,
+      user_id: resolvedOwnerUserId,
+    });
 
     await logDeviceEvent(req, {
       eventType: "device_updated",
@@ -340,6 +381,12 @@ exports.deactivate = async (req, res, next) => {
     const { deviceRef, deviceDoc } = await getDeviceOrThrow(req.params.id);
     const deviceData = deviceDoc.data() || {};
     await deviceRef.update({
+      status: "offline",
+      is_disabled: true,
+      updated_at: Date.now(),
+    });
+    await upsertDeviceRegistry(req.params.id, {
+      ...deviceData,
       status: "offline",
       is_disabled: true,
       updated_at: Date.now(),
@@ -407,16 +454,22 @@ exports.activate = async (req, res, next) => {
     const { deviceRef, deviceDoc } = await getDeviceOrThrow(req.params.id);
     const deviceData = deviceDoc.data() || {};
     await deviceRef.update({
-      status: "online",
+      status: "offline",
+      is_disabled: false,
+      updated_at: Date.now(),
+    });
+    await upsertDeviceRegistry(req.params.id, {
+      ...deviceData,
+      status: "offline",
       is_disabled: false,
       updated_at: Date.now(),
     });
 
     await syncRealtimeState(deviceData.child_id, {
-      deviceStatus: "online",
+      deviceStatus: "offline",
       disabled: false,
       blocked: false,
-      reason: "device_activated",
+      reason: "device_activated_waiting_for_live_data",
     });
 
     await logDeviceEvent(req, {
@@ -427,7 +480,7 @@ exports.activate = async (req, res, next) => {
       description: `Device ${deviceData.imei || req.params.id} was activated.`,
       target: buildDeviceTarget(req.params.id, {
         ...deviceData,
-        status: "online",
+        status: "offline",
         is_disabled: false,
       }),
       status: "success",
@@ -438,7 +491,7 @@ exports.activate = async (req, res, next) => {
           is_disabled: deviceData.is_disabled || false,
         },
         newValues: {
-          status: "online",
+          status: "offline",
           is_disabled: false,
         },
         changedFields: ["status", "is_disabled"],
@@ -474,6 +527,9 @@ exports.deleteDevice = async (req, res, next) => {
     const { deviceRef, deviceDoc } = await getDeviceOrThrow(req.params.id);
     const deviceData = deviceDoc.data() || {};
     await deviceRef.delete();
+    await removeDeviceRegistry(req.params.id, {
+      childId: deviceData.child_id || "",
+    });
 
     await syncRealtimeState(deviceData.child_id, {
       deviceStatus: "offline",

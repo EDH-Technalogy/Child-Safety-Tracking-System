@@ -1,0 +1,86 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "alerts": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || auth.token.role == 'admin')",
+        "$alertId": {
+          ".write": "auth != null && auth.token.role == 'admin'"
+        }
+      }
+    },
+    "alerts_by_child": {
+      "$childId": {
+        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_child').child($childId).child('user_id').val() == auth.uid)",
+        "$alertId": {
+          ".write": "auth != null && auth.token.role == 'admin'"
+        }
+      }
+    },
+    "admin_alerts": {
+      ".read": "auth != null && auth.token.role == 'admin'",
+      "$alertId": {
+        ".write": "auth != null && auth.token.role == 'admin'"
+      }
+    },
+    "live_tracking": {
+      "$trackingKey": {
+        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_tracking_key').child($trackingKey).child('user_id').val() == auth.uid)",
+        ".write": "auth != null && auth.token.role == 'admin'"
+      }
+    },
+    "safe_zones": {
+      "$childId": {
+        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_child').child($childId).child('user_id').val() == auth.uid)",
+        "$zoneId": {
+          ".write": "auth != null && (auth.token.role == 'admin' || newData.child('user_id').val() == auth.uid)"
+        }
+      }
+    },
+    "geofence_state": {
+      "$childId": {
+        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_child').child($childId).child('user_id').val() == auth.uid)",
+        "$zoneId": {
+          ".write": "auth != null && auth.token.role == 'admin'"
+        }
+      }
+    },
+    "device_registry": {
+      ".read": "auth != null && auth.token.role == 'admin'",
+      ".write": "auth != null && auth.token.role == 'admin'"
+    },
+    "device_registry_by_child": {
+      ".read": "auth != null && auth.token.role == 'admin'",
+      ".write": "auth != null && auth.token.role == 'admin'"
+    },
+    "device_registry_by_tracking_key": {
+      ".read": "auth != null && auth.token.role == 'admin'",
+      ".write": "auth != null && auth.token.role == 'admin'"
+    },
+    "location_history": {
+      "$trackingKey": {
+        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_tracking_key').child($trackingKey).child('user_id').val() == auth.uid)",
+        "$dateKey": {
+          "$timestampKey": {
+            ".write": "auth != null && auth.token.role == 'admin'"
+          }
+        }
+      }
+    },
+    "child_logs": {
+      "$childId": {
+        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_child').child($childId).child('user_id').val() == auth.uid)",
+        "$dateKey": {
+          "$logId": {
+            ".write": "auth != null && auth.token.role == 'admin'"
+          }
+        }
+      }
+    },
+    "location_daily_index": {
+      ".read": "auth != null && auth.token.role == 'admin'",
+      ".write": "auth != null && auth.token.role == 'admin'"
+    }
+  }
+}

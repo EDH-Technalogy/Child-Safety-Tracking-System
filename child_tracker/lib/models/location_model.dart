@@ -1,3 +1,5 @@
+import '../utils/timestamp_utils.dart';
+
 class LocationModel {
   final String id;
   final String childId;
@@ -45,7 +47,10 @@ class LocationModel {
       longitude: _parseDouble(json['longitude']),
       speed: _parseDouble(json['speed']),
       battery: _parseInt(json['battery']),
-      recordedAt: _parseInt(json['recorded_at']),
+      recordedAt:
+          TimestampUtils.normalizeEpochMilliseconds(json['recorded_at']) ??
+              TimestampUtils.normalizeEpochMilliseconds(json['timestamp']) ??
+              0,
     );
   }
 
@@ -64,20 +69,26 @@ class LocationModel {
 
 class RouteDataModel {
   final List<CoordinateModel> coordinates;
+  final List<HistoryEventModel> logs;
   final int firstLocationTime;
   final int lastLocationTime;
   final int totalDistanceMeters;
   final String totalDistanceKm;
   final int locationCount;
+  final int eventCount;
 
   RouteDataModel({
     required this.coordinates,
+    required this.logs,
     required this.firstLocationTime,
     required this.lastLocationTime,
     required this.totalDistanceMeters,
     required this.totalDistanceKm,
     required this.locationCount,
+    required this.eventCount,
   });
+
+  bool get hasAnyHistory => coordinates.isNotEmpty || logs.isNotEmpty;
 
   factory RouteDataModel.fromJson(Map<String, dynamic> json) {
     return RouteDataModel(
@@ -85,11 +96,24 @@ class RouteDataModel {
               ?.map((e) => CoordinateModel.fromJson(e))
               .toList() ??
           [],
-      firstLocationTime: json['first_location_time'] ?? 0,
-      lastLocationTime: json['last_location_time'] ?? 0,
-      totalDistanceMeters: json['total_distance_meters'] ?? 0,
+      logs: (json['logs'] as List<dynamic>?)
+              ?.map((e) => HistoryEventModel.fromJson(
+                    e is Map<String, dynamic>
+                        ? e
+                        : Map<String, dynamic>.from(e as Map),
+                  ))
+              .toList() ??
+          [],
+      firstLocationTime: TimestampUtils.normalizeEpochMilliseconds(
+              json['first_location_time']) ??
+          0,
+      lastLocationTime: TimestampUtils.normalizeEpochMilliseconds(
+              json['last_location_time']) ??
+          0,
+      totalDistanceMeters: LocationModel._parseInt(json['total_distance_meters']),
       totalDistanceKm: json['total_distance_km'] ?? '0',
-      locationCount: json['location_count'] ?? 0,
+      locationCount: LocationModel._parseInt(json['location_count']),
+      eventCount: LocationModel._parseInt(json['event_count']),
     );
   }
 }
@@ -107,9 +131,9 @@ class CoordinateModel {
 
   factory CoordinateModel.fromJson(Map<String, dynamic> json) {
     return CoordinateModel(
-      latitude: (json['latitude'] ?? 0).toDouble(),
-      longitude: (json['longitude'] ?? 0).toDouble(),
-      time: json['time'] ?? 0,
+      latitude: LocationModel._parseDouble(json['latitude'] ?? json['lat']),
+      longitude: LocationModel._parseDouble(json['longitude'] ?? json['lng']),
+      time: TimestampUtils.normalizeEpochMilliseconds(json['time']) ?? 0,
     );
   }
 
@@ -119,5 +143,50 @@ class CoordinateModel {
       'longitude': longitude,
       'time': time,
     };
+  }
+}
+
+class HistoryEventModel {
+  final String id;
+  final String type;
+  final String childId;
+  final String trackingKey;
+  final String parentUserId;
+  final String message;
+  final int timestamp;
+  final Map<String, dynamic> metadata;
+
+  const HistoryEventModel({
+    required this.id,
+    required this.type,
+    required this.childId,
+    required this.trackingKey,
+    required this.parentUserId,
+    required this.message,
+    required this.timestamp,
+    required this.metadata,
+  });
+
+  factory HistoryEventModel.fromJson(Map<String, dynamic> json) {
+    return HistoryEventModel(
+      id: (json['id'] ?? '').toString(),
+      type: (json['type'] ?? '').toString(),
+      childId: (json['childId'] ?? json['child_id'] ?? '').toString(),
+      trackingKey:
+          (json['trackingKey'] ?? json['tracking_key'] ?? '').toString(),
+      parentUserId:
+          (json['parentUserId'] ?? json['parent_user_id'] ?? '').toString(),
+      message: (json['message'] ?? '').toString(),
+      timestamp:
+          TimestampUtils.normalizeEpochMilliseconds(
+                json['timestamp'] ?? json['createdAt'] ?? json['created_at'],
+              ) ??
+              0,
+      metadata: json['metadata'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(json['metadata'] as Map<String, dynamic>)
+          : json['metadata'] is Map
+              ? Map<String, dynamic>.from(json['metadata'] as Map)
+              : <String, dynamic>{},
+    );
   }
 }

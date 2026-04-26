@@ -7,6 +7,7 @@ import '../providers/location_provider.dart';
 import '../providers/alert_provider.dart';
 import '../providers/geofence_provider.dart';
 import '../utils/constants.dart';
+import '../utils/timestamp_utils.dart';
 
 class ChildDetailScreen extends StatefulWidget {
   final String childId;
@@ -901,7 +902,11 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   }
 
   String _formatTimestamp(int timestamp) {
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final date = TimestampUtils.toLocalDateTime(timestamp);
+    if (date == null) {
+      return '--';
+    }
+
     return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

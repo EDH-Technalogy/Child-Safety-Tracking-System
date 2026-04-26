@@ -1,5 +1,9 @@
 const { firestore } = require("../firebase");
 const { verifyAuthToken } = require("../utils/auth-token");
+const {
+  findFallbackAdminById,
+  toSafeAdmin,
+} = require("../utils/local-auth-fallback");
 
 function createHttpError(status, message) {
   const error = new Error(message);
@@ -19,6 +23,18 @@ function getBearerToken(req) {
 
 async function resolveCurrentAuthState(payload) {
   if (payload.type === "admin") {
+    const fallbackAdmin = toSafeAdmin(findFallbackAdminById(payload.sub));
+    if (fallbackAdmin) {
+      return {
+        id: fallbackAdmin.id,
+        email: fallbackAdmin.email || payload.email || "",
+        name: fallbackAdmin.name || "",
+        role: "admin",
+        type: "admin",
+        source: "local_auth_fallback",
+      };
+    }
+
     const adminDoc = await firestore.collection("admins").doc(payload.sub).get();
 
     if (!adminDoc.exists) {
@@ -86,6 +102,25 @@ async function requireAuthenticatedAccess(req, res, next) {
   }
 }
 
+async function attachOptionalAuth(req, res, next) {
+  try {
+    const token = getBearerToken(req);
+    if (!token) {
+      req.auth = null;
+      return next();
+    }
+
+    req.auth = await authenticateRequest(req);
+    return next();
+  } catch (error) {
+    next(
+      error.status
+        ? error
+        : createHttpError(401, error.message || "Invalid authorization token")
+    );
+  }
+}
+
 async function requireAdminAccess(req, res, next) {
   try {
     const authState = await authenticateRequest(req);
@@ -124,6 +159,7 @@ async function allowBootstrapOrAdminAccess(req, res, next) {
 }
 
 module.exports = {
+  attachOptionalAuth,
   requireAuthenticatedAccess,
   requireAdminAccess,
   allowBootstrapOrAdminAccess,

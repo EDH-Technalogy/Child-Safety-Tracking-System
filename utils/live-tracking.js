@@ -1,4 +1,31 @@
 const { firestore, realtimeDB } = require("../firebase");
+const { normalizeEpochMillisecondsOrNull } = require("./live-timestamp");
+const {
+  normalizeTrackingKey: normalizeTrackingKeyOrThrow,
+  tryNormalizeTrackingKey,
+} = require("./tracking-key-normalizer");
+
+const DEFAULT_ONLINE_THRESHOLD_MS = 60 * 1000;
+const DEFAULT_DELAYED_THRESHOLD_MS = 180 * 1000;
+const FUTURE_TIMESTAMP_TOLERANCE_MS = 30 * 1000;
+
+function readPositiveIntegerEnv(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? Math.round(value) : fallback;
+}
+
+function getDeviceStatusThresholds() {
+  return {
+    onlineThresholdMs: readPositiveIntegerEnv(
+      "DEVICE_ONLINE_THRESHOLD_MS",
+      DEFAULT_ONLINE_THRESHOLD_MS
+    ),
+    delayedThresholdMs: readPositiveIntegerEnv(
+      "DEVICE_DELAYED_THRESHOLD_MS",
+      DEFAULT_DELAYED_THRESHOLD_MS
+    ),
+  };
+}
 
 function parseNumber(value) {
   const numericValue = Number(value);
@@ -21,23 +48,6 @@ function parseBattery(value) {
   return numericValue === null ? null : Math.max(0, Math.round(numericValue));
 }
 
-function normalizeTimestamp(value) {
-  const numericValue = parseNumber(value);
-  if (numericValue === null || numericValue <= 0) {
-    return null;
-  }
-
-  if (numericValue >= 1e12) {
-    return Math.round(numericValue);
-  }
-
-  if (numericValue >= 1e9) {
-    return Math.round(numericValue * 1000);
-  }
-
-  return null;
-}
-
 function isValidCoordinate(latitude, longitude) {
   return (
     latitude !== null &&
@@ -53,25 +63,111 @@ function asMap(value) {
   return value && typeof value === "object" ? value : {};
 }
 
+function computeDeviceConnectivityStatus(rawTimestamp, now = Date.now()) {
+  const latestTimestamp = normalizeEpochMillisecondsOrNull(rawTimestamp);
+  const { onlineThresholdMs, delayedThresholdMs } = getDeviceStatusThresholds();
+
+  if (latestTimestamp === null) {
+    return {
+      status: "no_data",
+      reason: "missing_live_location_timestamp",
+      latestTimestamp: null,
+      ageMs: null,
+      now,
+      onlineThresholdMs,
+      delayedThresholdMs,
+    };
+  }
+
+  const rawAgeMs = now - latestTimestamp;
+  if (rawAgeMs < -FUTURE_TIMESTAMP_TOLERANCE_MS) {
+    return {
+      status: "no_data",
+      reason: "future_live_location_timestamp",
+      latestTimestamp,
+      ageMs: rawAgeMs,
+      now,
+      onlineThresholdMs,
+      delayedThresholdMs,
+    };
+  }
+
+  const ageMs = Math.max(0, rawAgeMs);
+
+  if (ageMs <= onlineThresholdMs) {
+    return {
+      status: "online",
+      reason: "recent_live_location",
+      latestTimestamp,
+      ageMs,
+      now,
+      onlineThresholdMs,
+      delayedThresholdMs,
+    };
+  }
+
+  if (ageMs <= delayedThresholdMs) {
+    return {
+      status: "delayed",
+      reason: "live_location_delayed",
+      latestTimestamp,
+      ageMs,
+      now,
+      onlineThresholdMs,
+      delayedThresholdMs,
+    };
+  }
+
+  return {
+    status: "offline",
+    reason: "live_location_stale",
+    latestTimestamp,
+    ageMs,
+    now,
+    onlineThresholdMs,
+    delayedThresholdMs,
+  };
+}
+
 function normalizeTrackingKey(rawValue) {
-  const originalValue = rawValue?.toString().trim() || "";
-  if (!originalValue) {
-    return "";
-  }
-
-  const decodedValue = originalValue.replace(/~2F/gi, "/");
-  const liveTrackingMatch = decodedValue.match(/live_tracking\/([^/?#]+)/i);
-  if (liveTrackingMatch?.[1]) {
-    return liveTrackingMatch[1].trim();
-  }
-
-  return originalValue;
+  return tryNormalizeTrackingKey(rawValue);
 }
 
 async function getTrackingContextForChild(childId) {
   const normalizedChildId = childId?.toString().trim() || "";
   if (!normalizedChildId) {
     return null;
+  }
+
+  const registrySnapshot = await realtimeDB
+    .ref(`device_registry_by_child/${normalizedChildId}`)
+    .once("value");
+  const registryData = registrySnapshot.val() || {};
+  const registryTrackingKey = tryNormalizeTrackingKey(
+    registryData.tracking_key || registryData.imei || registryData.device_id
+  );
+
+  if (registryTrackingKey) {
+    const childDoc = await firestore
+      .collection("children")
+      .doc(normalizedChildId)
+      .get();
+    if (!childDoc.exists) {
+      return null;
+    }
+
+    return {
+      childId: normalizedChildId,
+      childData: childDoc.data() || {},
+      deviceDoc: null,
+      deviceData: {
+        child_id: normalizedChildId,
+        imei: registryData.imei || "",
+        tracking_key: registryTrackingKey,
+        status: registryData.status || "offline",
+      },
+      trackingKey: registryTrackingKey,
+    };
   }
 
   const childDoc = await firestore.collection("children").doc(normalizedChildId).get();
@@ -88,7 +184,9 @@ async function getTrackingContextForChild(childId) {
   const deviceDoc = deviceSnap.docs[0] || null;
   const deviceData = deviceDoc?.data() || {};
   const trackingKey =
-    normalizeTrackingKey(deviceData.imei) || normalizeTrackingKey(deviceDoc?.id) || "";
+    tryNormalizeTrackingKey(deviceData.imei) ||
+    tryNormalizeTrackingKey(deviceDoc?.id) ||
+    "";
 
   return {
     childId: normalizedChildId,
@@ -99,9 +197,15 @@ async function getTrackingContextForChild(childId) {
   };
 }
 
-function buildStatusMetadata({ trackingNode, childNode }) {
+function buildStatusMetadata({
+  trackingNode,
+  childNode,
+  liveTimestamp,
+  now = Date.now(),
+}) {
   const trackingNodeMap = asMap(trackingNode);
   const childNodeMap = asMap(childNode);
+  const computedStatus = computeDeviceConnectivityStatus(liveTimestamp, now);
 
   const connection =
     asMap(trackingNodeMap.connection).status !== undefined
@@ -114,10 +218,10 @@ function buildStatusMetadata({ trackingNode, childNode }) {
   const childStatus = asMap(childNodeMap.child_status);
 
   const timestamps = [
-    normalizeTimestamp(connection.updated_at),
-    normalizeTimestamp(connection.time),
-    normalizeTimestamp(deviceStatus.updated_at),
-    normalizeTimestamp(childStatus.updated_at),
+    normalizeEpochMillisecondsOrNull(connection.updated_at),
+    normalizeEpochMillisecondsOrNull(connection.time),
+    normalizeEpochMillisecondsOrNull(deviceStatus.updated_at),
+    normalizeEpochMillisecondsOrNull(childStatus.updated_at),
   ].filter((value) => value !== null);
 
   return {
@@ -126,16 +230,24 @@ function buildStatusMetadata({ trackingNode, childNode }) {
       ...(Object.keys(deviceStatus).length > 0 ? { device_status: deviceStatus } : {}),
       ...(Object.keys(connection).length > 0 ? { connection } : {}),
     },
-    latestStatus:
+    latestStatus: computedStatus.status,
+    rawLatestStatus:
       connection.status?.toString().trim() ||
       deviceStatus.status?.toString().trim() ||
       childStatus.status?.toString().trim() ||
       null,
     latestSignal:
+      computedStatus.reason ||
       connection.reason?.toString().trim() ||
       deviceStatus.reason?.toString().trim() ||
       null,
-    latestTimestamp: timestamps.length > 0 ? Math.max(...timestamps) : null,
+    latestTimestamp: computedStatus.latestTimestamp,
+    latestStatusTimestamp: timestamps.length > 0 ? Math.max(...timestamps) : null,
+    latestAgeMs: computedStatus.ageMs,
+    now: computedStatus.now,
+    statusReason: computedStatus.reason,
+    onlineThresholdMs: computedStatus.onlineThresholdMs,
+    delayedThresholdMs: computedStatus.delayedThresholdMs,
   };
 }
 
@@ -163,6 +275,9 @@ async function getResolvedLiveTrackingSnapshot(childId) {
   const rawLocation = asMap(locationSnapshot.val());
   const latitude = parseCoordinateValue(rawLocation, "latitude", "lat");
   const longitude = parseCoordinateValue(rawLocation, "longitude", "lng");
+  const liveLocationTimestamp =
+    normalizeEpochMillisecondsOrNull(rawLocation.recorded_at) ??
+    normalizeEpochMillisecondsOrNull(rawLocation.timestamp);
 
   console.info("[live-tracking.raw-location]", {
     trackingKey,
@@ -174,6 +289,20 @@ async function getResolvedLiveTrackingSnapshot(childId) {
     const statusMetadata = buildStatusMetadata({
       trackingNode: trackingSnapshot.val(),
       childNode: childSnapshot.val(),
+      liveTimestamp: liveLocationTimestamp,
+    });
+
+    console.info("[live-tracking.status]", {
+      childId: normalizedChildId,
+      trackingKey,
+      rawLiveTimestamp: liveLocationTimestamp,
+      now: statusMetadata.now,
+      ageMs: statusMetadata.latestAgeMs,
+      status: statusMetadata.latestStatus,
+      reason: statusMetadata.statusReason,
+      hasValidLocation: false,
+      onlineThresholdMs: statusMetadata.onlineThresholdMs,
+      delayedThresholdMs: statusMetadata.delayedThresholdMs,
     });
 
     return {
@@ -183,23 +312,26 @@ async function getResolvedLiveTrackingSnapshot(childId) {
       timestampInferred: false,
       location: null,
       latestStatus: statusMetadata.latestStatus,
+      rawLatestStatus: statusMetadata.rawLatestStatus,
       latestSignal: statusMetadata.latestSignal,
       latestTimestamp: statusMetadata.latestTimestamp,
+      latestStatusTimestamp: statusMetadata.latestStatusTimestamp,
+      latestAgeMs: statusMetadata.latestAgeMs,
+      statusReason: statusMetadata.statusReason,
+      onlineThresholdMs: statusMetadata.onlineThresholdMs,
+      delayedThresholdMs: statusMetadata.delayedThresholdMs,
       batteryLevel: null,
     };
   }
 
-  const recordedAt =
-    normalizeTimestamp(rawLocation.recorded_at) ??
-    normalizeTimestamp(rawLocation.timestamp) ??
-    Date.now();
+  const recordedAt = liveLocationTimestamp;
 
   const location = {
     latitude,
     longitude,
     speed: parseNumber(rawLocation.speed) || 0,
     battery: parseBattery(rawLocation.battery) || 0,
-    recorded_at: recordedAt,
+    recorded_at: recordedAt || 0,
   };
 
   if (rawLocation.location_text?.toString().trim()) {
@@ -209,6 +341,20 @@ async function getResolvedLiveTrackingSnapshot(childId) {
   const statusMetadata = buildStatusMetadata({
     trackingNode: trackingSnapshot.val(),
     childNode: childSnapshot.val(),
+    liveTimestamp: recordedAt,
+  });
+
+  console.info("[live-tracking.status]", {
+    childId: normalizedChildId,
+    trackingKey,
+    rawLiveTimestamp: recordedAt,
+    now: statusMetadata.now,
+    ageMs: statusMetadata.latestAgeMs,
+    status: statusMetadata.latestStatus,
+    reason: statusMetadata.statusReason,
+    hasValidLocation: true,
+    onlineThresholdMs: statusMetadata.onlineThresholdMs,
+    delayedThresholdMs: statusMetadata.delayedThresholdMs,
   });
 
   return {
@@ -219,20 +365,26 @@ async function getResolvedLiveTrackingSnapshot(childId) {
     trackingKey,
     rtdbPath,
     timestampInferred:
-      normalizeTimestamp(rawLocation.recorded_at) === null &&
-      normalizeTimestamp(rawLocation.timestamp) === null,
+      normalizeEpochMillisecondsOrNull(rawLocation.recorded_at) === null &&
+      normalizeEpochMillisecondsOrNull(rawLocation.timestamp) === null,
     location,
     latestStatus: statusMetadata.latestStatus,
+    rawLatestStatus: statusMetadata.rawLatestStatus,
     latestSignal: statusMetadata.latestSignal,
-    latestTimestamp:
-      Math.max(
-        recordedAt,
-        statusMetadata.latestTimestamp || 0,
-      ) || recordedAt,
+    latestTimestamp: statusMetadata.latestTimestamp,
+    latestStatusTimestamp: statusMetadata.latestStatusTimestamp,
+    latestAgeMs: statusMetadata.latestAgeMs,
+    statusReason: statusMetadata.statusReason,
+    onlineThresholdMs: statusMetadata.onlineThresholdMs,
+    delayedThresholdMs: statusMetadata.delayedThresholdMs,
     batteryLevel: location.battery,
   };
 }
 
 module.exports = {
+  computeDeviceConnectivityStatus,
+  getTrackingContextForChild,
   getResolvedLiveTrackingSnapshot,
+  getDeviceStatusThresholds,
+  normalizeTrackingKey,
 };

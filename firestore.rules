@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.role == 'admin';
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function ownsResourceByUserId() {
+      return signedIn() && resource.data.user_id == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read, update: if isSelf(userId) || isAdmin();
+      allow create: if isSelf(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /children/{childId} {
+      allow read: if ownsResourceByUserId() || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /devices/{deviceId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /safe_zones/{zoneId} {
+      allow read: if ownsResourceByUserId() || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /alerts/{alertId} {
+      allow read: if ownsResourceByUserId() || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /daily_summary/{summaryId} {
+      allow read: if ownsResourceByUserId() || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /activity_logs/{logId} {
+      allow read: if ownsResourceByUserId() || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /activity_log/{logId} {
+      allow read: if ownsResourceByUserId() || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /locations_history/{docId} {
+      allow read, write: if false;
+    }
+
+    match /live_tracking/{docId} {
+      allow read, write: if false;
+    }
+
+    match /geofence_state/{docId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,6 +1,11 @@
-const { firestore } = require("../firebase");
+const { firestore, realtimeDB } = require("../firebase");
 const { syncRealtimeState } = require("../utils/realtime-sync");
 const { createAuthToken } = require("../utils/auth-token");
+const {
+  findFallbackAdminByCredentials,
+  isFirestoreQuotaError,
+  toSafeAdmin,
+} = require("../utils/local-auth-fallback");
 const {
   safeWriteAuditLog,
   buildPerformedByFromRequest,
@@ -9,6 +14,12 @@ const {
   mapLegacyActivityLog,
   normalizeAuditLogRecord,
 } = require("../utils/audit-log");
+const {
+  getResolvedLiveTrackingSnapshot,
+} = require("../utils/live-tracking");
+const {
+  getDailyLocationIndexStats,
+} = require("../utils/location-history");
 
 const VALID_USER_ROLES = new Set(["admin", "user"]);
 
@@ -92,6 +103,36 @@ function normalizeTimestampValue(value, fallback = 0) {
   return fallback;
 }
 
+async function countRealtimeOnlineDevices() {
+  const devicesSnap = await firestore.collection("devices").get();
+  const statuses = await Promise.all(
+    devicesSnap.docs.map(async (deviceDoc) => {
+      const childId = deviceDoc.data()?.child_id?.toString().trim() || "";
+      if (!childId) {
+        return false;
+      }
+
+      try {
+        const liveSnapshot = await getResolvedLiveTrackingSnapshot(childId);
+        return liveSnapshot?.latestStatus === "online";
+      } catch (error) {
+        console.warn("[admin.countRealtimeOnlineDevices] skipped", {
+          deviceId: deviceDoc.id,
+          childId,
+          reason: error.message,
+        });
+        return false;
+      }
+    })
+  );
+  const activeDevices = statuses.filter(Boolean).length;
+
+  return {
+    activeDevices,
+    totalDevices: devicesSnap.size,
+  };
+}
+
 async function logAdminAudit(req, entry) {
   return safeWriteAuditLog({
     source: inferSource(req, "admin_panel"),
@@ -135,6 +176,29 @@ async function getAdminOrThrow(adminId) {
 }
 
 async function getCurrentAdminSubjectOrThrow(authState) {
+  if (authState?.source === "local_auth_fallback") {
+    const fallbackAdmin = {
+      id: authState.id,
+      name: authState.name || "Admin",
+      email: authState.email || "",
+      phone: authState.phone || "",
+      photo: authState.photo || "",
+      role: "admin",
+      status: "active",
+      created_at: Date.now(),
+    };
+
+    return {
+      subjectRef: null,
+      subjectDoc: {
+        id: fallbackAdmin.id,
+        data: () => fallbackAdmin,
+      },
+      collectionName: "local_auth_fallback",
+      entityType: "admin",
+    };
+  }
+
   if (authState?.type === "admin") {
     const { adminRef, adminDoc } = await getAdminOrThrow(authState.id);
     return {
@@ -158,6 +222,38 @@ async function getCurrentAdminSubjectOrThrow(authState) {
     collectionName: "users",
     entityType: "user",
   };
+}
+
+function buildFallbackAdminLoginPayload(admin) {
+  return {
+    ...buildAdminResponse(admin.id, admin),
+    token: createAuthToken({
+      subjectId: admin.id,
+      role: "admin",
+      subjectType: "admin",
+      email: admin.email,
+    }),
+    message: "Admin login successful",
+    auth_provider: "local_auth_fallback",
+  };
+}
+
+async function tryFallbackAdminLogin(req, res, reason) {
+  const admin = toSafeAdmin(
+    findFallbackAdminByCredentials(req.body?.email, req.body?.password)
+  );
+
+  if (!admin) {
+    return false;
+  }
+
+  console.warn("[admin.login.fallback]", {
+    email: admin.email,
+    reason,
+  });
+
+  res.json(buildFallbackAdminLoginPayload(admin));
+  return true;
 }
 
 async function syncUserAccessState(userId, shouldBlock) {
@@ -344,6 +440,13 @@ exports.adminLogin = async (req, res) => {
       },
     });
   } catch (error) {
+    if (
+      isFirestoreQuotaError(error) &&
+      (await tryFallbackAdminLogin(req, res, error.message))
+    ) {
+      return;
+    }
+
     await safeWriteAuditLog({
       eventType: "admin_login",
       entityType: "auth",
@@ -397,6 +500,20 @@ exports.adminLogout = async (req, res, next) => {
 
 exports.getAdminProfile = async (req, res, next) => {
   try {
+    if (req.auth?.source === "local_auth_fallback") {
+      return res.json(
+        buildAdminResponse(req.auth.id, {
+          name: req.auth.name || "Admin",
+          email: req.auth.email || "",
+          phone: req.auth.phone || "",
+          photo: req.auth.photo || "",
+          role: "admin",
+          status: "active",
+          created_at: Date.now(),
+        })
+      );
+    }
+
     const { subjectDoc, collectionName } = await getCurrentAdminSubjectOrThrow(
       req.auth
     );
@@ -730,10 +847,8 @@ exports.getTotalDevices = async (req,res)=>{
 
 // Get Total Active Devices
 exports.getActiveDevices = async (req,res)=>{
-  const snap = await firestore.collection("devices")
-    .where("status", "==", "online")
-    .get();
-  res.json({ count: snap.size });
+  const { activeDevices } = await countRealtimeOnlineDevices();
+  res.json({ count: activeDevices });
 };
 
 // Get Daily Active Devices Report (legacy)
@@ -741,29 +856,12 @@ exports.getDailyActiveDevicesReport = async (req,res)=>{
   try {
     const { date } = req.params;
     const targetDate = date || new Date().toISOString().slice(0, 10);
-    
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    const locationSnap = await firestore.collection("locations_history")
-      .where("recorded_at", ">=", startOfDay.getTime())
-      .where("recorded_at", "<=", endOfDay.getTime())
-      .get();
-    
-    const uniqueChildren = new Set();
-    locationSnap.forEach(doc => {
-      const data = doc.data();
-      if (data.child_id) {
-        uniqueChildren.add(data.child_id);
-      }
-    });
-    
+    const stats = await getDailyLocationIndexStats(targetDate);
+
     res.json({
       date: targetDate,
-      active_devices_count: uniqueChildren.size,
-      total_location_updates: locationSnap.size
+      active_devices_count: stats.activeDevicesCount,
+      total_location_updates: stats.totalLocationUpdates
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -774,29 +872,12 @@ exports.getDailyActiveDevicesReport = async (req,res)=>{
 exports.dailyActiveDevices = async (req, res) => {
   try {
     const date = req.params.date || new Date().toISOString().slice(0, 10);
-    
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    const locationSnap = await firestore.collection("locations_history")
-      .where("recorded_at", ">=", startOfDay.getTime())
-      .where("recorded_at", "<=", endOfDay.getTime())
-      .get();
-    
-    const uniqueChildren = new Set();
-    locationSnap.forEach(doc => {
-      const data = doc.data();
-      if (data.child_id) {
-        uniqueChildren.add(data.child_id);
-      }
-    });
-    
+    const stats = await getDailyLocationIndexStats(date);
+
     res.json({
       date: date,
-      active_devices_count: uniqueChildren.size,
-      total_location_updates: locationSnap.size
+      active_devices_count: stats.activeDevicesCount,
+      total_location_updates: stats.totalLocationUpdates
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -975,10 +1056,7 @@ exports.getSystemStats = async (req,res)=>{
       .where("status", "==", "active")
       .get();
     
-    const devicesSnap = await firestore.collection("devices").get();
-    const activeDevicesSnap = await firestore.collection("devices")
-      .where("status", "==", "online")
-      .get();
+    const { totalDevices, activeDevices } = await countRealtimeOnlineDevices();
     
     const childrenSnap = await firestore.collection("children").get();
     const alertsSnap = await firestore.collection("alerts").get();
@@ -986,8 +1064,8 @@ exports.getSystemStats = async (req,res)=>{
     res.json({
       total_users: usersSnap.size,
       active_users: activeUsersSnap.size,
-      total_devices: devicesSnap.size,
-      active_devices: activeDevicesSnap.size,
+      total_devices: totalDevices,
+      active_devices: activeDevices,
       total_children: childrenSnap.size,
       total_alerts: alertsSnap.size
     });
@@ -1332,6 +1410,19 @@ exports.deleteAlert = async (req, res) => {
 
     const alertData = alertDoc.data();
     await alertRef.delete();
+    const realtimeAlertUpdates = {
+      [`admin_alerts/${req.params.id}`]: null,
+    };
+    if (alertData.user_id) {
+      realtimeAlertUpdates[`alerts/${alertData.user_id}/${req.params.id}`] =
+        null;
+    }
+    if (alertData.child_id) {
+      realtimeAlertUpdates[
+        `alerts_by_child/${alertData.child_id}/${req.params.id}`
+      ] = null;
+    }
+    await realtimeDB.ref().update(realtimeAlertUpdates);
 
     await logAdminAudit(req, {
       eventType: "alert_resolved",

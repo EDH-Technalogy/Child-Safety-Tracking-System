@@ -84,6 +84,22 @@ String localizeRawMessage(AppLocalizations l10n, String raw) {
     return l10n.failedToUpdateProfile;
   }
 
+  if (message == 'Current password is incorrect') {
+    return l10n.invalidCredentials;
+  }
+
+  if (message == 'New password must be at least 6 characters') {
+    return l10n.passwordMinSix;
+  }
+
+  if (message == 'Passwords do not match') {
+    return l10n.passwordsDoNotMatch;
+  }
+
+  if (message.startsWith('currentPassword') && message.contains('required')) {
+    return l10n.passwordRequired;
+  }
+
   if (message.startsWith('Failed to delete alert')) {
     return l10n.failedToDeleteAlert;
   }
@@ -138,8 +154,16 @@ String localizeStatusLabel(AppLocalizations l10n, String? value) {
       return l10n.blocked;
     case 'online':
       return l10n.online;
+    case 'delayed':
+    case 'weak_connection':
+      return l10n.deviceOffline;
     case 'offline':
+    case 'disconnected':
       return l10n.offline;
+    case 'no_data':
+    case 'no_recent_data':
+    case 'missing_live_tracking':
+      return l10n.noData;
     default:
       return l10n.unknown;
   }

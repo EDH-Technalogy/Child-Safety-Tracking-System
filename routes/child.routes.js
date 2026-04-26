@@ -1,6 +1,9 @@
 const router = require("express").Router();
 const child = require("../controllers/child.controller");
-const { requireAuthenticatedAccess } = require("../middleware/auth");
+const {
+  requireAdminAccess,
+  requireAuthenticatedAccess,
+} = require("../middleware/auth");
 
 router.use(requireAuthenticatedAccess);
 
@@ -26,9 +29,9 @@ router.patch("/:child_id/status", child.updateChildStatus);
 router.get("/device/:child_id", child.getChildWithDevice);
 
 // Block child
-router.patch("/block/:child_id", child.blockChild);
+router.patch("/block/:child_id", requireAdminAccess, child.blockChild);
 
 // Unblock child
-router.patch("/unblock/:child_id", child.unblockChild);
+router.patch("/unblock/:child_id", requireAdminAccess, child.unblockChild);
 
 module.exports = router;

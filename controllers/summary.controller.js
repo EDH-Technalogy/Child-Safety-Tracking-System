@@ -1,5 +1,9 @@
 const { firestore } = require("../firebase");
 const { getChildWithAccessOrThrow } = require("../utils/child-access");
+const {
+  buildDateKey,
+  listChildLocationHistory,
+} = require("../utils/location-history");
 
 async function listChildSummaryRecords(childId) {
   const snap = await firestore
@@ -10,19 +14,6 @@ async function listChildSummaryRecords(childId) {
   const summaries = [];
   snap.forEach((doc) => summaries.push({ id: doc.id, ...doc.data() }));
   return summaries;
-}
-
-async function listChildLocations(childId) {
-  const snap = await firestore
-    .collection("locations_history")
-    .where("child_id", "==", childId)
-    .get();
-
-  const locations = [];
-  snap.forEach((doc) => locations.push({ id: doc.id, ...doc.data() }));
-  locations.sort((a, b) => (a.recorded_at || 0) - (b.recorded_at || 0));
-
-  return locations;
 }
 
 async function listChildAlerts(childId) {
@@ -127,7 +118,7 @@ exports.getZoneExitCount = async (req,res)=>{
   await getChildWithAccessOrThrow(req, child_id);
   const { start_date, end_date } = req.query;
   const alerts = (await listChildAlerts(child_id)).filter((alert) => {
-    if (alert.type !== "OUT_ZONE") {
+    if (!["OUT_ZONE", "SAFE_ZONE_EXIT", "ZONE_EXIT"].includes(alert.type)) {
       return false;
     }
 
@@ -157,9 +148,8 @@ exports.generateDailySummary = async (req,res)=>{
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23,59,59,999);
 
-    const locations = (await listChildLocations(child_id)).filter((location) => {
-      const recordedAt = location.recorded_at || 0;
-      return recordedAt >= startOfDay.getTime() && recordedAt <= endOfDay.getTime();
+    const locations = await listChildLocationHistory(child_id, {
+      dateKey: buildDateKey(startOfDay.getTime()),
     });
 
     if (locations.length === 0) {
@@ -186,7 +176,7 @@ exports.generateDailySummary = async (req,res)=>{
     const zoneExitCount = alerts.filter((alert) => {
       const createdAt = alert.created_at || 0;
       return (
-        alert.type === "OUT_ZONE" &&
+        ["OUT_ZONE", "SAFE_ZONE_EXIT", "ZONE_EXIT"].includes(alert.type) &&
         createdAt >= startOfDay.getTime() &&
         createdAt <= endOfDay.getTime()
       );

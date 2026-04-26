@@ -110,6 +110,16 @@ class DeviceModel {
   final int batteryLevel;
   final String firmwareVersion;
   final String status;
+  final String latestLiveStatus;
+  final String rawLiveStatus;
+  final String latestSignal;
+  final int latestTimestamp;
+  final int latestAgeMs;
+  final String liveTrackingKey;
+  final bool timestampInferred;
+  final String statusReason;
+  final int onlineThresholdMs;
+  final int delayedThresholdMs;
 
   DeviceModel({
     required this.id,
@@ -119,18 +129,58 @@ class DeviceModel {
     required this.batteryLevel,
     required this.firmwareVersion,
     required this.status,
+    this.latestLiveStatus = '',
+    this.rawLiveStatus = '',
+    this.latestSignal = '',
+    this.latestTimestamp = 0,
+    this.latestAgeMs = 0,
+    this.liveTrackingKey = '',
+    this.timestampInferred = false,
+    this.statusReason = '',
+    this.onlineThresholdMs = 0,
+    this.delayedThresholdMs = 0,
   });
 
   factory DeviceModel.fromJson(Map<String, dynamic> json) {
+    final resolvedStatus =
+        (json['status'] ?? json['latest_live_status'] ?? 'offline').toString();
+
     return DeviceModel(
-      id: json['id'] ?? '',
-      childId: json['child_id'] ?? '',
-      imei: json['imei'] ?? '',
-      simNumber: json['sim_number'] ?? '',
-      batteryLevel: json['battery_level'] ?? 0,
-      firmwareVersion: json['firmware_version'] ?? '',
-      status: json['status'] ?? 'offline',
+      id: (json['id'] ?? '').toString(),
+      childId: (json['child_id'] ?? '').toString(),
+      imei: (json['imei'] ?? '').toString(),
+      simNumber: (json['sim_number'] ?? '').toString(),
+      batteryLevel: ChildModel._parseInt(json['battery_level']),
+      firmwareVersion: (json['firmware_version'] ?? '').toString(),
+      status: resolvedStatus,
+      latestLiveStatus: (json['latest_live_status'] ?? '').toString(),
+      rawLiveStatus: (json['raw_live_status'] ?? '').toString(),
+      latestSignal: (json['latest_signal'] ?? '').toString(),
+      latestTimestamp: ChildModel._parseInt(json['latest_timestamp']),
+      latestAgeMs: ChildModel._parseInt(json['latest_age_ms']),
+      liveTrackingKey: (json['live_tracking_key'] ?? '').toString(),
+      timestampInferred: _parseBool(json['timestamp_inferred']),
+      statusReason: (json['status_reason'] ?? '').toString(),
+      onlineThresholdMs: ChildModel._parseInt(json['online_threshold_ms']),
+      delayedThresholdMs: ChildModel._parseInt(json['delayed_threshold_ms']),
     );
+  }
+
+  bool get isOnline => status.trim().toLowerCase() == 'online';
+
+  bool get hasLiveTimestamp => latestTimestamp > 0;
+
+  static bool _parseBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+
+    if (value is num) {
+      return value != 0;
+    }
+
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized == 'true' || normalized == '1';
   }
 
   Map<String, dynamic> toJson() {
@@ -142,6 +192,16 @@ class DeviceModel {
       'battery_level': batteryLevel,
       'firmware_version': firmwareVersion,
       'status': status,
+      'latest_live_status': latestLiveStatus,
+      'raw_live_status': rawLiveStatus,
+      'latest_signal': latestSignal,
+      'latest_timestamp': latestTimestamp,
+      'latest_age_ms': latestAgeMs,
+      'live_tracking_key': liveTrackingKey,
+      'timestamp_inferred': timestampInferred,
+      'status_reason': statusReason,
+      'online_threshold_ms': onlineThresholdMs,
+      'delayed_threshold_ms': delayedThresholdMs,
     };
   }
 }

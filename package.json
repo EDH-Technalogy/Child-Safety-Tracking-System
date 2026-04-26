@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "run": "node server.js"
+    "run": "node server.js",
+    "migrate:location-history": "node scripts/migrate_locations_history_to_rtdb.js"
   },
   "keywords": [],
   "author": "",

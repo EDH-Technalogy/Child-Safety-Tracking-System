@@ -11,12 +11,15 @@ class NotificationProvider with ChangeNotifier {
 
   Future<void> init() async {
     await _notificationService.init();
+    _enabled = _notificationService.enabled;
     _isInitialized = true;
     notifyListeners();
   }
 
   Future<void> loadEnabledState() async {
-    // Sync with SettingsProvider via settings, but for now use service state
+    if (!_isInitialized) {
+      await init();
+    }
     _enabled = _notificationService.enabled;
     notifyListeners();
   }

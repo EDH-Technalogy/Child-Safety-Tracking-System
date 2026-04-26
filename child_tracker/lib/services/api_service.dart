@@ -209,34 +209,75 @@ class ApiService {
     String? email,
     String? photo,
   }) async {
-    try {
-      final payload = {
-        'name': name,
-        'phone': phone,
-        if (email != null) 'email': email,
-        if (photo != null) 'photo': photo,
-      };
+    final payload = {
+      'name': name.trim(),
+      'phone': phone.trim(),
+      if (email != null) 'email': email.trim(),
+      if (photo != null) 'photo': photo,
+    };
 
-      if (kDebugMode) {
-        debugPrint(
-          '[ApiService.updateProfile] userId=$userId fields=${payload.keys.toList()} hasPhoto=${payload.containsKey('photo')}',
-        );
-      }
+    if (kDebugMode) {
+      debugPrint(
+        '[ApiService.updateProfile] userId=$userId fields=${payload.keys.toList()} hasPhoto=${payload.containsKey('photo')}',
+      );
+    }
 
-      final response = await http.put(
+    final response = await _sendRequest(
+      http.put(
         Uri.parse('$baseUrl${ApiConfig.users}/$userId'),
         headers: await _buildAuthHeaders(),
         body: jsonEncode(payload),
-      );
+      ),
+      'update profile',
+    );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception(response.body);
-      }
-    } catch (e) {
-      throw Exception('Failed to update profile: $e');
+    if (kDebugMode) {
+      debugPrint(
+        '[ApiService.updateProfile] status=${response.statusCode} userId=$userId',
+      );
     }
+
+    return Map<String, dynamic>.from(
+      _decodeResponse(response, 'update profile'),
+    );
+  }
+
+  Future<Map<String, dynamic>> changePassword({
+    required String userId,
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    final payload = {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+      'confirmPassword': confirmPassword,
+    };
+
+    if (kDebugMode) {
+      debugPrint(
+        '[ApiService.changePassword] userId=$userId fields=${payload.keys.toList()} passwordLengths=current:${currentPassword.length},new:${newPassword.length},confirm:${confirmPassword.length}',
+      );
+    }
+
+    final response = await _sendRequest(
+      http.patch(
+        Uri.parse('$baseUrl${ApiConfig.users}/$userId/password'),
+        headers: await _buildAuthHeaders(),
+        body: jsonEncode(payload),
+      ),
+      'change password',
+    );
+
+    if (kDebugMode) {
+      debugPrint(
+        '[ApiService.changePassword] status=${response.statusCode} userId=$userId',
+      );
+    }
+
+    return Map<String, dynamic>.from(
+      _decodeResponse(response, 'change password'),
+    );
   }
 
   // Request Password Reset
@@ -336,7 +377,9 @@ class ApiService {
     };
 
     if (kDebugMode) {
-      debugPrint('[ApiService.addChild] payload=$payload');
+      debugPrint(
+        '[ApiService.addChild] userId=${userId.trim()} fields=${payload.keys.toList()} hasPhoto=${(photo ?? '').isNotEmpty} registerDevice=${(imei ?? '').trim().isNotEmpty}',
+      );
     }
 
     final response = await _sendRequest(
@@ -392,17 +435,39 @@ class ApiService {
     required String childId,
     required String name,
     required int age,
+    String? userId,
     String? photo,
+    bool? registerDevice,
+    String? deviceId,
+    String? imei,
+    String? simNumber,
+    String? firmware,
   }) async {
+    final payload = {
+      if (userId != null && userId.trim().isNotEmpty) 'user_id': userId.trim(),
+      'name': name,
+      'age': age,
+      if (photo != null) 'photo': photo,
+      if (registerDevice != null) 'register_device': registerDevice,
+      if (deviceId != null && deviceId.trim().isNotEmpty)
+        'device_id': deviceId.trim(),
+      if (imei != null && imei.trim().isNotEmpty) 'imei': imei.trim(),
+      if (simNumber != null) 'sim_number': simNumber,
+      if (firmware != null && firmware.trim().isNotEmpty)
+        'firmware': firmware.trim(),
+    };
+
+    if (kDebugMode) {
+      debugPrint(
+        '[ApiService.updateChild] childId=$childId fields=${payload.keys.toList()} registerDevice=$registerDevice hasPhoto=${payload.containsKey('photo')}',
+      );
+    }
+
     final response = await _sendRequest(
       http.put(
         Uri.parse('$baseUrl${ApiConfig.children}/$childId'),
         headers: await _buildAuthHeaders(),
-        body: jsonEncode({
-          'name': name,
-          'age': age,
-          if (photo != null) 'photo': photo,
-        }),
+        body: jsonEncode(payload),
       ),
       'update child',
     );
@@ -453,7 +518,7 @@ class ApiService {
     final response = await _sendRequest(
       http.post(
         Uri.parse('$baseUrl${ApiConfig.devices}/register'),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
         body: jsonEncode({
           'child_id': childId,
           'imei': imei,
@@ -474,7 +539,7 @@ class ApiService {
     final response = await _sendRequest(
       http.patch(
         Uri.parse('$baseUrl${ApiConfig.devices}/deactivate/$deviceId'),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
       ),
       'deactivate device',
     );
@@ -536,10 +601,23 @@ class ApiService {
 
   // Get Location History By Date
   Future<List<dynamic>> getLocationHistoryByDate(
-      String childId, String date) async {
+    String childId,
+    String date, {
+    int? timezoneOffsetMinutes,
+  }) async {
     try {
+      final uri = Uri.parse(
+        '$baseUrl${ApiConfig.locations}/history/$childId/$date',
+      ).replace(
+        queryParameters: timezoneOffsetMinutes == null
+            ? null
+            : {
+                'timezone_offset_minutes':
+                    timezoneOffsetMinutes.toString(),
+              },
+      );
       final response = await http.get(
-        Uri.parse('$baseUrl${ApiConfig.locations}/history/$childId/$date'),
+        uri,
         headers: await _buildAuthHeaders(),
       );
 
@@ -554,10 +632,24 @@ class ApiService {
   }
 
   // Get Route Data
-  Future<Map<String, dynamic>> getRouteData(String childId, String date) async {
+  Future<Map<String, dynamic>> getRouteData(
+    String childId,
+    String date, {
+    int? timezoneOffsetMinutes,
+  }) async {
     try {
+      final uri = Uri.parse(
+        '$baseUrl${ApiConfig.locations}/route/$childId/$date',
+      ).replace(
+        queryParameters: timezoneOffsetMinutes == null
+            ? null
+            : {
+                'timezone_offset_minutes':
+                    timezoneOffsetMinutes.toString(),
+              },
+      );
       final response = await http.get(
-        Uri.parse('$baseUrl${ApiConfig.locations}/route/$childId/$date'),
+        uri,
         headers: await _buildAuthHeaders(),
       );
 
@@ -656,6 +748,7 @@ class ApiService {
     required double latitude,
     required double longitude,
     int? radius,
+    String? centerSource,
   }) async {
     try {
       final payload = {
@@ -666,6 +759,8 @@ class ApiService {
         'latitude': latitude,
         'longitude': longitude,
         if (radius != null) 'radius': radius,
+        if (centerSource != null && centerSource.isNotEmpty)
+          'center_source': centerSource,
       };
 
       if (kDebugMode) {
@@ -741,6 +836,7 @@ class ApiService {
     String? status,
     String? childId,
     String? childName,
+    String? centerSource,
   }) async {
     try {
       final payload = {
@@ -751,6 +847,8 @@ class ApiService {
         if (status != null) 'status': status,
         if (childId != null && childId.isNotEmpty) 'child_id': childId,
         if (childName != null && childName.isNotEmpty) 'child_name': childName,
+        if (centerSource != null && centerSource.isNotEmpty)
+          'center_source': centerSource,
       };
 
       if (kDebugMode) {
@@ -830,7 +928,7 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl${ApiConfig.activities}/add'),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
         body: jsonEncode({
           'child_id': childId,
           'event_type': eventType,
@@ -853,7 +951,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl${ApiConfig.activities}/$childId'),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -873,7 +971,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl${ApiConfig.summaries}/today/$childId'),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -892,7 +990,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl${ApiConfig.summaries}/$childId/$date'),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -910,7 +1008,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl${ApiConfig.summaries}/weekly/$childId'),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -934,7 +1032,7 @@ class ApiService {
 
       final response = await http.get(
         Uri.parse(url),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -958,7 +1056,7 @@ class ApiService {
 
       final response = await http.get(
         Uri.parse(url),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -979,7 +1077,7 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl${ApiConfig.summaries}/generate'),
-        headers: headers,
+        headers: await _buildAuthHeaders(),
         body: jsonEncode({
           'child_id': childId,
           if (date != null) 'date': date,

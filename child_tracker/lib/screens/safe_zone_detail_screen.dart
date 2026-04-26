@@ -9,9 +9,11 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/geofence_model.dart';
 import '../models/location_model.dart';
+import '../providers/alert_provider.dart';
 import '../providers/geofence_provider.dart';
 import '../providers/location_provider.dart';
 import '../utils/constants.dart';
+import '../utils/timestamp_utils.dart';
 
 enum _MapViewMode {
   defaultView,
@@ -40,6 +42,7 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
   String? _lastCameraKey;
   _MapViewMode _mapViewMode = _MapViewMode.satellite;
   double _lastZoom = AppConstants.defaultZoom;
+  String get _alertMonitorOwnerId => 'safe_zone_detail:${widget.zone.id}';
 
   @override
   void initState() {
@@ -56,8 +59,13 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
         Provider.of<LocationProvider>(context, listen: false);
     final geofenceProvider =
         Provider.of<GeofenceProvider>(context, listen: false);
+    final alertProvider = Provider.of<AlertProvider>(context, listen: false);
 
     await locationProvider.getLiveLocation(widget.zone.childId);
+    await alertProvider.startMonitoring(
+      widget.zone.childId,
+      ownerId: _alertMonitorOwnerId,
+    );
 
     final shouldOwnTracking = !locationProvider.isTracking ||
         locationProvider.trackingChildId != widget.zone.childId;
@@ -78,6 +86,8 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
 
   @override
   void dispose() {
+    Provider.of<AlertProvider>(context, listen: false)
+        .stopMonitoring(ownerId: _alertMonitorOwnerId);
     if (_ownsLocationTracking) {
       Provider.of<LocationProvider>(context, listen: false).stopLiveTracking();
     }
@@ -359,11 +369,11 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
   }
 
   String _formatTimestamp(int timestamp) {
-    if (timestamp <= 0) {
+    final date = TimestampUtils.toLocalDateTime(timestamp);
+    if (date == null) {
       return '--';
     }
 
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
     return '${date.day}/${date.month}/${date.year} '
         '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
@@ -405,7 +415,9 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
         builder: (context, geofenceProvider, locationProvider, child) {
           final liveLocation = locationProvider.liveLocation;
           _scheduleZoneCheck(liveLocation);
-          _frameMap(liveLocation);
+          if (!locationProvider.isAnimatingLiveLocation) {
+            _frameMap(liveLocation);
+          }
 
           ZoneDistance? zoneDistance;
           final checkedZones =

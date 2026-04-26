@@ -1,6 +1,11 @@
 import 'location_model.dart';
+import '../utils/timestamp_utils.dart';
 
 class LiveTrackingModel {
+  static const int onlineThresholdMs = 60 * 1000;
+  static const int delayedThresholdMs = 180 * 1000;
+  static const int futureTimestampToleranceMs = 30 * 1000;
+
   final LocationModel? location;
   final LiveTrackingStatusModel? childStatus;
   final LiveTrackingStatusModel? deviceStatus;
@@ -57,19 +62,31 @@ class LiveTrackingModel {
     return timestamps.last;
   }
 
-  String? get effectiveDeviceStatus {
-    for (final candidate in [
-      connection?.status,
-      deviceStatus?.status,
-      childStatus?.status,
-    ]) {
-      final normalized = candidate?.trim() ?? '';
-      if (normalized.isNotEmpty) {
-        return normalized;
-      }
+  int? get latestLiveLocationTimestamp {
+    final timestamp = location?.recordedAt ?? 0;
+    return timestamp > 0 ? timestamp : null;
+  }
+
+  String get effectiveDeviceStatus {
+    final liveTimestamp = latestLiveLocationTimestamp;
+    if (liveTimestamp == null) {
+      return 'no_data';
     }
 
-    return null;
+    final ageMs = DateTime.now().millisecondsSinceEpoch - liveTimestamp;
+    if (ageMs < -futureTimestampToleranceMs) {
+      return 'no_data';
+    }
+
+    if (ageMs <= onlineThresholdMs) {
+      return 'online';
+    }
+
+    if (ageMs <= delayedThresholdMs) {
+      return 'delayed';
+    }
+
+    return 'offline';
   }
 
   static Map<String, dynamic> _asMap(Object? value) {
@@ -114,8 +131,9 @@ class LiveTrackingStatusModel {
       status: (data['status'] ?? '').toString(),
       blocked: _parseBool(data['blocked']),
       disabled: _parseBool(data['disabled']),
-      updatedAt: _parseInt(data['updated_at']),
-      time: _parseInt(data['time']),
+      updatedAt:
+          TimestampUtils.normalizeEpochMilliseconds(data['updated_at']) ?? 0,
+      time: TimestampUtils.normalizeEpochMilliseconds(data['time']) ?? 0,
       reason: (data['reason'] ?? '').toString(),
     );
   }
@@ -131,17 +149,5 @@ class LiveTrackingStatusModel {
 
     final normalized = value?.toString().trim().toLowerCase() ?? '';
     return normalized == 'true' || normalized == '1';
-  }
-
-  static int _parseInt(Object? value) {
-    if (value is int) {
-      return value;
-    }
-
-    if (value is num) {
-      return value.round();
-    }
-
-    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 }

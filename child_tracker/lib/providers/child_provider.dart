@@ -16,26 +16,44 @@ class ChildProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  ChildModel _mergeChildSnapshot(ChildModel existing, ChildModel incoming) {
+  ChildModel _mergeChildSnapshot(
+    ChildModel existing,
+    ChildModel incoming, {
+    bool clearDevice = false,
+  }) {
     return incoming.copyWith(
-      device: incoming.device ?? existing.device,
-      createdAt: incoming.createdAt != 0 ? incoming.createdAt : existing.createdAt,
+      device: clearDevice ? null : incoming.device ?? existing.device,
+      clearDevice: clearDevice,
+      createdAt:
+          incoming.createdAt != 0 ? incoming.createdAt : existing.createdAt,
       status: incoming.status.isNotEmpty ? incoming.status : existing.status,
       userId: incoming.userId.isNotEmpty ? incoming.userId : existing.userId,
       name: incoming.name.isNotEmpty ? incoming.name : existing.name,
     );
   }
 
-  ChildModel _mergeWithKnownState(ChildModel incoming) {
+  ChildModel _mergeWithKnownState(
+    ChildModel incoming, {
+    bool clearDevice = false,
+  }) {
     var merged = incoming;
 
-    final existingIndex = _children.indexWhere((child) => child.id == incoming.id);
+    final existingIndex =
+        _children.indexWhere((child) => child.id == incoming.id);
     if (existingIndex != -1) {
-      merged = _mergeChildSnapshot(_children[existingIndex], merged);
+      merged = _mergeChildSnapshot(
+        _children[existingIndex],
+        merged,
+        clearDevice: clearDevice,
+      );
     }
 
     if (_selectedChild?.id == incoming.id) {
-      merged = _mergeChildSnapshot(_selectedChild!, merged);
+      merged = _mergeChildSnapshot(
+        _selectedChild!,
+        merged,
+        clearDevice: clearDevice,
+      );
     }
 
     return merged;
@@ -44,11 +62,13 @@ class ChildProvider with ChangeNotifier {
   void _syncChildInState(
     ChildModel incoming, {
     bool updateSelected = false,
+    bool clearDevice = false,
   }) {
-    final merged = _mergeWithKnownState(incoming);
-    final existingIndex = _children.indexWhere((child) => child.id == merged.id);
-    final belongsToLoadedScope = (_loadedUserId ?? '').isNotEmpty &&
-        merged.userId == _loadedUserId;
+    final merged = _mergeWithKnownState(incoming, clearDevice: clearDevice);
+    final existingIndex =
+        _children.indexWhere((child) => child.id == merged.id);
+    final belongsToLoadedScope =
+        (_loadedUserId ?? '').isNotEmpty && merged.userId == _loadedUserId;
 
     if (existingIndex != -1) {
       _children[existingIndex] = merged;
@@ -67,6 +87,7 @@ class ChildProvider with ChangeNotifier {
     Map<String, dynamic> childJson, {
     Map<String, dynamic>? deviceJson,
     bool updateSelected = false,
+    bool clearDevice = false,
   }) {
     if (childJson.isEmpty) {
       return;
@@ -77,38 +98,58 @@ class ChildProvider with ChangeNotifier {
       if (deviceJson != null) 'device': deviceJson,
     });
 
-    _syncChildInState(child, updateSelected: updateSelected);
+    _syncChildInState(
+      child,
+      updateSelected: updateSelected,
+      clearDevice: clearDevice,
+    );
     notifyListeners();
   }
 
-  Future<bool> loadChildren(String userId) async {
-    _isLoading = true;
+  Future<bool> loadChildren(String userId, {bool showLoading = true}) async {
+    if (showLoading) {
+      _isLoading = true;
+    }
     _error = null;
     _loadedUserId = userId;
-    notifyListeners();
+    if (showLoading) {
+      notifyListeners();
+    }
 
     try {
       final response = await _apiService.getChildren(userId);
-      final nextChildren = response
-          .map((json) => ChildModel.fromJson(Map<String, dynamic>.from(json as Map)))
-          .map(_mergeWithKnownState)
-          .toList();
+      final nextChildren = response.map((json) {
+        final childJson = Map<String, dynamic>.from(json as Map);
+        return _mergeWithKnownState(
+          ChildModel.fromJson(childJson),
+          clearDevice:
+              childJson.containsKey('device') && childJson['device'] == null,
+        );
+      }).toList();
 
       _children = nextChildren;
       if (_selectedChild != null) {
         final selectedIndex =
             _children.indexWhere((child) => child.id == _selectedChild!.id);
         if (selectedIndex != -1) {
-          _selectedChild =
-              _mergeChildSnapshot(_selectedChild!, _children[selectedIndex]);
+          final listChild = _children[selectedIndex];
+          _selectedChild = _mergeChildSnapshot(
+            _selectedChild!,
+            listChild,
+            clearDevice: listChild.device == null,
+          );
           _children[selectedIndex] = _selectedChild!;
         }
       }
-      _isLoading = false;
+      if (showLoading) {
+        _isLoading = false;
+      }
       notifyListeners();
       return true;
     } catch (e) {
-      _isLoading = false;
+      if (showLoading) {
+        _isLoading = false;
+      }
       _error = e.toString();
       notifyListeners();
       return false;
@@ -161,6 +202,11 @@ class ChildProvider with ChangeNotifier {
     required int age,
     String? photo,
     required String userId,
+    bool? registerDevice,
+    String? deviceId,
+    String? imei,
+    String? simNumber,
+    String? firmware,
   }) async {
     _isLoading = true;
     _error = null;
@@ -169,12 +215,18 @@ class ChildProvider with ChangeNotifier {
     try {
       await _apiService.updateChild(
         childId: childId,
+        userId: userId,
         name: name,
         age: age,
         photo: photo,
+        registerDevice: registerDevice,
+        deviceId: deviceId,
+        imei: imei,
+        simNumber: simNumber,
+        firmware: firmware,
       );
 
-      // Reload children list
+      await getChildWithDevice(childId);
       await loadChildren(userId);
       return true;
     } catch (e) {
@@ -235,6 +287,8 @@ class ChildProvider with ChangeNotifier {
         deviceJson: response['device'] is Map
             ? Map<String, dynamic>.from(response['device'] as Map)
             : null,
+        clearDevice:
+            response.containsKey('device') && response['device'] == null,
         updateSelected: true,
       );
       _isLoading = false;

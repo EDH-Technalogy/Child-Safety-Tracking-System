@@ -1,10 +1,13 @@
 const router = require("express").Router();
 const alert = require("../controllers/alert.controller");
-const { requireAuthenticatedAccess } = require("../middleware/auth");
+const {
+  attachOptionalAuth,
+  requireAuthenticatedAccess,
+} = require("../middleware/auth");
 
 // Send Alert (SOS / OUT_ZONE / LOW_BATTERY)
-router.post("/send", alert.sendAlert);
-router.post("/sos", alert.sosAlert);
+router.post("/send", attachOptionalAuth, alert.sendAlert);
+router.post("/sos", attachOptionalAuth, alert.sosAlert);
 
 // Get Child Alerts (Flutter calls: /api/alerts/{childId})
 router.get("/:child_id", requireAuthenticatedAccess, alert.getAlerts);
@@ -27,18 +30,18 @@ router.get(
 );
 
 // Low Battery Alert
-router.post("/low-battery", alert.lowBatteryAlert);
+router.post("/low-battery", attachOptionalAuth, alert.lowBatteryAlert);
 
 // Device Off Alert
-router.post("/device-off", alert.deviceOffAlert);
+router.post("/device-off", attachOptionalAuth, alert.deviceOffAlert);
 
 // Device Online Alert
-router.post("/device-online", alert.deviceOnlineAlert);
+router.post("/device-online", attachOptionalAuth, alert.deviceOnlineAlert);
 
 // Safe Zone Exit Alert
-router.post("/zone-exit", alert.safeZoneExitAlert);
+router.post("/zone-exit", attachOptionalAuth, alert.safeZoneExitAlert);
 
 // Safe Zone Enter Alert
-router.post("/zone-enter", alert.safeZoneEnterAlert);
+router.post("/zone-enter", attachOptionalAuth, alert.safeZoneEnterAlert);
 
 module.exports = router;

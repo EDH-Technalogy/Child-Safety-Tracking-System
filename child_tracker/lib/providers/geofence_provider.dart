@@ -65,6 +65,7 @@ class GeofenceProvider with ChangeNotifier {
     required double latitude,
     required double longitude,
     int? radius,
+    String? centerSource,
   }) async {
     _isLoading = true;
     _error = null;
@@ -80,6 +81,7 @@ class GeofenceProvider with ChangeNotifier {
         latitude: latitude,
         longitude: longitude,
         radius: radius,
+        centerSource: centerSource,
       );
 
       final createdZoneId = (response['zone_id'] ?? '').toString().trim();
@@ -128,6 +130,7 @@ class GeofenceProvider with ChangeNotifier {
     String? status,
     String? childId,
     String? childName,
+    String? centerSource,
   }) async {
     _isLoading = true;
     _error = null;
@@ -144,6 +147,7 @@ class GeofenceProvider with ChangeNotifier {
         status: status,
         childId: childId,
         childName: childName,
+        centerSource: centerSource,
       );
 
       if (childId != null && childId.isNotEmpty) {

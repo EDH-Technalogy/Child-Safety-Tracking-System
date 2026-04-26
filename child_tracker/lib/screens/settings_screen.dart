@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
@@ -26,7 +27,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
   XFile? _selectedImage;
   String? _photoUrl;
   bool _uploadingImage = false;
+  bool _loadingProfile = false;
   final ImagePicker _imagePicker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadCurrentProfile();
+    });
+  }
+
+  Future<void> _loadCurrentProfile() async {
+    final l10n = AppLocalizations.of(context)!;
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+
+    if (user == null) {
+      return;
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        '[SettingsScreen] account opened userId=${user.id} role=${user.role}',
+      );
+    }
+
+    setState(() {
+      _loadingProfile = true;
+    });
+
+    await authProvider.getProfile();
+
+    if (!mounted) return;
+    setState(() {
+      _loadingProfile = false;
+    });
+
+    final error = authProvider.error;
+    if (error != null && error.trim().isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(localizeRawMessage(l10n, error)),
+          backgroundColor: AppColors.errorColor,
+        ),
+      );
+    }
+  }
+
+  void _showStatusSnackBar({
+    required String message,
+    required bool success,
+  }) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            success ? AppColors.successColor : AppColors.errorColor,
+      ),
+    );
+  }
 
   Future<bool> _persistPhotoChange(String photoUrl) async {
     final l10n = AppLocalizations.of(context)!;
@@ -187,6 +250,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final localeProvider = context.watch<LocaleProvider>();
+    final currentLanguageLabel =
+        _languageLabel(l10n, localeProvider.locale.languageCode);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.settings),
@@ -194,9 +261,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
           final user = authProvider.user;
+
+          if (user == null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('${l10n.login}: ${l10n.account}'),
+              ),
+            );
+          }
+
           final effectivePhotoUrl = (_photoUrl?.isNotEmpty ?? false)
               ? _photoUrl!
-              : (user?.photo ?? '');
+              : (user.photo ?? '');
           final photoProvider = _selectedImage == null
               ? buildPhotoProvider(effectivePhotoUrl)
               : null;
@@ -208,6 +285,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
+                      if (_loadingProfile) ...[
+                        const LinearProgressIndicator(),
+                        const SizedBox(height: 16),
+                      ],
                       GestureDetector(
                         onTap: _pickImage,
                         child: CircleAvatar(
@@ -243,13 +324,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        user?.name ?? l10n.user,
+                        user.name.isNotEmpty ? user.name : l10n.user,
                         style: const TextStyle(
                             fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        user?.email ?? '',
+                        user.email,
                         style:
                             const TextStyle(fontSize: 14, color: Colors.grey),
                       ),
@@ -280,7 +361,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 16),
               _buildSection(context, l10n.app, [
                 _buildTile(context, Icons.language, l10n.language,
-                    () => _showLanguageDialog(context)),
+                    () => _showLanguageDialog(context),
+                    subtitle: currentLanguageLabel),
                 _buildTile(context, Icons.location_on, l10n.locationSettings,
                     () {
                   Navigator.push(
@@ -376,10 +458,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildTile(
-      BuildContext context, IconData icon, String title, VoidCallback onTap) {
+    BuildContext context,
+    IconData icon,
+    String title,
+    VoidCallback onTap, {
+    String? subtitle,
+  }) {
     return ListTile(
       leading: Icon(icon, color: const Color(0xFF1E40AF)),
       title: Text(title),
+      subtitle: subtitle != null ? Text(subtitle) : null,
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
     );
@@ -390,119 +478,502 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user;
 
-    final nameController = TextEditingController(text: user?.name ?? '');
-    final phoneController = TextEditingController(text: user?.phone ?? '');
+    if (user == null) {
+      _showStatusSnackBar(message: l10n.loginFailed, success: false);
+      return;
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        '[SettingsScreen.editProfile] opened userId=${user.id} role=${user.role}',
+      );
+    }
+
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController(text: user.name);
+    final phoneController = TextEditingController(text: user.phone);
+    final emailController = TextEditingController(text: user.email);
+
+    bool isSubmitting = false;
 
     await showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.editProfile),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: l10n.name,
-                prefixIcon: const Icon(Icons.person),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      barrierDismissible: !isSubmitting,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            title: Text(l10n.editProfile),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    textCapitalization: TextCapitalization.words,
+                    enabled: !isSubmitting,
+                    decoration: InputDecoration(
+                      labelText: l10n.name,
+                      prefixIcon: const Icon(Icons.person),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return l10n.enterName;
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: phoneController,
+                    enabled: !isSubmitting,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: l10n.phone,
+                      prefixIcon: const Icon(Icons.phone),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return l10n.enterPhone;
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: emailController,
+                    enabled: !isSubmitting,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: l10n.email,
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    validator: (value) {
+                      final email = value?.trim() ?? '';
+                      if (email.isEmpty) {
+                        return l10n.emailRequired;
+                      }
+                      if (!email.contains('@') || !email.contains('.')) {
+                        return l10n.enterValidEmail;
+                      }
+                      return null;
+                    },
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: l10n.phone,
-                prefixIcon: const Icon(Icons.phone),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            actions: [
+              TextButton(
+                onPressed:
+                    isSubmitting ? null : () => Navigator.pop(dialogContext),
+                child: Text(l10n.cancel),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(l10n.cancel)),
-          ElevatedButton(
-            onPressed: () async {
-              final success = await authProvider.updateProfile(
-                  name: nameController.text, phone: phoneController.text);
-              if (!mounted || !dialogContext.mounted) return;
-              Navigator.pop(dialogContext);
-              ScaffoldMessenger.of(this.context).showSnackBar(
-                SnackBar(
-                    content: success
-                        ? Text(l10n.profileUpdatedSuccess)
-                        : Text(
-                            authProvider.error != null
-                                ? localizeRawMessage(l10n, authProvider.error!)
-                                : l10n.profileUpdatedFailed,
-                          ),
-                    backgroundColor: success ? Colors.green : Colors.red),
-              );
-            },
-            child: Text(l10n.save),
-          ),
-        ],
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (formKey.currentState?.validate() != true) {
+                          if (kDebugMode) {
+                            debugPrint(
+                              '[SettingsScreen.editProfile] validation failed userId=${user.id}',
+                            );
+                          }
+                          return;
+                        }
+
+                        final payloadFields = <String>[
+                          'name',
+                          'phone',
+                          'email',
+                        ];
+
+                        if (kDebugMode) {
+                          debugPrint(
+                            '[SettingsScreen.editProfile] submit userId=${user.id} role=${user.role} fields=$payloadFields',
+                          );
+                        }
+
+                        setDialogState(() {
+                          isSubmitting = true;
+                        });
+
+                        final success = await authProvider.updateProfile(
+                          name: nameController.text.trim(),
+                          phone: phoneController.text.trim(),
+                          email: emailController.text.trim(),
+                        );
+
+                        if (!mounted || !dialogContext.mounted) return;
+
+                        setDialogState(() {
+                          isSubmitting = false;
+                        });
+
+                        if (success) {
+                          Navigator.pop(dialogContext);
+                          _showStatusSnackBar(
+                            message: l10n.profileUpdatedSuccess,
+                            success: true,
+                          );
+                          return;
+                        }
+
+                        _showStatusSnackBar(
+                          message: authProvider.error != null
+                              ? localizeRawMessage(l10n, authProvider.error!)
+                              : l10n.profileUpdatedFailed,
+                          success: false,
+                        );
+                      },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.save),
+              ),
+            ],
+          );
+        },
       ),
     );
+
+    nameController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
   }
 
   Future<void> _showChangePasswordDialog(BuildContext context) async {
-    Navigator.pushNamed(context, '/forgot-password');
+    final l10n = AppLocalizations.of(context)!;
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+
+    if (user == null) {
+      _showStatusSnackBar(message: l10n.loginFailed, success: false);
+      return;
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        '[SettingsScreen.changePassword] opened userId=${user.id} role=${user.role}',
+      );
+    }
+
+    final formKey = GlobalKey<FormState>();
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool isSubmitting = false;
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: !isSubmitting,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            title: Text(l10n.changePasswordTitle),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: currentPasswordController,
+                    enabled: !isSubmitting,
+                    obscureText: obscureCurrent,
+                    decoration: InputDecoration(
+                      labelText: _currentPasswordLabel(context),
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscureCurrent
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            obscureCurrent = !obscureCurrent;
+                          });
+                        },
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return _currentPasswordRequiredLabel(context);
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: newPasswordController,
+                    enabled: !isSubmitting,
+                    obscureText: obscureNew,
+                    decoration: InputDecoration(
+                      labelText: l10n.newPassword,
+                      prefixIcon: const Icon(Icons.lock_reset),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscureNew ? Icons.visibility : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            obscureNew = !obscureNew;
+                          });
+                        },
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return l10n.passwordRequired;
+                      }
+                      if (value.length < 6) {
+                        return l10n.passwordMinSix;
+                      }
+                      if (value == currentPasswordController.text) {
+                        return _newPasswordMustDifferLabel(context);
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: confirmPasswordController,
+                    enabled: !isSubmitting,
+                    obscureText: obscureConfirm,
+                    decoration: InputDecoration(
+                      labelText: l10n.confirmPassword,
+                      prefixIcon: const Icon(Icons.verified_user_outlined),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscureConfirm
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            obscureConfirm = !obscureConfirm;
+                          });
+                        },
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return l10n.passwordRequired;
+                      }
+                      if (value != newPasswordController.text) {
+                        return l10n.passwordsDoNotMatch;
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed:
+                    isSubmitting ? null : () => Navigator.pop(dialogContext),
+                child: Text(l10n.cancel),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (formKey.currentState?.validate() != true) {
+                          if (kDebugMode) {
+                            debugPrint(
+                              '[SettingsScreen.changePassword] validation failed userId=${user.id}',
+                            );
+                          }
+                          return;
+                        }
+
+                        if (kDebugMode) {
+                          debugPrint(
+                            '[SettingsScreen.changePassword] submit userId=${user.id} role=${user.role} passwordLengths=current:${currentPasswordController.text.length},new:${newPasswordController.text.length},confirm:${confirmPasswordController.text.length}',
+                          );
+                        }
+
+                        setDialogState(() {
+                          isSubmitting = true;
+                        });
+
+                        final success = await authProvider.changePassword(
+                          currentPassword: currentPasswordController.text,
+                          newPassword: newPasswordController.text,
+                          confirmPassword: confirmPasswordController.text,
+                        );
+
+                        if (!mounted || !dialogContext.mounted) return;
+
+                        setDialogState(() {
+                          isSubmitting = false;
+                        });
+
+                        if (success) {
+                          Navigator.pop(dialogContext);
+                          _showStatusSnackBar(
+                            message: l10n.passwordChangedSuccessfully,
+                            success: true,
+                          );
+                          return;
+                        }
+
+                        _showStatusSnackBar(
+                          message: authProvider.error != null
+                              ? localizeRawMessage(l10n, authProvider.error!)
+                              : l10n.error,
+                          success: false,
+                        );
+                      },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.save),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    currentPasswordController.dispose();
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
+  }
+
+  String _currentPasswordLabel(BuildContext context) {
+    switch (Localizations.localeOf(context).languageCode) {
+      case 'fa':
+        return 'رمز عبور فعلی';
+      case 'ps':
+        return 'اوسنی پاسورډ';
+      default:
+        return 'Current Password';
+    }
+  }
+
+  String _currentPasswordRequiredLabel(BuildContext context) {
+    switch (Localizations.localeOf(context).languageCode) {
+      case 'fa':
+        return 'لطفاً رمز عبور فعلی را وارد کنید';
+      case 'ps':
+        return 'مهرباني وکړئ اوسنی پاسورډ دننه کړئ';
+      default:
+        return 'Please enter current password';
+    }
+  }
+
+  String _newPasswordMustDifferLabel(BuildContext context) {
+    switch (Localizations.localeOf(context).languageCode) {
+      case 'fa':
+        return 'رمز عبور جدید باید متفاوت باشد';
+      case 'ps':
+        return 'نوی پاسورډ باید توپیر ولري';
+      default:
+        return 'New password must be different';
+    }
   }
 
   Future<void> _showLanguageDialog(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
-    final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.selectLanguage),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-                leading: Radio<String>(
-                    value: 'en',
-                    groupValue: localeProvider.locale.languageCode,
-                    onChanged: (_) {}),
-                title: Text(l10n.english),
-                onTap: () {
-                  localeProvider.setLocale(const Locale('en'));
-                  Navigator.pop(context);
-                }),
-            ListTile(
-                leading: Radio<String>(
-                    value: 'ps',
-                    groupValue: localeProvider.locale.languageCode,
-                    onChanged: (_) {}),
-                title: Text(l10n.pashto),
-                onTap: () {
-                  localeProvider.setLocale(const Locale('ps'));
-                  Navigator.pop(context);
-                }),
-            ListTile(
-                leading: Radio<String>(
-                    value: 'fa',
-                    groupValue: localeProvider.locale.languageCode,
-                    onChanged: (_) {}),
-                title: Text(l10n.dari),
-                onTap: () {
-                  localeProvider.setLocale(const Locale('fa'));
-                  Navigator.pop(context);
-                }),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context), child: Text(l10n.cancel))
-        ],
+      builder: (dialogContext) => Consumer<LocaleProvider>(
+        builder: (dialogContext, localeProvider, child) {
+          Future<void> selectLocale(Locale locale) async {
+            final selectedCode = locale.languageCode;
+
+            debugPrint(
+              '[SettingsScreen.language] selected=$selectedCode current=${localeProvider.locale.languageCode}',
+            );
+
+            await localeProvider.setLocale(locale);
+
+            if (!dialogContext.mounted) return;
+            Navigator.pop(dialogContext);
+          }
+
+          return AlertDialog(
+            title: Text(l10n.selectLanguage),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _languageOptionTile(
+                  value: 'en',
+                  title: l10n.english,
+                  groupValue: localeProvider.locale.languageCode,
+                  onSelected: () => selectLocale(const Locale('en')),
+                ),
+                _languageOptionTile(
+                  value: 'ps',
+                  title: l10n.pashto,
+                  groupValue: localeProvider.locale.languageCode,
+                  onSelected: () => selectLocale(const Locale('ps')),
+                ),
+                _languageOptionTile(
+                  value: 'fa',
+                  title: l10n.dari,
+                  groupValue: localeProvider.locale.languageCode,
+                  onSelected: () => selectLocale(const Locale('fa')),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(l10n.cancel),
+              ),
+            ],
+          );
+        },
       ),
     );
+  }
+
+  Widget _languageOptionTile({
+    required String value,
+    required String title,
+    required String groupValue,
+    required VoidCallback onSelected,
+  }) {
+    return ListTile(
+      leading: Radio<String>(
+        value: value,
+        groupValue: groupValue,
+        onChanged: (_) => onSelected(),
+      ),
+      title: Text(title),
+      onTap: onSelected,
+    );
+  }
+
+  String _languageLabel(AppLocalizations l10n, String languageCode) {
+    switch (languageCode) {
+      case 'ps':
+        return l10n.pashto;
+      case 'fa':
+        return l10n.dari;
+      default:
+        return l10n.english;
+    }
   }
 
   Future<void> _showLogoutDialog(BuildContext context) async {

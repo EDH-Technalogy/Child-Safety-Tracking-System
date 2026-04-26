@@ -5,6 +5,11 @@ const {
   getChildOrThrow,
   isAdminRequest,
 } = require("../utils/child-access");
+const {
+  removeSafeZoneMirror,
+  upsertSafeZoneMirror,
+} = require("../utils/safe-zone-sync");
+const { appendChildLog } = require("../utils/child-logs");
 
 const MIN_RADIUS_METERS = 50;
 const MAX_RADIUS_METERS = 50000;
@@ -268,7 +273,8 @@ exports.createSafeZone = async (req, res, next) => {
     const childData = childDoc.data() || {};
     const childName = childData.name?.toString().trim() || "";
 
-    const zone = await firestore.collection("safe_zones").add({
+    const createdAt = Date.now();
+    const zonePayload = {
       child_id: childId,
       child_name: childName,
       user_id: childData.user_id || "",
@@ -276,16 +282,36 @@ exports.createSafeZone = async (req, res, next) => {
       latitude,
       longitude,
       radius,
-      created_at: Date.now(),
-      updated_at: Date.now(),
+      created_at: createdAt,
+      updated_at: createdAt,
       status: "active",
       created_by: req.auth?.id || "",
       created_by_role: req.auth?.role || "",
+    };
+    const zone = await firestore.collection("safe_zones").add(zonePayload);
+    await upsertSafeZoneMirror(zone.id, zonePayload);
+    await appendChildLog({
+      childId,
+      trackingKey: "",
+      parentUserId: childData.user_id || "",
+      type: "SAFE_ZONE_CREATED",
+      message: `Safe zone "${name}" created.`,
+      timestamp: createdAt,
+      metadata: {
+        zoneId: zone.id,
+        zoneName: name,
+        radius,
+        latitude,
+        longitude,
+        actorId: req.auth?.id || "",
+        actorRole: req.auth?.role || "",
+      },
     });
 
     console.info("[geofence.createSafeZone]", {
       requestedChildId: req.body.child_id?.toString().trim() || "",
       requestedChildName: req.body.child_name?.toString().trim() || "",
+      centerSource: req.body.center_source?.toString().trim() || "",
       childId,
       childName,
       actorId: req.auth?.id,
@@ -421,11 +447,36 @@ exports.updateSafeZone = async (req, res, next) => {
     updates.updated_by_role = req.auth?.role || "";
 
     await zoneRef.update(updates);
+    await upsertSafeZoneMirror(req.params.zone_id, {
+      ...zoneData,
+      ...updates,
+      child_id: zoneData.child_id,
+      child_name: resolvedChildName,
+      user_id: resolvedUserId,
+    });
+    await appendChildLog({
+      childId: zoneData.child_id,
+      trackingKey: "",
+      parentUserId: resolvedUserId,
+      type: "SAFE_ZONE_UPDATED",
+      message: `Safe zone "${updates.name || zoneData.name || "Safe Zone"}" updated.`,
+      timestamp: updates.updated_at,
+      metadata: {
+        zoneId: req.params.zone_id,
+        updatedFields: Object.keys(updates),
+        radius: updates.radius ?? zoneData.radius ?? null,
+        latitude: updates.latitude ?? zoneData.latitude ?? null,
+        longitude: updates.longitude ?? zoneData.longitude ?? null,
+        actorId: req.auth?.id || "",
+        actorRole: req.auth?.role || "",
+      },
+    });
 
     console.info("[geofence.updateSafeZone]", {
       zoneId: req.params.zone_id,
       requestedChildId: req.body.child_id?.toString().trim() || "",
       requestedChildName: req.body.child_name?.toString().trim() || "",
+      centerSource: req.body.center_source?.toString().trim() || "",
       childId: zoneData.child_id,
       childName: resolvedChildName,
       actorId: req.auth?.id,
@@ -446,6 +497,9 @@ exports.deleteSafeZone = async (req, res, next) => {
 
     await getChildWithAccessOrThrow(req, zoneData.child_id);
     await zoneRef.delete();
+    await removeSafeZoneMirror(req.params.zone_id, {
+      childId: zoneData.child_id,
+    });
 
     console.info("[geofence.deleteSafeZone]", {
       zoneId: req.params.zone_id,

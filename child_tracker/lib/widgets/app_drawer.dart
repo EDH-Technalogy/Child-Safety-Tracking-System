@@ -171,7 +171,8 @@ class AppDrawer extends StatelessWidget {
                 }
                 return;
               }
-              final child = childProvider.children.first;
+              final child = childProvider.selectedChild ??
+                  childProvider.children.first;
               Navigator.push(
                 context,
                 MaterialPageRoute(

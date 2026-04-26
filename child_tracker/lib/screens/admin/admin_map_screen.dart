@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../models/location_model.dart';
+import '../../providers/alert_provider.dart';
 import '../../providers/child_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/geofence_provider.dart';
@@ -33,6 +34,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   LocationProvider? _locationProvider;
   GeofenceProvider? _geofenceProvider;
   LatLng? _lastFocusedTarget;
+  String? _alertMonitorOwnerId;
 
   @override
   void initState() {
@@ -111,6 +113,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     if (childId == null) return;
 
     final childProvider = Provider.of<ChildProvider>(context, listen: false);
+    final alertProvider = Provider.of<AlertProvider>(context, listen: false);
     final locationProvider =
         Provider.of<LocationProvider>(context, listen: false);
     final geofenceProvider =
@@ -118,6 +121,15 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
 
     await childProvider.getChildWithDevice(childId);
     await locationProvider.getLiveLocation(childId);
+    final nextOwnerId = 'admin_map:$childId';
+    if (_alertMonitorOwnerId != null && _alertMonitorOwnerId != nextOwnerId) {
+      alertProvider.stopMonitoring(ownerId: _alertMonitorOwnerId!);
+    }
+    _alertMonitorOwnerId = nextOwnerId;
+    await alertProvider.startMonitoring(
+      childId,
+      ownerId: nextOwnerId,
+    );
     await geofenceProvider.loadSafeZones(childId);
 
     locationProvider.startLiveTracking(childId);
@@ -237,6 +249,10 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       return;
     }
 
+    if (_locationProvider?.isAnimatingLiveLocation == true) {
+      return;
+    }
+
     final nextTarget = LatLng(location.latitude, location.longitude);
     if (_lastFocusedTarget?.latitude == nextTarget.latitude &&
         _lastFocusedTarget?.longitude == nextTarget.longitude) {
@@ -298,95 +314,106 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
 
   void _showMapSettings() {
     final l10n = context.l10n;
+    final mediaQuery = MediaQuery.of(context);
+    final maxSheetHeight = mediaQuery.size.height * 0.85;
+    final bottomPadding = mediaQuery.viewPadding.bottom + 24;
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.mapSettings,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: maxSheetHeight,
+          ),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.mapSettings,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: Text(l10n.liveTracking),
+                  subtitle: Text(l10n.showChildLocation),
+                  value: _showLiveTracking,
+                  activeColor: AppColors.primaryColor,
+                  onChanged: (value) {
+                    setState(() {
+                      _showLiveTracking = value;
+                    });
+                    Navigator.pop(context);
+                    if (value && _activeChildId != null) {
+                      final locationProvider =
+                          Provider.of<LocationProvider>(context, listen: false);
+                      locationProvider.startLiveTracking(_activeChildId!);
+                    }
+                  },
+                ),
+                SwitchListTile(
+                  title: Text(l10n.safeZones),
+                  subtitle: Text(l10n.showSafeZones),
+                  value: _showSafeZones,
+                  activeColor: AppColors.primaryColor,
+                  onChanged: (value) {
+                    setState(() {
+                      _showSafeZones = value;
+                    });
+                    _updateMarkers();
+                    Navigator.pop(context);
+                  },
+                ),
+                SwitchListTile(
+                  title: Text(l10n.childLocation),
+                  subtitle: Text(l10n.showChildMarker),
+                  value: _showChildLocation,
+                  activeColor: AppColors.primaryColor,
+                  onChanged: (value) {
+                    setState(() {
+                      _showChildLocation = value;
+                    });
+                    _updateMarkers();
+                    Navigator.pop(context);
+                  },
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  l10n.defaultZoomLevel,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Slider(
+                  value: _defaultZoom,
+                  min: 10,
+                  max: 20,
+                  divisions: 10,
+                  label: _defaultZoom.toStringAsFixed(1),
+                  activeColor: AppColors.primaryColor,
+                  onChanged: (value) {
+                    setState(() {
+                      _defaultZoom = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(l10n.done),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: Text(l10n.liveTracking),
-              subtitle: Text(l10n.showChildLocation),
-              value: _showLiveTracking,
-              activeColor: AppColors.primaryColor,
-              onChanged: (value) {
-                setState(() {
-                  _showLiveTracking = value;
-                });
-                Navigator.pop(context);
-                if (value && _activeChildId != null) {
-                  final locationProvider =
-                      Provider.of<LocationProvider>(context, listen: false);
-                  locationProvider.startLiveTracking(_activeChildId!);
-                }
-              },
-            ),
-            SwitchListTile(
-              title: Text(l10n.safeZones),
-              subtitle: Text(l10n.showSafeZones),
-              value: _showSafeZones,
-              activeColor: AppColors.primaryColor,
-              onChanged: (value) {
-                setState(() {
-                  _showSafeZones = value;
-                });
-                _updateMarkers();
-                Navigator.pop(context);
-              },
-            ),
-            SwitchListTile(
-              title: Text(l10n.childLocation),
-              subtitle: Text(l10n.showChildMarker),
-              value: _showChildLocation,
-              activeColor: AppColors.primaryColor,
-              onChanged: (value) {
-                setState(() {
-                  _showChildLocation = value;
-                });
-                _updateMarkers();
-                Navigator.pop(context);
-              },
-            ),
-            const SizedBox(height: 16),
-            Text(
-              l10n.defaultZoomLevel,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Slider(
-              value: _defaultZoom,
-              min: 10,
-              max: 20,
-              divisions: 10,
-              label: _defaultZoom.toStringAsFixed(1),
-              activeColor: AppColors.primaryColor,
-              onChanged: (value) {
-                setState(() {
-                  _defaultZoom = value;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(l10n.done),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -547,6 +574,10 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   void dispose() {
     _locationProvider?.removeListener(_handleMapDataChanged);
     _geofenceProvider?.removeListener(_handleMapDataChanged);
+    if (_alertMonitorOwnerId != null) {
+      Provider.of<AlertProvider>(context, listen: false)
+          .stopMonitoring(ownerId: _alertMonitorOwnerId!);
+    }
     Provider.of<LocationProvider>(context, listen: false).stopLiveTracking();
     _mapController?.dispose();
     super.dispose();

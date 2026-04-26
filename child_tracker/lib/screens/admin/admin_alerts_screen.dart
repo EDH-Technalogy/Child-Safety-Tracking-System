@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/admin_api_service.dart';
 import '../../utils/localization_helpers.dart';
+import '../../utils/timestamp_utils.dart';
 import '../../widgets/admin_drawer.dart';
 
 class AdminAlertsScreen extends StatefulWidget {
@@ -105,13 +106,12 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
   }
 
   String _formatTimestamp(dynamic timestamp) {
-    if (timestamp == null) return context.l10n.unknown;
-    try {
-      final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
+    final date = TimestampUtils.toLocalDateTime(timestamp);
+    if (date == null) {
       return context.l10n.unknown;
     }
+
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   @override
