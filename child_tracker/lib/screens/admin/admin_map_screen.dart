@@ -7,9 +7,12 @@ import '../../providers/alert_provider.dart';
 import '../../providers/child_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/geofence_provider.dart';
+import '../../services/admin_api_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/localization_helpers.dart';
+import '../../widgets/google_map_guard.dart';
 import '../../widgets/admin_drawer.dart';
+import '../../widgets/hover_icon_button.dart';
 
 class AdminMapScreen extends StatefulWidget {
   final String? childId;
@@ -21,6 +24,7 @@ class AdminMapScreen extends StatefulWidget {
 }
 
 class _AdminMapScreenState extends State<AdminMapScreen> {
+  final AdminApiService _adminApi = AdminApiService();
   GoogleMapController? _mapController;
   Position? _currentPosition;
   String? _activeChildId;
@@ -35,6 +39,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   GeofenceProvider? _geofenceProvider;
   LatLng? _lastFocusedTarget;
   String? _alertMonitorOwnerId;
+  String? _hoveredActionKey;
 
   @override
   void initState() {
@@ -73,9 +78,12 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
 
   Future<void> _initializeMap() async {
     await _getCurrentLocation();
-    _activeChildId = _resolveInitialChildId();
+    _activeChildId = await _resolveInitialChildId();
     if (_activeChildId != null) {
       await _loadChildData();
+    }
+    if (!mounted) {
+      return;
     }
     setState(() {
       _isLoading = false;
@@ -119,7 +127,11 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     final geofenceProvider =
         Provider.of<GeofenceProvider>(context, listen: false);
 
-    await childProvider.getChildWithDevice(childId);
+    final didLoadChild = await childProvider.getChildWithDevice(childId);
+    if (!didLoadChild) {
+      return;
+    }
+
     await locationProvider.getLiveLocation(childId);
     final nextOwnerId = 'admin_map:$childId';
     if (_alertMonitorOwnerId != null && _alertMonitorOwnerId != nextOwnerId) {
@@ -136,7 +148,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
     _updateMarkers();
   }
 
-  String? _resolveInitialChildId() {
+  Future<String?> _resolveInitialChildId() async {
     if (widget.childId != null && widget.childId!.trim().isNotEmpty) {
       return widget.childId!.trim();
     }
@@ -152,6 +164,24 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
       if (firstChildId.isNotEmpty) {
         return firstChildId;
       }
+    }
+
+    try {
+      final children = await _adminApi.getAllChildren();
+      for (final entry in children) {
+        if (entry is! Map) {
+          continue;
+        }
+
+        final child = Map<String, dynamic>.from(entry);
+        final childId =
+            (child['id'] ?? child['child_id'] ?? '').toString().trim();
+        if (childId.isNotEmpty) {
+          return childId;
+        }
+      }
+    } catch (_) {
+      // Fall back to the empty-state UI when admin child lookup is unavailable.
     }
 
     return null;
@@ -433,13 +463,37 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
         title: Text(l10n.mapView),
         backgroundColor: AppColors.primaryColor,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
+          HoverIconButton(
+            icon: Icons.tune_rounded,
+            isHovered: _hoveredActionKey == 'settings',
+            isDimmed:
+                _hoveredActionKey != null && _hoveredActionKey != 'settings',
+            onHoverChanged: (value) {
+              setState(() {
+                if (value) {
+                  _hoveredActionKey = 'settings';
+                } else if (_hoveredActionKey == 'settings') {
+                  _hoveredActionKey = null;
+                }
+              });
+            },
             onPressed: _showMapSettings,
             tooltip: l10n.mapSettings,
           ),
-          IconButton(
-            icon: const Icon(Icons.my_location),
+          HoverIconButton(
+            icon: Icons.gps_fixed_rounded,
+            isHovered: _hoveredActionKey == 'my_location',
+            isDimmed:
+                _hoveredActionKey != null && _hoveredActionKey != 'my_location',
+            onHoverChanged: (value) {
+              setState(() {
+                if (value) {
+                  _hoveredActionKey = 'my_location';
+                } else if (_hoveredActionKey == 'my_location') {
+                  _hoveredActionKey = null;
+                }
+              });
+            },
             onPressed: () async {
               await _getCurrentLocation();
               if (_currentPosition != null && _mapController != null) {
@@ -460,19 +514,26 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
           : Stack(
               children: [
                 if (canRenderMap)
-                  GoogleMap(
-                    onMapCreated: _onMapCreated,
-                    initialCameraPosition: CameraPosition(
-                      target: _getInitialPosition(),
-                      zoom: _defaultZoom,
+                  GoogleMapAvailabilityGuard(
+                    mapBuilder: (_) => GoogleMap(
+                      onMapCreated: _onMapCreated,
+                      initialCameraPosition: CameraPosition(
+                        target: _getInitialPosition(),
+                        zoom: _defaultZoom,
+                      ),
+                      markers: _markers,
+                      circles: _circles,
+                      myLocationEnabled: true,
+                      myLocationButtonEnabled: false,
+                      zoomControlsEnabled: false,
+                      mapToolbarEnabled: false,
+                      compassEnabled: true,
                     ),
-                    markers: _markers,
-                    circles: _circles,
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: false,
-                    zoomControlsEnabled: false,
-                    mapToolbarEnabled: false,
-                    compassEnabled: true,
+                    fallbackBuilder: (_) => const GoogleMapUnavailableState(
+                      title: 'Map unavailable',
+                      message:
+                          'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+                    ),
                   )
                 else
                   _buildUnavailableMapState(),
@@ -548,8 +609,10 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                     heroTag: 'settings',
                     onPressed: _showMapSettings,
                     backgroundColor: Colors.white,
-                    child:
-                        const Icon(Icons.layers, color: AppColors.primaryColor),
+                    child: const Icon(
+                      Icons.layers_rounded,
+                      color: AppColors.primaryColor,
+                    ),
                   ),
                 ),
               ],
@@ -565,7 +628,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
             );
           }
         },
-        child: const Icon(Icons.my_location),
+        child: const Icon(Icons.gps_fixed_rounded),
       ),
     );
   }

@@ -330,6 +330,19 @@ class _AdminChildrenScreenState extends State<AdminChildrenScreen> {
                                           case 'safe_zones':
                                             _openSafeZonesScreen(child);
                                             break;
+                                          case 'activity':
+                                            Navigator.pushNamed(
+                                              context,
+                                              '/activity',
+                                              arguments: {
+                                                'childId':
+                                                    child['id'].toString(),
+                                                'childName': (child['name'] ??
+                                                        l10n.unknown)
+                                                    .toString(),
+                                              },
+                                            );
+                                            break;
                                           case 'delete':
                                             _deleteChild(
                                                 child['id'].toString());
@@ -344,6 +357,17 @@ class _AdminChildrenScreenState extends State<AdminChildrenScreen> {
                                               const Icon(Icons.location_on),
                                               const SizedBox(width: 8),
                                               Text(l10n.safeZones),
+                                            ],
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'activity',
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                  Icons.analytics_outlined),
+                                              const SizedBox(width: 8),
+                                              Text(l10n.activity),
                                             ],
                                           ),
                                         ),

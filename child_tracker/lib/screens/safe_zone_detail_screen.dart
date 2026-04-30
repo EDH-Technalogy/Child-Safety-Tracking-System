@@ -14,6 +14,7 @@ import '../providers/geofence_provider.dart';
 import '../providers/location_provider.dart';
 import '../utils/constants.dart';
 import '../utils/timestamp_utils.dart';
+import '../widgets/google_map_guard.dart';
 
 enum _MapViewMode {
   defaultView,
@@ -458,50 +459,58 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
 
           return Stack(
             children: [
-              GoogleMap(
-                onMapCreated: (controller) {
-                  _mapController = controller;
-                  _frameMap(liveLocation);
-                },
-                onCameraMove: (position) {
-                  _lastZoom = position.zoom;
-                },
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(widget.zone.latitude, widget.zone.longitude),
-                  zoom: AppConstants.defaultZoom,
-                ),
-                mapType: _activeMapType,
-                markers: _buildMarkers(
-                  l10n: l10n,
-                  liveLocation: liveLocation,
-                  isInsideZone: isInsideZone,
-                  distanceMeters: distanceMeters ?? 0,
-                  movementLabel: movementLabel,
-                  latestUpdateLabel: latestUpdateLabel,
-                ),
-                circles: {
-                  Circle(
-                    circleId: CircleId('safe_zone_${widget.zone.id}'),
-                    center: LatLng(widget.zone.latitude, widget.zone.longitude),
-                    radius: widget.zone.radius.toDouble(),
-                    fillColor: AppColors.successColor.withValues(alpha: 0.18),
-                    strokeColor: AppColors.successColor,
-                    strokeWidth: 2,
+              GoogleMapAvailabilityGuard(
+                mapBuilder: (_) => GoogleMap(
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                    _frameMap(liveLocation);
+                  },
+                  onCameraMove: (position) {
+                    _lastZoom = position.zoom;
+                  },
+                  initialCameraPosition: CameraPosition(
+                    target: LatLng(widget.zone.latitude, widget.zone.longitude),
+                    zoom: AppConstants.defaultZoom,
                   ),
-                },
-                padding: EdgeInsets.only(
-                  top: 96,
-                  left: 16,
-                  right: 16,
-                  bottom: liveLocation == null ? 96 : 24,
+                  mapType: _activeMapType,
+                  markers: _buildMarkers(
+                    l10n: l10n,
+                    liveLocation: liveLocation,
+                    isInsideZone: isInsideZone,
+                    distanceMeters: distanceMeters ?? 0,
+                    movementLabel: movementLabel,
+                    latestUpdateLabel: latestUpdateLabel,
+                  ),
+                  circles: {
+                    Circle(
+                      circleId: CircleId('safe_zone_${widget.zone.id}'),
+                      center:
+                          LatLng(widget.zone.latitude, widget.zone.longitude),
+                      radius: widget.zone.radius.toDouble(),
+                      fillColor: AppColors.successColor.withValues(alpha: 0.18),
+                      strokeColor: AppColors.successColor,
+                      strokeWidth: 2,
+                    ),
+                  },
+                  padding: EdgeInsets.only(
+                    top: 96,
+                    left: 16,
+                    right: 16,
+                    bottom: liveLocation == null ? 96 : 24,
+                  ),
+                  mapToolbarEnabled: false,
+                  zoomControlsEnabled: false,
+                  myLocationButtonEnabled: false,
+                  compassEnabled: true,
+                  buildingsEnabled: true,
+                  rotateGesturesEnabled: true,
+                  tiltGesturesEnabled: true,
                 ),
-                mapToolbarEnabled: false,
-                zoomControlsEnabled: false,
-                myLocationButtonEnabled: false,
-                compassEnabled: true,
-                buildingsEnabled: true,
-                rotateGesturesEnabled: true,
-                tiltGesturesEnabled: true,
+                fallbackBuilder: (_) => const GoogleMapUnavailableState(
+                  title: 'Map unavailable',
+                  message:
+                      'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+                ),
               ),
               Positioned(
                 top: 16,

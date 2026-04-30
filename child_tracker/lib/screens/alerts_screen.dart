@@ -23,21 +23,28 @@ class _AlertsScreenState extends State<AlertsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startMonitoring());
+    _initializeAlerts();
   }
 
-  Future<void> _loadAlerts() async {
+  Future<void> _initializeAlerts() async {
     final alertProvider = Provider.of<AlertProvider>(context, listen: false);
-    await alertProvider.loadAlerts(widget.childId);
-    await alertProvider.getUnreadCount(widget.childId);
-  }
 
-  Future<void> _startMonitoring() async {
-    final alertProvider = Provider.of<AlertProvider>(context, listen: false);
+    // Start real-time monitoring for this child
     await alertProvider.startMonitoring(
       widget.childId,
       ownerId: _monitorOwnerId,
     );
+    if (!mounted) {
+      return;
+    }
+    if (alertProvider.unreadCount > 0) {
+      await alertProvider.markAllAsRead(widget.childId);
+    }
+  }
+
+  Future<void> _refreshAlerts() async {
+    final alertProvider = Provider.of<AlertProvider>(context, listen: false);
+    await alertProvider.loadAlerts(widget.childId);
   }
 
   @override
@@ -53,7 +60,35 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.alerts),
+        title: Row(
+          children: [
+            Text(l10n.alerts),
+            const SizedBox(width: 8),
+            Consumer<AlertProvider>(
+              builder: (context, alertProvider, child) {
+                final unreadCount =
+                    alertProvider.unreadCountForChild(widget.childId);
+                if (unreadCount == 0) return const SizedBox();
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
         actions: [
           Consumer<AlertProvider>(
             builder: (context, alertProvider, child) {
@@ -100,7 +135,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: _loadAlerts,
+            onRefresh: _refreshAlerts,
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: alertProvider.alerts.length,
@@ -111,6 +146,49 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   onTap: () async {
                     if (!alert.isRead) {
                       await alertProvider.markAsRead(alert.id, widget.childId);
+                    }
+                  },
+                  onDelete: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text(l10n.deleteAlert),
+                        content: Text(l10n.areYouSureDeleteAlert),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: Text(l10n.cancel),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: TextButton.styleFrom(
+                                foregroundColor: Colors.red),
+                            child: Text(l10n.delete),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true) {
+                      if (!context.mounted) return;
+                      final messenger = ScaffoldMessenger.of(context);
+                      final success = await alertProvider.deleteAlert(
+                          alert.id, widget.childId);
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              success
+                                  ? l10n.alertDeletedSuccessfully
+                                  : localizeErrorMessage(
+                                      l10n,
+                                      alertProvider.error ??
+                                          l10n.failedToDeleteAlert,
+                                    ),
+                            ),
+                          ),
+                        );
+                      }
                     }
                   },
                 );
@@ -126,8 +204,13 @@ class _AlertsScreenState extends State<AlertsScreen> {
 class _AlertCard extends StatelessWidget {
   final AlertModel alert;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
-  const _AlertCard({required this.alert, required this.onTap});
+  const _AlertCard({
+    required this.alert,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -296,6 +379,11 @@ class _AlertCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                 ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.grey),
+                onPressed: onDelete,
+                tooltip: l10n.deleteAlert,
+              ),
             ],
           ),
         ),
@@ -316,8 +404,10 @@ class _AlertCard extends StatelessWidget {
       case 'LOW_BATTERY':
         return Icons.battery_alert;
       case 'DEVICE_OFF':
+      case 'DEVICE_DISCONNECTED':
         return Icons.power_off;
       case 'DEVICE_ONLINE':
+      case 'DEVICE_RECONNECTED':
         return Icons.power;
       default:
         return Icons.notifications;
@@ -337,8 +427,10 @@ class _AlertCard extends StatelessWidget {
       case 'LOW_BATTERY':
         return AppColors.lowBatteryColor;
       case 'DEVICE_OFF':
+      case 'DEVICE_DISCONNECTED':
         return AppColors.deviceOfflineColor;
       case 'DEVICE_ONLINE':
+      case 'DEVICE_RECONNECTED':
         return AppColors.successColor;
       default:
         return AppColors.infoColor;

@@ -136,7 +136,10 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
                             ),
                             const SizedBox(height: 12),
                             ...routeData.logs.map(
-                              (log) => _HistoryEventTile(event: log),
+                              (log) => _HistoryEventTile(
+                                event: log,
+                                childName: widget.childName,
+                              ),
                             ),
                           ],
                         ],
@@ -163,8 +166,7 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
             icon: const Icon(Icons.chevron_left),
             onPressed: () async {
               setState(() {
-                _selectedDate =
-                    _selectedDate.subtract(const Duration(days: 1));
+                _selectedDate = _selectedDate.subtract(const Duration(days: 1));
               });
               await _loadHistory();
             },
@@ -253,8 +255,7 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
                   children: [
                     Text(
                       l10n.start,
-                      style:
-                          const TextStyle(color: Colors.grey, fontSize: 12),
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                     Text(
                       _formatTime(routeData.firstLocationTime),
@@ -267,8 +268,7 @@ class _LocationHistoryScreenState extends State<LocationHistoryScreen> {
                   children: [
                     Text(
                       l10n.end,
-                      style:
-                          const TextStyle(color: Colors.grey, fontSize: 12),
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                     Text(
                       _formatTime(routeData.lastLocationTime),
@@ -546,45 +546,344 @@ class _HistoryMessageState extends StatelessWidget {
 
 class _HistoryEventTile extends StatelessWidget {
   final HistoryEventModel event;
+  final String childName;
 
-  const _HistoryEventTile({required this.event});
+  const _HistoryEventTile({
+    required this.event,
+    required this.childName,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: _eventColor(event.type),
-          child: Icon(
-            _eventIcon(event.type),
-            color: Colors.white,
-            size: 18,
+      child: InkWell(
+        onTap: _supportsDetails ? () => _showEventDetails(context) : null,
+        borderRadius: BorderRadius.circular(12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: _eventColor(event.type),
+            child: Icon(
+              _eventIcon(event.type),
+              color: Colors.white,
+              size: 18,
+            ),
           ),
+          title: Text(
+            _eventLabel(l10n, event.type),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                event.message.trim().isEmpty
+                    ? _eventLabel(l10n, event.type)
+                    : localizeRawMessage(l10n, event.message),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _formatTimestamp(event.timestamp),
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          trailing:
+              _supportsDetails ? const Icon(Icons.chevron_right_rounded) : null,
+          isThreeLine: true,
         ),
-        title: Text(
-          _eventLabel(l10n, event.type),
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              event.message.trim().isEmpty
-                  ? _eventLabel(l10n, event.type)
-                  : localizeRawMessage(l10n, event.message),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _formatTimestamp(event.timestamp),
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        isThreeLine: true,
       ),
     );
+  }
+
+  bool get _supportsDetails {
+    switch (event.type.toUpperCase()) {
+      case 'DEVICE_DISCONNECTED':
+      case 'DEVICE_RECONNECTED':
+      case 'DEVICE_OFFLINE':
+      case 'DEVICE_ONLINE':
+      case 'DEVICE_STATUS':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  void _showEventDetails(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        final disconnectedAt = _readTimestamp(
+          event.metadata,
+          ['disconnectedAt', 'previousOfflineAt'],
+        );
+        final reconnectedAt = _readTimestamp(event.metadata, ['reconnectedAt']);
+        final lastKnownTimestamp = _readTimestamp(
+          event.metadata,
+          ['lastKnownTimestamp'],
+        );
+        final reconnectedTimestamp = _readTimestamp(
+          event.metadata,
+          ['reconnectedTimestamp'],
+        );
+        final durationOfflineMs = _readInt(
+          event.metadata,
+          ['durationOfflineMs'],
+        );
+        final lastKnownLat = _readDouble(event.metadata, ['lastKnownLat']);
+        final lastKnownLng = _readDouble(event.metadata, ['lastKnownLng']);
+        final lastKnownAccuracy = _readDouble(
+          event.metadata,
+          ['lastKnownAccuracy'],
+        );
+        final lastKnownAddress = _readString(
+          event.metadata,
+          ['lastKnownAddress'],
+        );
+        final reconnectedLat = _readDouble(event.metadata, ['reconnectedLat']);
+        final reconnectedLng = _readDouble(event.metadata, ['reconnectedLng']);
+        final reconnectedAccuracy = _readDouble(
+          event.metadata,
+          ['reconnectedAccuracy'],
+        );
+        final reconnectedAddress = _readString(
+          event.metadata,
+          ['reconnectedAddress'],
+        );
+        final reason = _readString(event.metadata, ['reason']);
+
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              8,
+              20,
+              20 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: _eventColor(event.type),
+                      child: Icon(
+                        _eventIcon(event.type),
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _eventLabel(l10n, event.type),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatTimestamp(event.timestamp),
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _DetailSection(
+                  title: 'Overview',
+                  children: [
+                    _DetailRow(label: 'Child', value: childName),
+                    _DetailRow(label: l10n.childId, value: event.childId),
+                    if (event.trackingKey.trim().isNotEmpty)
+                      _DetailRow(
+                        label: 'Tracking Key',
+                        value: event.trackingKey,
+                      ),
+                    _DetailRow(
+                      label: 'Message',
+                      value: event.message.trim().isEmpty
+                          ? l10n.noMessage
+                          : localizeRawMessage(l10n, event.message),
+                    ),
+                    if (reason != null && reason.isNotEmpty)
+                      _DetailRow(label: 'Reason', value: reason),
+                  ],
+                ),
+                if (disconnectedAt != null ||
+                    lastKnownTimestamp != null ||
+                    lastKnownLat != null ||
+                    lastKnownLng != null) ...[
+                  const SizedBox(height: 14),
+                  _DetailSection(
+                    title: l10n.offline,
+                    children: [
+                      if (disconnectedAt != null)
+                        _DetailRow(
+                          label: 'Disconnected At',
+                          value: _formatTimestamp(disconnectedAt),
+                        ),
+                      if (lastKnownTimestamp != null)
+                        _DetailRow(
+                          label: 'Last Known Time',
+                          value: _formatTimestamp(lastKnownTimestamp),
+                        ),
+                      if (lastKnownLat != null && lastKnownLng != null)
+                        _DetailRow(
+                          label: l10n.location,
+                          value: _formatCoordinates(lastKnownLat, lastKnownLng),
+                        ),
+                      if (lastKnownAccuracy != null)
+                        _DetailRow(
+                          label: 'Accuracy',
+                          value: '${lastKnownAccuracy.toStringAsFixed(1)} m',
+                        ),
+                      if (lastKnownAddress != null &&
+                          lastKnownAddress.isNotEmpty)
+                        _DetailRow(
+                          label: 'Address',
+                          value: lastKnownAddress,
+                        ),
+                    ],
+                  ),
+                ],
+                if (reconnectedAt != null ||
+                    reconnectedTimestamp != null ||
+                    reconnectedLat != null ||
+                    reconnectedLng != null ||
+                    durationOfflineMs != null) ...[
+                  const SizedBox(height: 14),
+                  _DetailSection(
+                    title: l10n.online,
+                    children: [
+                      if (reconnectedAt != null)
+                        _DetailRow(
+                          label: 'Reconnected At',
+                          value: _formatTimestamp(reconnectedAt),
+                        ),
+                      if (reconnectedTimestamp != null)
+                        _DetailRow(
+                          label: 'Reconnect Time',
+                          value: _formatTimestamp(reconnectedTimestamp),
+                        ),
+                      if (durationOfflineMs != null)
+                        _DetailRow(
+                          label: 'Offline Duration',
+                          value: _formatDuration(durationOfflineMs),
+                        ),
+                      if (reconnectedLat != null && reconnectedLng != null)
+                        _DetailRow(
+                          label: l10n.location,
+                          value: _formatCoordinates(
+                              reconnectedLat, reconnectedLng),
+                        ),
+                      if (reconnectedAccuracy != null)
+                        _DetailRow(
+                          label: 'Accuracy',
+                          value: '${reconnectedAccuracy.toStringAsFixed(1)} m',
+                        ),
+                      if (reconnectedAddress != null &&
+                          reconnectedAddress.isNotEmpty)
+                        _DetailRow(
+                          label: 'Address',
+                          value: reconnectedAddress,
+                        ),
+                    ],
+                  ),
+                ],
+                if (disconnectedAt == null &&
+                    reconnectedAt == null &&
+                    lastKnownTimestamp == null &&
+                    reconnectedTimestamp == null &&
+                    lastKnownLat == null &&
+                    reconnectedLat == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      l10n.noAdditionalDetailsAvailable,
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static int? _readTimestamp(Map<String, dynamic> metadata, List<String> keys) {
+    for (final key in keys) {
+      final value = TimestampUtils.normalizeEpochMilliseconds(metadata[key]);
+      if (value != null && value > 0) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  static int? _readInt(Map<String, dynamic> metadata, List<String> keys) {
+    for (final key in keys) {
+      final value = int.tryParse('${metadata[key]}');
+      if (value != null) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  static double? _readDouble(Map<String, dynamic> metadata, List<String> keys) {
+    for (final key in keys) {
+      final value = double.tryParse('${metadata[key]}');
+      if (value != null) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  static String? _readString(Map<String, dynamic> metadata, List<String> keys) {
+    for (final key in keys) {
+      final value = metadata[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  static String _formatCoordinates(double latitude, double longitude) {
+    return '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}';
+  }
+
+  static String _formatDuration(int durationMs) {
+    final totalSeconds = (durationMs / 1000).round();
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    final parts = <String>[];
+
+    if (hours > 0) {
+      parts.add('${hours}h');
+    }
+    if (minutes > 0) {
+      parts.add('${minutes}m');
+    }
+    if (seconds > 0 && hours == 0) {
+      parts.add('${seconds}s');
+    }
+
+    return parts.isEmpty ? '0s' : parts.join(' ');
   }
 
   static IconData _eventIcon(String type) {
@@ -596,8 +895,10 @@ class _HistoryEventTile extends StatelessWidget {
       case 'SAFE_ZONE_ENTER':
         return Icons.check_circle;
       case 'DEVICE_ONLINE':
+      case 'DEVICE_RECONNECTED':
         return Icons.wifi;
       case 'DEVICE_OFFLINE':
+      case 'DEVICE_DISCONNECTED':
       case 'DEVICE_STATUS':
         return Icons.signal_wifi_statusbar_connected_no_internet_4;
       case 'SAFE_ZONE_CREATED':
@@ -621,8 +922,10 @@ class _HistoryEventTile extends StatelessWidget {
       case 'SAFE_ZONE_ENTER':
         return AppColors.successColor;
       case 'DEVICE_ONLINE':
+      case 'DEVICE_RECONNECTED':
         return AppColors.primaryColor;
       case 'DEVICE_OFFLINE':
+      case 'DEVICE_DISCONNECTED':
       case 'DEVICE_STATUS':
         return Colors.grey;
       case 'SAFE_ZONE_CREATED':
@@ -663,5 +966,81 @@ class _HistoryEventTile extends StatelessWidget {
     }
 
     return DateFormat('MMM dd, yyyy - HH:mm:ss').format(date);
+  }
+}
+
+class _DetailSection extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _DetailSection({
+    required this.title,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

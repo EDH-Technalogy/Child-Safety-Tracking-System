@@ -12,6 +12,7 @@ import '../services/api_service.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 import '../utils/timestamp_utils.dart';
+import '../widgets/google_map_guard.dart';
 import 'safe_zone_detail_screen.dart';
 
 class AddSafeZoneScreen extends StatefulWidget {
@@ -100,7 +101,8 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
     );
     _radius = (widget.initialZone?.radius ?? AppConstants.defaultSafeZoneRadius)
         .clamp(_minRadius, _maxRadius);
-    if (_isValidCoordinate(widget.initialZone?.latitude, widget.initialZone?.longitude)) {
+    if (_isValidCoordinate(
+        widget.initialZone?.latitude, widget.initialZone?.longitude)) {
       _savedCenter = LatLng(
         widget.initialZone!.latitude,
         widget.initialZone!.longitude,
@@ -321,9 +323,8 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
         response['recorded_at'] ?? response['timestamp'],
       );
       _liveLocationError = null;
-      final applyCenter = applyAsSelection
-          ? _applyManualCenterSelection
-          : _setPreviewCenter;
+      final applyCenter =
+          applyAsSelection ? _applyManualCenterSelection : _setPreviewCenter;
       applyCenter(
         latitude: latitude!,
         longitude: longitude!,
@@ -505,9 +506,8 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
     bool animate = true,
     bool applyAsSelection = true,
   }) {
-    final applyCenter = applyAsSelection
-        ? _applyManualCenterSelection
-        : _setPreviewCenter;
+    final applyCenter =
+        applyAsSelection ? _applyManualCenterSelection : _setPreviewCenter;
     applyCenter(
       latitude: option.latitude,
       longitude: option.longitude,
@@ -1096,30 +1096,37 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
                 child: Stack(
                   children: [
                     if (displayedCenter != null)
-                      GoogleMap(
-                        onMapCreated: (controller) {
-                          _mapController = controller;
-                          _animateToCenter(displayedCenter);
-                        },
-                        onCameraMove: (position) {
-                          _lastMapZoom = position.zoom;
-                        },
-                        onTap: _onMapTap,
-                        initialCameraPosition: CameraPosition(
-                          target: displayedCenter,
-                          zoom: 16,
+                      GoogleMapAvailabilityGuard(
+                        mapBuilder: (_) => GoogleMap(
+                          onMapCreated: (controller) {
+                            _mapController = controller;
+                            _animateToCenter(displayedCenter);
+                          },
+                          onCameraMove: (position) {
+                            _lastMapZoom = position.zoom;
+                          },
+                          onTap: _onMapTap,
+                          initialCameraPosition: CameraPosition(
+                            target: displayedCenter,
+                            zoom: 16,
+                          ),
+                          mapType: _activeMapType,
+                          markers: _markers,
+                          circles: _circles,
+                          myLocationEnabled: true,
+                          myLocationButtonEnabled: false,
+                          zoomControlsEnabled: false,
+                          mapToolbarEnabled: false,
+                          compassEnabled: true,
+                          buildingsEnabled: true,
+                          rotateGesturesEnabled: true,
+                          tiltGesturesEnabled: true,
                         ),
-                        mapType: _activeMapType,
-                        markers: _markers,
-                        circles: _circles,
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: false,
-                        zoomControlsEnabled: false,
-                        mapToolbarEnabled: false,
-                        compassEnabled: true,
-                        buildingsEnabled: true,
-                        rotateGesturesEnabled: true,
-                        tiltGesturesEnabled: true,
+                        fallbackBuilder: (_) => const GoogleMapUnavailableState(
+                          title: 'Map unavailable',
+                          message:
+                              'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+                        ),
                       )
                     else
                       Container(

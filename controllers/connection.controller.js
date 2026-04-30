@@ -43,6 +43,13 @@ exports.updateConnection = async (req, res, next) => {
     const previousConnectionSnapshot = await realtimeDB.ref(rtdbPath).once("value");
     const previousConnection = previousConnectionSnapshot.val() || {};
     const previousStatus = previousConnection.status?.toString().trim() || "";
+    const historyType = mapConnectionStatusToHistoryType(status);
+    const connectionState =
+      historyType === "DEVICE_ONLINE"
+        ? "online"
+        : historyType === "DEVICE_OFFLINE"
+          ? "offline"
+          : "unknown";
 
     await realtimeDB.ref().update({
       [rtdbPath]: {
@@ -53,8 +60,11 @@ exports.updateConnection = async (req, res, next) => {
         child_id: childId,
       },
       [`live_tracking/${trackingKey}/status`]: {
-        online: mapConnectionStatusToHistoryType(status) === "DEVICE_ONLINE",
+        online: historyType === "DEVICE_ONLINE",
+        connectionState,
         lastSeen: time,
+        ...(connectionState === "online" ? { lastOnlineAt: time } : {}),
+        ...(connectionState === "offline" ? { lastOfflineAt: time } : {}),
         deviceStatus: status,
         network: req.body.network?.toString().trim() || "unknown",
         updatedAt: time,
@@ -75,7 +85,6 @@ exports.updateConnection = async (req, res, next) => {
         created_at: time,
       });
 
-      const historyType = mapConnectionStatusToHistoryType(status);
       await appendChildLog({
         childId,
         trackingKey,

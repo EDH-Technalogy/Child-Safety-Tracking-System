@@ -18,6 +18,14 @@
         }
       }
     },
+    "alerts_live": {
+      "$childId": {
+        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_child').child($childId).child('user_id').val() == auth.uid)",
+        "$alertId": {
+          ".write": "(auth != null && auth.token.role == 'admin') || (!data.exists() && newData.exists() && root.child('device_registry_by_child').child($childId).exists() && newData.child('message').val() != null && newData.child('timestamp').val() != null && newData.child('isRead').val() != null)"
+        }
+      }
+    },
     "admin_alerts": {
       ".read": "auth != null && auth.token.role == 'admin'",
       "$alertId": {
@@ -73,6 +81,16 @@
         ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_child').child($childId).child('user_id').val() == auth.uid)",
         "$dateKey": {
           "$logId": {
+            ".write": "auth != null && auth.token.role == 'admin'"
+          }
+        }
+      }
+    },
+    "connection_events": {
+      "$childId": {
+        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_child').child($childId).child('user_id').val() == auth.uid)",
+        "$dateKey": {
+          "$eventId": {
             ".write": "auth != null && auth.token.role == 'admin'"
           }
         }

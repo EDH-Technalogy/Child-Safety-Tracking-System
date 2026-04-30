@@ -1422,4 +1422,133 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get yearsOld => 'years old';
+
+  @override
+  String get adminOverviewSubtitle =>
+      'Live operational overview for the admin system';
+
+  @override
+  String get noDataAvailableYet => 'No data available yet';
+
+  @override
+  String get dashboardPartialData =>
+      'Some dashboard sections could not be loaded. Available data is still shown.';
+
+  @override
+  String get systemStatus => 'System Status';
+
+  @override
+  String get chartsAndInsights => 'Charts & Insights';
+
+  @override
+  String get monitorUsersDevicesAlertsLocations =>
+      'Monitor users, devices, alerts, and location activity';
+
+  @override
+  String welcomeBackAdmin(Object name) {
+    return 'Welcome back, $name';
+  }
+
+  @override
+  String get lastUpdated => 'Last updated';
+
+  @override
+  String get refreshData => 'Refresh data';
+
+  @override
+  String get todayAlerts => 'Today\'s Alerts';
+
+  @override
+  String get safeZonesCount => 'Safe Zones';
+
+  @override
+  String get liveDeviceStatus => 'Live device status';
+
+  @override
+  String get latestAlertVolume => 'Latest alert volume';
+
+  @override
+  String get totalParentsNormalUsers => 'Parent / Normal Users';
+
+  @override
+  String get offlineDevices => 'Offline Devices';
+
+  @override
+  String get vsYesterday => 'vs yesterday';
+
+  @override
+  String get locationUpdates => 'Location Updates';
+
+  @override
+  String get recentActivity => 'Recent Activity';
+
+  @override
+  String get latestAuditEvents => 'Latest audit and activity events';
+
+  @override
+  String get openCoreAdminAreas => 'Open core admin areas';
+
+  @override
+  String get usersActionSubtitle => 'Review accounts, roles, and user access';
+
+  @override
+  String get childrenActionSubtitle => 'Open child profiles and assignments';
+
+  @override
+  String get devicesActionSubtitle => 'Monitor device health and assignments';
+
+  @override
+  String get viewMapActionSubtitle => 'Open live map monitoring';
+
+  @override
+  String get viewAlertsActionSubtitle => 'Review active and historical alerts';
+
+  @override
+  String get viewReportsHistory => 'Reports & History';
+
+  @override
+  String get viewReportsActionSubtitle => 'Open logs and historical reports';
+
+  @override
+  String get safeZonesActionSubtitle => 'Review configured safe zones';
+
+  @override
+  String get usersByRole => 'Users by Role';
+
+  @override
+  String get userRoleDistribution =>
+      'Distribution of parent and admin accounts';
+
+  @override
+  String get deviceStatusChart => 'Device Status';
+
+  @override
+  String get liveFleetHealth => 'Live fleet health by connection state';
+
+  @override
+  String get alertsByType => 'Alerts by Type';
+
+  @override
+  String get alertBreakdownAcrossThePlatform =>
+      'Alert breakdown across the platform';
+
+  @override
+  String get locationUpdatesLast7Days =>
+      'Location update volume over the last 7 days';
+
+  @override
+  String get noAggregatedLocationData =>
+      'No aggregated location data available';
+
+  @override
+  String get allAccessibleSafeZones => 'All accessible safe zones';
+
+  @override
+  String get todayLocationUpdates => 'Today\'s Location Updates';
+
+  @override
+  String get last7Days => 'Last 7 Days';
+
+  @override
+  String get geofenceBreachesToday => 'Geofence Breaches Today';
 }

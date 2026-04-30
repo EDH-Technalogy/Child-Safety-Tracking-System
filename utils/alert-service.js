@@ -65,6 +65,10 @@ function buildAlertMessage({
       return "Device has been turned off!";
     case "DEVICE_ONLINE":
       return "Device is now online!";
+    case "DEVICE_DISCONNECTED":
+      return "Device disconnected automatically after no recent updates.";
+    case "DEVICE_RECONNECTED":
+      return "Device reconnected automatically.";
     default:
       return `${normalizedType || "ALERT"} event detected near ${safeLocationText}.`;
   }
@@ -79,7 +83,11 @@ async function createAlertRecord({
   latitude = null,
   longitude = null,
   batteryLevel = null,
+  alertId = null,
+  createdAt = null,
+  initialStatus = "unread",
   extraFields = {},
+  writeChildLog = true,
 }) {
   const normalizedType = type?.toString().trim().toUpperCase();
   if (!childId || !normalizedType) {
@@ -88,7 +96,13 @@ async function createAlertRecord({
 
   const { childDoc } = await getChildOrThrow(childId);
   const childData = childDoc.data() || {};
-  const time = Date.now();
+  const time = Number.isFinite(Number(createdAt))
+    ? Number(createdAt)
+    : Date.now();
+  const normalizedStatus =
+    initialStatus?.toString().trim().toLowerCase() === "read"
+      ? "read"
+      : "unread";
 
   const alertPayload = {
     child_id: childId,
@@ -102,14 +116,22 @@ async function createAlertRecord({
     longitude: isFiniteNumber(longitude) ? Number(longitude) : null,
     battery_level: batteryLevel,
     created_at: time,
-    status: "unread",
+    timestamp: time,
+    status: normalizedStatus,
+    is_read: normalizedStatus === "read",
+    isRead: normalizedStatus === "read",
     ...extraFields,
   };
 
-  const alertDoc = firestore.collection("alerts").doc();
-  const alertId = alertDoc.id;
+  const alertDoc = alertId
+    ? firestore.collection("alerts").doc(alertId)
+    : firestore.collection("alerts").doc();
+  const resolvedAlertId = alertDoc.id;
+  const existingAlertDoc = await alertDoc.get();
+  const alreadyExists = existingAlertDoc.exists;
+
   const livePayload = {
-    alert_id: alertId,
+    alert_id: resolvedAlertId,
     child_id: childId,
     user_id: childData.user_id || "",
     child_name: childData.name || "",
@@ -121,7 +143,10 @@ async function createAlertRecord({
     longitude: alertPayload.longitude,
     battery_level: batteryLevel,
     created_at: time,
-    status: "unread",
+    timestamp: time,
+    status: normalizedStatus,
+    is_read: normalizedStatus === "read",
+    isRead: normalizedStatus === "read",
     ...extraFields,
   };
   const adminLivePayload = {
@@ -129,61 +154,68 @@ async function createAlertRecord({
     parent_user_id: childData.user_id || "",
   };
   const realtimeUpdates = {
-    [`alerts_by_child/${childId}/${alertId}`]: livePayload,
-    [`admin_alerts/${alertId}`]: adminLivePayload,
-    [`alerts_live/${childId}`]: livePayload,
+    [`alerts_by_child/${childId}/${resolvedAlertId}`]: livePayload,
+    [`alerts_live/${childId}/${resolvedAlertId}`]: livePayload,
+    [`admin_alerts/${resolvedAlertId}`]: adminLivePayload,
   };
 
   if (childData.user_id?.toString().trim()) {
-    realtimeUpdates[`alerts/${childData.user_id}/${alertId}`] = livePayload;
+    realtimeUpdates[`alerts/${childData.user_id}/${resolvedAlertId}`] =
+      livePayload;
   }
 
-  await alertDoc.set(alertPayload);
+  if (!alreadyExists) {
+    await alertDoc.set(alertPayload);
+  }
   await realtimeDB.ref().update(realtimeUpdates);
 
-  const trackingContext = await getTrackingContextForChild(childId);
-  const resolvedTrackingKey =
-    extraFields.tracking_key?.toString().trim() ||
-    trackingContext?.trackingKey ||
-    "";
-  const normalizedLogType = normalizeLogType(normalizedType);
-  await appendChildLog({
-    childId,
-    trackingKey: resolvedTrackingKey,
-    parentUserId: childData.user_id || "",
-    type: normalizedLogType,
-    message,
-    timestamp: time,
-    metadata: {
-      source: "alert_service",
-      alertId,
-      zoneName,
-      locationText,
-      latitude: alertPayload.latitude,
-      longitude: alertPayload.longitude,
-      batteryLevel,
-      originalType: normalizedType,
-    },
-  });
+  if (writeChildLog && !alreadyExists) {
+    const trackingContext = await getTrackingContextForChild(childId);
+    const resolvedTrackingKey =
+      extraFields.tracking_key?.toString().trim() ||
+      trackingContext?.trackingKey ||
+      "";
+    const normalizedLogType = normalizeLogType(normalizedType);
+    await appendChildLog({
+      childId,
+      trackingKey: resolvedTrackingKey,
+      parentUserId: childData.user_id || "",
+      type: normalizedLogType,
+      message,
+      timestamp: time,
+      metadata: {
+        source: "alert_service",
+        alertId: resolvedAlertId,
+        zoneName,
+        locationText,
+        latitude: alertPayload.latitude,
+        longitude: alertPayload.longitude,
+        batteryLevel,
+        originalType: normalizedType,
+      },
+    });
+  }
 
   console.info("[alerts.createAlertRecord]", {
     childId,
     userId: childData.user_id || "",
     type: normalizedType,
-    alertId,
+    alertId: resolvedAlertId,
+    duplicate: alreadyExists,
     livePath: childData.user_id
-      ? `/alerts/${childData.user_id}/${alertId}`
-      : `/alerts_by_child/${childId}/${alertId}`,
-    adminLivePath: `/admin_alerts/${alertId}`,
+      ? `/alerts/${childData.user_id}/${resolvedAlertId}`
+      : `/alerts_by_child/${childId}/${resolvedAlertId}`,
+    adminLivePath: `/admin_alerts/${resolvedAlertId}`,
     zoneName,
     locationText,
   });
 
   return {
-    alertId,
+    alertId: resolvedAlertId,
     time,
-    alertData: alertPayload,
+    alertData: alreadyExists ? existingAlertDoc.data() || alertPayload : alertPayload,
     childData,
+    alreadyExists,
   };
 }
 

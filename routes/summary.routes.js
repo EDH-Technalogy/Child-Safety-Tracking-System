@@ -7,6 +7,9 @@ router.use(requireAuthenticatedAccess);
 // Get Today's Summary
 router.get("/today/:child_id", summary.today);
 
+// Get rolling last-24-hour summary
+router.get("/last-24-hours/:child_id", summary.last24Hours);
+
 // Get Summary by Date
 router.get("/:child_id/:date", summary.getByDate);
 

@@ -13,13 +13,17 @@ const {
   getResolvedLiveTrackingSnapshot,
   getTrackingContextForChild,
 } = require("../utils/live-tracking");
-const { normalizeRealtimeLocationTimestamps } = require("../utils/live-timestamp");
+const {
+  normalizeEpochMillisecondsOrNull,
+  normalizeRealtimeLocationTimestamps,
+} = require("../utils/live-timestamp");
 const {
   appendLocationHistory,
   listChildLocationHistory,
   parseTimezoneOffsetMinutes,
 } = require("../utils/location-history");
 const { listChildLogs } = require("../utils/child-logs");
+const { recordDeviceReconnected } = require("../utils/connection-events");
 
 const SOS_ALERT_COOLDOWN_MS = 60000;
 
@@ -165,6 +169,7 @@ exports.updateLocation = async (req, res, next) => {
       latitude,
       longitude,
     });
+    const heartbeatAt = Date.now();
 
     const trackingContext = await getTrackingContextForChild(childId);
     const trackingKey = trackingContext?.trackingKey || childId;
@@ -191,18 +196,81 @@ exports.updateLocation = async (req, res, next) => {
       req.body.network_status?.toString().trim() ||
       req.body.signal?.toString().trim() ||
       "unknown";
-    await realtimeDB.ref().update({
-      [rtdbPath]: livePayload,
-      [statusPath]: {
+    await realtimeDB.ref(rtdbPath).set(livePayload);
+
+    const statusRef = realtimeDB.ref(statusPath);
+    let reconnectContext = null;
+    const statusTransaction = await statusRef.transaction((currentValue) => {
+      const currentStatus =
+        currentValue && typeof currentValue === "object" ? currentValue : {};
+      const currentConnectionState =
+        currentStatus.connectionState?.toString().trim().toLowerCase() ||
+        (currentStatus.online === false
+          ? "offline"
+          : currentStatus.online === true
+            ? "online"
+            : "") ||
+        (currentStatus.deviceStatus?.toString().trim().toLowerCase() === "offline"
+          ? "offline"
+          : "");
+
+      if (currentConnectionState === "offline") {
+        reconnectContext = {
+          disconnectedAt:
+            normalizeEpochMillisecondsOrNull(currentStatus.lastOfflineAt),
+          lastKnownLat: Number.isFinite(Number(currentStatus.lastKnownLat))
+            ? Number(currentStatus.lastKnownLat)
+            : null,
+          lastKnownLng: Number.isFinite(Number(currentStatus.lastKnownLng))
+            ? Number(currentStatus.lastKnownLng)
+            : null,
+          lastKnownAccuracy: Number.isFinite(Number(currentStatus.lastKnownAccuracy))
+            ? Number(currentStatus.lastKnownAccuracy)
+            : null,
+          lastKnownTimestamp:
+            normalizeEpochMillisecondsOrNull(currentStatus.lastKnownTimestamp),
+          lastKnownAddress:
+            currentStatus.lastKnownAddress?.toString().trim() || null,
+        };
+      } else {
+        reconnectContext = null;
+      }
+
+      return {
+        ...currentStatus,
         online: true,
-        lastSeen: livePayload.recorded_at,
+        connectionState: "online",
+        lastOnlineAt: heartbeatAt,
+        lastSeen: heartbeatAt,
         deviceStatus: "active",
         network,
-        updatedAt: livePayload.recorded_at,
+        updatedAt: heartbeatAt,
         child_id: childId,
         tracking_key: trackingKey,
-      },
+      };
     });
+
+    if (statusTransaction.committed && reconnectContext) {
+      await recordDeviceReconnected({
+        childId,
+        trackingKey,
+        parentUserId:
+          trackingContext?.childData?.user_id?.toString().trim() || "",
+        reconnectedAt: heartbeatAt,
+        disconnectedAt: reconnectContext.disconnectedAt,
+        lastKnownLat: reconnectContext.lastKnownLat,
+        lastKnownLng: reconnectContext.lastKnownLng,
+        lastKnownAccuracy: reconnectContext.lastKnownAccuracy,
+        lastKnownTimestamp: reconnectContext.lastKnownTimestamp,
+        lastKnownAddress: reconnectContext.lastKnownAddress,
+        reconnectedLat: latitude,
+        reconnectedLng: longitude,
+        reconnectedAccuracy: accuracy,
+        reconnectedTimestamp: livePayload.recorded_at,
+        reconnectedAddress: locationText,
+        source: "location_update",
+      });
+    }
 
     console.info("[location.updateLocation.rtdb-write]", {
       childId,
@@ -218,6 +286,8 @@ exports.updateLocation = async (req, res, next) => {
       normalizedRecordedAt: livePayload.recorded_at,
       statusPath: `/${statusPath}`,
       payload: livePayload,
+      heartbeatAt,
+      reconnectLogged: Boolean(statusTransaction.committed && reconnectContext),
       timestamp: recordedAt,
     });
 

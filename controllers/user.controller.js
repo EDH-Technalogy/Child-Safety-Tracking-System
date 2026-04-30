@@ -209,6 +209,29 @@ function ensureCanManageUserRecord(req, targetUserId) {
   throw createHttpError(403, "You do not have permission to access this user");
 }
 
+exports.getFirebaseToken = async (req, res, next) => {
+  try {
+    if (!req.auth?.id) {
+      throw createHttpError(401, "Authorization token is required");
+    }
+
+    const role = req.auth.role === "admin" ? "admin" : "user";
+    const firebaseToken = await admin.auth().createCustomToken(req.auth.id, {
+      role,
+      type: req.auth.type || role,
+      email: req.auth.email || "",
+    });
+
+    res.json({
+      token: firebaseToken,
+      uid: req.auth.id,
+      role,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // REGISTER
 exports.register = async (req, res) => {
   try {

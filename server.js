@@ -4,6 +4,8 @@ const { realtimeDB } = require("./firebase");
 const requestLogger = require("./middleware/requestLogger");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 const { initLiveGeofenceMonitor } = require("./utils/live-geofence-monitor");
+const { initConnectionMonitor } = require("./utils/connection-monitor");
+const { initSosAlertLiveListener } = require("./utils/sos-alert-live-listener");
 const { syncRealtimeMirrorsFromFirestore } = require("./utils/realtime-bootstrap");
 
 const app = express();
@@ -79,6 +81,8 @@ async function startServer() {
     }
 
     initLiveGeofenceMonitor();
+    initConnectionMonitor();
+    initSosAlertLiveListener();
     app.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
         console.log("API Endpoints:");

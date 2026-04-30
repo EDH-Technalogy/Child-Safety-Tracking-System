@@ -31,6 +31,8 @@ String localizeRawMessage(AppLocalizations l10n, String raw) {
     'Alert not found': 'alertNotFound',
     'Login failed': 'loginFailed',
     'Registration failed': 'registrationFailed',
+    'Child is in danger!': 'sos',
+    'Child is in danger': 'sos',
   };
 
   final exactKey = exactMessages[message];
@@ -143,6 +145,23 @@ String localizeRawMessage(AppLocalizations l10n, String raw) {
     return l10n.deviceOnline;
   }
 
+  if (message
+      .startsWith('Device disconnected automatically after no updates')) {
+    return l10n.deviceOffline;
+  }
+
+  if (message.startsWith("Your child's device disconnected after no updates")) {
+    return l10n.deviceOffline;
+  }
+
+  if (message == 'Device reconnected automatically.') {
+    return l10n.deviceOnline;
+  }
+
+  if (message == "Your child's device is online again.") {
+    return l10n.deviceOnline;
+  }
+
   return message;
 }
 
@@ -198,8 +217,10 @@ String localizeAlertTypeLabel(AppLocalizations l10n, String? value) {
       return l10n.lowBattery;
     case 'DEVICE_OFF':
     case 'DEVICE_OFFLINE':
+    case 'DEVICE_DISCONNECTED':
       return l10n.deviceOffline;
     case 'DEVICE_ONLINE':
+    case 'DEVICE_RECONNECTED':
       return l10n.deviceOnline;
     default:
       return (value ?? '').trim().isEmpty ? l10n.unknown : value!.toString();
@@ -232,6 +253,8 @@ String _localizedGetter(AppLocalizations l10n, String key) {
       return l10n.loginFailed;
     case 'registrationFailed':
       return l10n.registrationFailed;
+    case 'sos':
+      return l10n.sos;
     default:
       return l10n.error;
   }

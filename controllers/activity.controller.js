@@ -41,7 +41,7 @@ async function listLegacyActivityLogs(childId) {
   );
 }
 
-async function listGeofenceAuditLogs(childId) {
+async function listRelevantAuditLogs(childId) {
   const snapshot = await firestore
     .collection(AUDIT_LOG_COLLECTION)
     .where("metadata.childId", "==", childId)
@@ -50,7 +50,12 @@ async function listGeofenceAuditLogs(childId) {
   return snapshot.docs
     .map((doc) => normalizeAuditLogRecord(doc.id, doc.data() || {}))
     .filter((entry) =>
-      ["safe_zone_exit", "safe_zone_enter"].includes(entry.eventType)
+      [
+        "safe_zone_exit",
+        "safe_zone_enter",
+        "device_disconnected_auto",
+        "device_reconnected_auto",
+      ].includes(entry.eventType)
     )
     .map(mapActivityResponseItem);
 }
@@ -105,12 +110,12 @@ exports.getLogs = async (req, res, next) => {
     const childId = req.params.child_id?.toString().trim();
     await getChildWithAccessOrThrow(req, childId);
 
-    const [legacyLogs, geofenceLogs] = await Promise.all([
+    const [legacyLogs, relevantAuditLogs] = await Promise.all([
       listLegacyActivityLogs(childId),
-      listGeofenceAuditLogs(childId),
+      listRelevantAuditLogs(childId),
     ]);
 
-    const logs = [...legacyLogs, ...geofenceLogs].sort(
+    const logs = [...legacyLogs, ...relevantAuditLogs].sort(
       (a, b) => (b.created_at || 0) - (a.created_at || 0)
     );
 
@@ -120,7 +125,7 @@ exports.getLogs = async (req, res, next) => {
       role: req.auth?.role || null,
       total: logs.length,
       legacyCount: legacyLogs.length,
-      geofenceCount: geofenceLogs.length,
+      relevantAuditCount: relevantAuditLogs.length,
     });
 
     res.json(logs);

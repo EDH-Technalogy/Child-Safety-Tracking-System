@@ -217,7 +217,10 @@ class AdminApiService {
         Uri.parse('$baseUrl/admin/stats/system'),
         headers: await _buildHeaders(),
       );
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (response.body.trim().isEmpty) {
+          return <String, dynamic>{};
+        }
         return jsonDecode(response.body);
       } else {
         throw Exception(response.body);

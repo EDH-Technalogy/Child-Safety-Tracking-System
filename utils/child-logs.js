@@ -32,8 +32,13 @@ function buildChildLogEntry({
   trackingKey = "",
   parentUserId = "",
   type,
+  title = "",
   message,
+  latitude = null,
+  longitude = null,
+  accuracy = null,
   timestamp = Date.now(),
+  dateKey = "",
   metadata = {},
 }) {
   const normalizedTimestamp = normalizeLogTimestamp(timestamp);
@@ -44,9 +49,16 @@ function buildChildLogEntry({
     childId: childId?.toString().trim() || "",
     trackingKey: trackingKey?.toString().trim() || "",
     parentUserId: parentUserId?.toString().trim() || "",
+    title: title?.toString().trim() || normalizedType,
     message: message?.toString().trim() || normalizedType,
+    latitude: Number.isFinite(Number(latitude)) ? Number(latitude) : null,
+    longitude: Number.isFinite(Number(longitude)) ? Number(longitude) : null,
+    lat: Number.isFinite(Number(latitude)) ? Number(latitude) : null,
+    lng: Number.isFinite(Number(longitude)) ? Number(longitude) : null,
+    accuracy: Number.isFinite(Number(accuracy)) ? Number(accuracy) : null,
     timestamp: normalizedTimestamp,
     createdAt: normalizedTimestamp,
+    dateKey: dateKey?.toString().trim() || buildDateKey(normalizedTimestamp),
     metadata: metadata && typeof metadata === "object" ? metadata : {},
   };
 }
@@ -56,8 +68,13 @@ async function appendChildLog({
   trackingKey = "",
   parentUserId = "",
   type,
+  title = "",
   message,
+  latitude = null,
+  longitude = null,
+  accuracy = null,
   timestamp = Date.now(),
+  dateKey = "",
   metadata = {},
   logId = null,
 }) {
@@ -71,12 +88,19 @@ async function appendChildLog({
     trackingKey,
     parentUserId,
     type,
+    title,
     message,
+    latitude,
+    longitude,
+    accuracy,
     timestamp,
+    dateKey,
     metadata,
   });
-  const dateKey = buildDateKey(entry.timestamp);
-  const childLogsRef = realtimeDB.ref(`child_logs/${normalizedChildId}/${dateKey}`);
+  const resolvedDateKey = entry.dateKey || buildDateKey(entry.timestamp);
+  const childLogsRef = realtimeDB.ref(
+    `child_logs/${normalizedChildId}/${resolvedDateKey}`
+  );
   const resolvedLogId = logId?.toString().trim() || childLogsRef.push().key;
 
   await childLogsRef.child(resolvedLogId).set({
@@ -86,7 +110,7 @@ async function appendChildLog({
 
   return {
     id: resolvedLogId,
-    dateKey,
+    dateKey: resolvedDateKey,
     entry,
   };
 }
@@ -108,12 +132,26 @@ function normalizeChildLog(id, rawValue = {}, childId = "") {
     childId: source.childId?.toString().trim() || childId,
     trackingKey: source.trackingKey?.toString().trim() || "",
     parentUserId: source.parentUserId?.toString().trim() || "",
+    title:
+      source.title?.toString().trim() ||
+      normalizeLogType(source.type),
     message: source.message?.toString().trim() || "",
+    latitude: Number.isFinite(Number(source.latitude ?? source.lat))
+      ? Number(source.latitude ?? source.lat)
+      : null,
+    longitude: Number.isFinite(Number(source.longitude ?? source.lng))
+      ? Number(source.longitude ?? source.lng)
+      : null,
+    accuracy: Number.isFinite(Number(source.accuracy))
+      ? Number(source.accuracy)
+      : null,
     timestamp,
     createdAt:
       normalizeEpochMillisecondsOrNull(source.createdAt) ??
       normalizeEpochMillisecondsOrNull(source.created_at) ??
       timestamp,
+    dateKey:
+      source.dateKey?.toString().trim() || buildDateKey(timestamp),
     metadata: source.metadata && typeof source.metadata === "object"
       ? source.metadata
       : {},
@@ -125,12 +163,18 @@ function dedupeChildLogs(logs = []) {
   const deduped = [];
 
   for (const log of logs) {
-    const dedupeKey = [
-      log.type || "",
-      log.timestamp || 0,
-      log.message || "",
-      log.childId || "",
-    ].join("|");
+    const transitionEventId =
+      log.metadata?.eventId ||
+      log.metadata?.connectionEventId ||
+      null;
+    const dedupeKey = transitionEventId
+      ? `connection-event:${transitionEventId}`
+      : [
+          log.type || "",
+          log.timestamp || 0,
+          log.message || "",
+          log.childId || "",
+        ].join("|");
 
     if (seen.has(dedupeKey)) {
       continue;
@@ -181,17 +225,27 @@ function buildLegacyLogFromAlert(docId, data = {}) {
     childId: data.child_id?.toString().trim() || "",
     trackingKey: data.tracking_key?.toString().trim() || "",
     parentUserId: data.user_id?.toString().trim() || "",
+    title: type,
     message: data.message?.toString().trim() || type,
+    latitude: Number.isFinite(Number(data.latitude)) ? Number(data.latitude) : null,
+    longitude: Number.isFinite(Number(data.longitude)) ? Number(data.longitude) : null,
+    accuracy: Number.isFinite(Number(data.accuracy))
+      ? Number(data.accuracy)
+      : null,
     timestamp:
       normalizeEpochMillisecondsOrNull(data.created_at) ?? Date.now(),
     createdAt:
       normalizeEpochMillisecondsOrNull(data.created_at) ?? Date.now(),
+    dateKey: buildDateKey(
+      normalizeEpochMillisecondsOrNull(data.created_at) ?? Date.now()
+    ),
     metadata: {
       source: "alerts_collection",
       locationText: data.location_text || null,
       zoneName: data.zone_name || null,
       batteryLevel: data.battery_level ?? null,
       originalType: data.type || null,
+      connectionEventId: data.connection_event_id || null,
     },
   };
 }
@@ -210,12 +264,21 @@ function buildLegacyLogFromConnection(docId, data = {}) {
     childId: data.child_id?.toString().trim() || "",
     trackingKey: data.tracking_key?.toString().trim() || "",
     parentUserId: "",
+    title:
+      type === "DEVICE_ONLINE"
+        ? "Device reconnected"
+        : type === "DEVICE_OFFLINE"
+          ? "Device disconnected"
+          : "Device status",
     message:
       type === "DEVICE_ONLINE"
         ? "Device connection restored."
         : type === "DEVICE_OFFLINE"
           ? "Device connection lost."
           : `Device status changed to ${status}.`,
+    latitude: Number.isFinite(Number(data.latitude)) ? Number(data.latitude) : null,
+    longitude: Number.isFinite(Number(data.longitude)) ? Number(data.longitude) : null,
+    accuracy: null,
     timestamp:
       normalizeEpochMillisecondsOrNull(data.event_time) ??
       normalizeEpochMillisecondsOrNull(data.created_at) ??
@@ -224,6 +287,11 @@ function buildLegacyLogFromConnection(docId, data = {}) {
       normalizeEpochMillisecondsOrNull(data.created_at) ??
       normalizeEpochMillisecondsOrNull(data.event_time) ??
       Date.now(),
+    dateKey: buildDateKey(
+      normalizeEpochMillisecondsOrNull(data.event_time) ??
+        normalizeEpochMillisecondsOrNull(data.created_at) ??
+        Date.now()
+    ),
     metadata: {
       source: "connection_logs_collection",
       previousStatus: data.previous_status || null,
@@ -243,16 +311,130 @@ function buildLegacyLogFromActivity(docId, data = {}) {
     childId: data.child_id?.toString().trim() || "",
     trackingKey: "",
     parentUserId: "",
+    title: type,
     message: data.description?.toString().trim() || type,
+    latitude: null,
+    longitude: null,
+    accuracy: null,
     timestamp:
       normalizeEpochMillisecondsOrNull(data.created_at) ?? Date.now(),
     createdAt:
       normalizeEpochMillisecondsOrNull(data.created_at) ?? Date.now(),
+    dateKey: buildDateKey(
+      normalizeEpochMillisecondsOrNull(data.created_at) ?? Date.now()
+    ),
     metadata: {
       source: "activity_logs_collection",
       originalType: data.event_type || null,
     },
   };
+}
+
+function normalizeConnectionEvent(id, rawValue = {}, childId = "") {
+  const source = rawValue && typeof rawValue === "object" ? rawValue : {};
+  const timestamp =
+    normalizeEpochMillisecondsOrNull(source.createdAt) ??
+    normalizeEpochMillisecondsOrNull(source.reconnectedAt) ??
+    normalizeEpochMillisecondsOrNull(source.disconnectedAt) ??
+    normalizeEpochMillisecondsOrNull(source.timestamp);
+
+  if (!timestamp) {
+    return null;
+  }
+
+  const type = normalizeLogType(source.type);
+  const reconnectedLat = Number(source.reconnectedLat);
+  const reconnectedLng = Number(source.reconnectedLng);
+  const lastKnownLat = Number(source.lastKnownLat);
+  const lastKnownLng = Number(source.lastKnownLng);
+
+  return {
+    id: (source.eventId ?? source.id ?? id ?? "").toString(),
+    type,
+    childId: source.childId?.toString().trim() || childId,
+    trackingKey: source.trackingKey?.toString().trim() || "",
+    parentUserId: source.parentUserId?.toString().trim() || "",
+    title:
+      source.title?.toString().trim() ||
+      (type === "DEVICE_RECONNECTED"
+        ? "Device reconnected"
+        : type === "DEVICE_DISCONNECTED"
+          ? "Device disconnected"
+          : type),
+    message: source.message?.toString().trim() || type,
+    latitude:
+      Number.isFinite(reconnectedLat) && Number.isFinite(reconnectedLng)
+        ? reconnectedLat
+        : Number.isFinite(lastKnownLat) && Number.isFinite(lastKnownLng)
+          ? lastKnownLat
+          : null,
+    longitude:
+      Number.isFinite(reconnectedLat) && Number.isFinite(reconnectedLng)
+        ? reconnectedLng
+        : Number.isFinite(lastKnownLat) && Number.isFinite(lastKnownLng)
+          ? lastKnownLng
+          : null,
+    accuracy:
+      Number.isFinite(Number(source.reconnectedAccuracy))
+        ? Number(source.reconnectedAccuracy)
+        : Number.isFinite(Number(source.lastKnownAccuracy))
+          ? Number(source.lastKnownAccuracy)
+          : null,
+    timestamp,
+    createdAt:
+      normalizeEpochMillisecondsOrNull(source.createdAt) ?? timestamp,
+    dateKey:
+      source.dateKey?.toString().trim() || buildDateKey(timestamp),
+    metadata: {
+      source: "connection_events",
+      eventId: (source.eventId ?? source.id ?? id ?? "").toString(),
+      disconnectedAt:
+        normalizeEpochMillisecondsOrNull(source.disconnectedAt),
+      reconnectedAt:
+        normalizeEpochMillisecondsOrNull(source.reconnectedAt),
+      durationOfflineMs:
+        Number.isFinite(Number(source.durationOfflineMs))
+          ? Number(source.durationOfflineMs)
+          : null,
+      lastKnownLat: Number.isFinite(lastKnownLat) ? lastKnownLat : null,
+      lastKnownLng: Number.isFinite(lastKnownLng) ? lastKnownLng : null,
+      lastKnownAccuracy: Number.isFinite(Number(source.lastKnownAccuracy))
+        ? Number(source.lastKnownAccuracy)
+        : null,
+      lastKnownTimestamp:
+        normalizeEpochMillisecondsOrNull(source.lastKnownTimestamp),
+      lastKnownAddress: source.lastKnownAddress?.toString().trim() || null,
+      reconnectedLat: Number.isFinite(reconnectedLat) ? reconnectedLat : null,
+      reconnectedLng: Number.isFinite(reconnectedLng) ? reconnectedLng : null,
+      reconnectedAccuracy: Number.isFinite(Number(source.reconnectedAccuracy))
+        ? Number(source.reconnectedAccuracy)
+        : null,
+      reconnectedTimestamp:
+        normalizeEpochMillisecondsOrNull(source.reconnectedTimestamp),
+      reconnectedAddress:
+        source.reconnectedAddress?.toString().trim() || null,
+      ...(source.metadata && typeof source.metadata === "object"
+        ? source.metadata
+        : {}),
+    },
+  };
+}
+
+async function readConnectionEventsBucket(childId, bucketKey) {
+  const snapshot = await realtimeDB
+    .ref(`connection_events/${childId}/${bucketKey}`)
+    .once("value");
+  const events = [];
+  const rawValue = snapshot.val() || {};
+
+  for (const [id, data] of Object.entries(rawValue)) {
+    const normalizedEvent = normalizeConnectionEvent(id, data, childId);
+    if (normalizedEvent) {
+      events.push(normalizedEvent);
+    }
+  }
+
+  return events;
 }
 
 async function listLegacyLogsForChild(childId, window) {
@@ -318,17 +500,28 @@ async function listChildLogs(
       readChildLogsBucket(normalizedChildId, bucketKey)
     )
   );
+  const connectionBucketResults = await Promise.all(
+    window.bucketKeys.map((bucketKey) =>
+      readConnectionEventsBucket(normalizedChildId, bucketKey)
+    )
+  );
   const liveLogs = bucketResults
-    .expand((logs) => logs)
-    .where(
+    .flatMap((logs) => logs)
+    .filter(
       (log) =>
         log.timestamp >= window.startTimestamp &&
         log.timestamp <= window.endTimestamp
-    )
-    .toList();
+    );
+  const connectionEvents = connectionBucketResults
+    .flatMap((logs) => logs)
+    .filter(
+      (log) =>
+        log.timestamp >= window.startTimestamp &&
+        log.timestamp <= window.endTimestamp
+    );
 
   const legacyLogs = await listLegacyLogsForChild(normalizedChildId, window);
-  return dedupeChildLogs([...liveLogs, ...legacyLogs]);
+  return dedupeChildLogs([...connectionEvents, ...liveLogs, ...legacyLogs]);
 }
 
 module.exports = {
@@ -336,4 +529,6 @@ module.exports = {
   buildChildLogEntry,
   listChildLogs,
   normalizeLogType,
+  readChildLogsBucket,
+  readConnectionEventsBucket,
 };

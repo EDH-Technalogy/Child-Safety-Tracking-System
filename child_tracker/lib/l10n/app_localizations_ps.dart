@@ -1430,4 +1430,133 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get yearsOld => 'کلن';
+
+  @override
+  String get adminOverviewSubtitle =>
+      'د اډمین سیسټم ژوندی او عملیاتي عمومي لید';
+
+  @override
+  String get noDataAvailableYet => 'لا تر اوسه معلومات نشته';
+
+  @override
+  String get dashboardPartialData =>
+      'د ډشبورډ ځینې برخې پورته نه شوې. شته معلومات لا هم ښودل کېږي.';
+
+  @override
+  String get systemStatus => 'د سیسټم حالت';
+
+  @override
+  String get chartsAndInsights => 'چارټونه او شننې';
+
+  @override
+  String get monitorUsersDevicesAlertsLocations =>
+      'کاروونکي، وسایل، خبرتیاوې او د ځای فعالیت وڅارئ';
+
+  @override
+  String welcomeBackAdmin(Object name) {
+    return 'بیا ښه راغلاست، $name';
+  }
+
+  @override
+  String get lastUpdated => 'وروستۍ تازه‌کول';
+
+  @override
+  String get refreshData => 'معلومات تازه کړئ';
+
+  @override
+  String get todayAlerts => 'د نن خبرتیاوې';
+
+  @override
+  String get safeZonesCount => 'د خوندي سیمو شمېر';
+
+  @override
+  String get liveDeviceStatus => 'د وسیلو ژوندی حالت';
+
+  @override
+  String get latestAlertVolume => 'د خبرتیاوو وروستی حجم';
+
+  @override
+  String get totalParentsNormalUsers => 'والدین / عادي کاروونکي';
+
+  @override
+  String get offlineDevices => 'آفلاین وسایل';
+
+  @override
+  String get vsYesterday => 'له پرون سره پرتله';
+
+  @override
+  String get locationUpdates => 'د ځای تازه‌کولونه';
+
+  @override
+  String get recentActivity => 'وروستي فعالیتونه';
+
+  @override
+  String get latestAuditEvents => 'وروستي د پلټنې او فعالیت پېښې';
+
+  @override
+  String get openCoreAdminAreas => 'اصلي اډمین برخې پرانیزئ';
+
+  @override
+  String get usersActionSubtitle =>
+      'حسابونه، رولونه او د کاروونکو لاسرسی وڅېړئ';
+
+  @override
+  String get childrenActionSubtitle =>
+      'د ماشومانو پروفایلونه او تړاوونه پرانیزئ';
+
+  @override
+  String get devicesActionSubtitle => 'د وسیلو روغتیا او تړاوونه وڅارئ';
+
+  @override
+  String get viewMapActionSubtitle => 'ژوندی نقشه وڅارئ';
+
+  @override
+  String get viewAlertsActionSubtitle => 'فعاله او پخوانۍ خبرتیاوې وګورئ';
+
+  @override
+  String get viewReportsHistory => 'راپورونه او تاریخچه';
+
+  @override
+  String get viewReportsActionSubtitle => 'لاګونه او تاریخي راپورونه پرانیزئ';
+
+  @override
+  String get safeZonesActionSubtitle => 'تنظیم شوې خوندي سیمې وګورئ';
+
+  @override
+  String get usersByRole => 'کاروونکي د رول له مخې';
+
+  @override
+  String get userRoleDistribution => 'د والدینو او اډمین حسابونو وېش';
+
+  @override
+  String get deviceStatusChart => 'د وسیلو حالت';
+
+  @override
+  String get liveFleetHealth => 'د نښلونې حالت له مخې د وسایلو ژوندی روغتیا';
+
+  @override
+  String get alertsByType => 'خبرتیاوې د ډول له مخې';
+
+  @override
+  String get alertBreakdownAcrossThePlatform =>
+      'په ټول سیسټم کې د خبرتیاوو وېش';
+
+  @override
+  String get locationUpdatesLast7Days =>
+      'په تېرو ۷ ورځو کې د ځای تازه‌کولو حجم';
+
+  @override
+  String get noAggregatedLocationData => 'د ځای هېڅ تجمیعي معلومات نشته';
+
+  @override
+  String get allAccessibleSafeZones => 'ټولې د لاسرسي وړ خوندي سیمې';
+
+  @override
+  String get todayLocationUpdates => 'د نن د ځای تازه‌کول';
+
+  @override
+  String get last7Days => 'وروستۍ ۷ ورځې';
+
+  @override
+  String get geofenceBreachesToday => 'د نن جيوفنس سرغړونې';
 }

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/admin_api_service.dart';
 import '../services/api_service.dart';
+import '../services/realtime_database_auth_service.dart';
 import '../models/user_model.dart';
 import '../utils/constants.dart';
 import '../utils/session_token_store.dart';
@@ -127,6 +128,7 @@ class AuthProvider with ChangeNotifier {
     _user = null;
     _error = null;
     SessionTokenStore.clear();
+    await RealtimeDatabaseAuthService.reset();
   }
 
   bool _shouldInvalidatePersistedSession(String message) {

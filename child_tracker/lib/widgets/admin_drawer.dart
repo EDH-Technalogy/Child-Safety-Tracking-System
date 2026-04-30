@@ -1,25 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../providers/child_provider.dart';
 import '../providers/locale_provider.dart';
-import '../screens/admin/admin_devices_screen.dart';
-import '../screens/admin/admin_children_screen.dart';
-import '../screens/admin/admin_alerts_screen.dart';
-import '../screens/admin/admin_logs_screen.dart';
-import '../screens/admin/admin_dashboard_screen.dart';
-import '../screens/admin/admin_users_screen.dart';
-import '../screens/admin/admin_home_screen.dart';
-import '../screens/admin/admin_map_screen.dart';
-import '../screens/admin/admin_add_child_screen.dart';
-import '../screens/admin/admin_settings_screen.dart';
 import '../screens/admin/admin_account_screen.dart';
+import '../screens/admin/admin_add_child_screen.dart';
+import '../screens/admin/admin_alerts_screen.dart';
+import '../screens/admin/admin_children_screen.dart';
+import '../screens/admin/admin_dashboard_screen.dart';
+import '../screens/admin/admin_devices_screen.dart';
+import '../screens/admin/admin_home_screen.dart';
+import '../screens/admin/admin_logs_screen.dart';
+import '../screens/admin/admin_map_screen.dart';
+import '../screens/admin/admin_settings_screen.dart';
+import '../screens/admin/admin_users_screen.dart';
 import '../screens/login_screen.dart';
 import '../utils/photo_provider.dart';
+import 'animated_nav_item.dart';
 
-class AdminDrawer extends StatelessWidget {
+class AdminDrawer extends StatefulWidget {
   const AdminDrawer({super.key});
+
+  @override
+  State<AdminDrawer> createState() => _AdminDrawerState();
+}
+
+class _AdminDrawerState extends State<AdminDrawer> {
+  String? _hoveredItemKey;
 
   @override
   Widget build(BuildContext context) {
@@ -82,8 +91,6 @@ class AdminDrawer extends StatelessWidget {
               },
             ),
           ),
-
-          // Admin Panel Section
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
@@ -96,7 +103,10 @@ class AdminDrawer extends StatelessWidget {
             ),
           ),
           _DrawerItem(
-            icon: Icons.dashboard,
+            itemKey: 'admin_dashboard',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.space_dashboard_rounded,
             title: l10n.home,
             onTap: () {
               Navigator.pop(context);
@@ -109,7 +119,10 @@ class AdminDrawer extends StatelessWidget {
             },
           ),
           _DrawerItem(
-            icon: Icons.people,
+            itemKey: 'admin_users',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.manage_accounts_rounded,
             title: l10n.userManagement,
             onTap: () {
               Navigator.pop(context);
@@ -122,7 +135,10 @@ class AdminDrawer extends StatelessWidget {
             },
           ),
           _DrawerItem(
-            icon: Icons.person,
+            itemKey: 'admin_account',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.admin_panel_settings_rounded,
             title: l10n.account,
             onTap: () {
               Navigator.pop(context);
@@ -135,7 +151,10 @@ class AdminDrawer extends StatelessWidget {
             },
           ),
           _DrawerItem(
-            icon: Icons.phone_android,
+            itemKey: 'admin_devices',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.devices_other_rounded,
             title: l10n.deviceManagement,
             onTap: () {
               Navigator.pop(context);
@@ -148,7 +167,10 @@ class AdminDrawer extends StatelessWidget {
             },
           ),
           _DrawerItem(
-            icon: Icons.child_care,
+            itemKey: 'admin_children',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.face_retouching_natural_rounded,
             title: l10n.children,
             onTap: () {
               Navigator.pop(context);
@@ -161,7 +183,10 @@ class AdminDrawer extends StatelessWidget {
             },
           ),
           _DrawerItem(
-            icon: Icons.notifications,
+            itemKey: 'admin_alerts',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.crisis_alert_rounded,
             title: l10n.alerts,
             onTap: () {
               Navigator.pop(context);
@@ -174,7 +199,10 @@ class AdminDrawer extends StatelessWidget {
             },
           ),
           _DrawerItem(
-            icon: Icons.history,
+            itemKey: 'admin_logs',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.timeline_rounded,
             title: l10n.systemLogs,
             onTap: () {
               Navigator.pop(context);
@@ -186,10 +214,7 @@ class AdminDrawer extends StatelessWidget {
               );
             },
           ),
-
           const Divider(),
-
-          // User Pages Section - With Admin Sidebar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
@@ -202,7 +227,10 @@ class AdminDrawer extends StatelessWidget {
             ),
           ),
           _DrawerItem(
-            icon: Icons.home,
+            itemKey: 'user_home',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.home_work_rounded,
             title: l10n.home,
             onTap: () {
               Navigator.pop(context);
@@ -215,7 +243,10 @@ class AdminDrawer extends StatelessWidget {
             },
           ),
           _DrawerItem(
-            icon: Icons.map,
+            itemKey: 'user_map',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.travel_explore_rounded,
             title: l10n.map,
             onTap: () {
               final childProvider =
@@ -236,7 +267,10 @@ class AdminDrawer extends StatelessWidget {
             },
           ),
           _DrawerItem(
-            icon: Icons.person_add,
+            itemKey: 'user_add_child',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.person_add_alt_1_rounded,
             title: l10n.addChild,
             onTap: () {
               Navigator.pop(context);
@@ -249,7 +283,10 @@ class AdminDrawer extends StatelessWidget {
             },
           ),
           _DrawerItem(
-            icon: Icons.settings,
+            itemKey: 'user_settings',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.settings_suggest_rounded,
             title: l10n.settings,
             onTap: () {
               Navigator.pop(context);
@@ -261,12 +298,12 @@ class AdminDrawer extends StatelessWidget {
               );
             },
           ),
-
           const Divider(),
-
-          // Language Settings
           _DrawerItem(
-            icon: Icons.language,
+            itemKey: 'language',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.translate_rounded,
             title: l10n.language,
             subtitle: localeProvider.locale.languageCode == 'ps'
                 ? l10n.pashto
@@ -277,10 +314,12 @@ class AdminDrawer extends StatelessWidget {
               _showLanguageDialog(context);
             },
           ),
-
           const Divider(),
           _DrawerItem(
-            icon: Icons.info_outline,
+            itemKey: 'about',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.info_rounded,
             title: l10n.about,
             onTap: () {
               Navigator.pop(context);
@@ -289,7 +328,10 @@ class AdminDrawer extends StatelessWidget {
           ),
           const Divider(),
           _DrawerItem(
-            icon: Icons.logout,
+            itemKey: 'logout',
+            hoveredKey: _hoveredItemKey,
+            onHoverChanged: _handleHoverChanged,
+            icon: Icons.logout_rounded,
             title: l10n.logout,
             isLogout: true,
             onTap: () async {
@@ -310,6 +352,20 @@ class AdminDrawer extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _handleHoverChanged(String itemKey, bool isHovered) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (isHovered) {
+        _hoveredItemKey = itemKey;
+      } else if (_hoveredItemKey == itemKey) {
+        _hoveredItemKey = null;
+      }
+    });
   }
 
   void _showLanguageDialog(BuildContext context) {
@@ -382,41 +438,37 @@ class AdminDrawer extends StatelessWidget {
 }
 
 class _DrawerItem extends StatelessWidget {
+  const _DrawerItem({
+    required this.itemKey,
+    required this.hoveredKey,
+    required this.onHoverChanged,
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.subtitle,
+    this.isLogout = false,
+  });
+
+  final String itemKey;
+  final String? hoveredKey;
+  final void Function(String itemKey, bool isHovered) onHoverChanged;
   final IconData icon;
   final String title;
   final String? subtitle;
-  final bool isSelected = false;
   final bool isLogout;
   final VoidCallback onTap;
 
-  const _DrawerItem({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.isLogout = false,
-    required this.onTap,
-  });
-
   @override
   Widget build(BuildContext context) {
-    final Color color = isLogout
-        ? Colors.red
-        : isSelected
-            ? Theme.of(context).primaryColor
-            : Colors.grey[700]!;
-
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: color,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-      subtitle: subtitle != null ? Text(subtitle!) : null,
-      selected: isSelected,
-      selectedTileColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+    return AnimatedNavItem(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      tooltip: title,
+      isDanger: isLogout,
+      isHovered: hoveredKey == itemKey,
+      isDimmed: hoveredKey != null && hoveredKey != itemKey,
+      onHoverChanged: (value) => onHoverChanged(itemKey, value),
       onTap: onTap,
     );
   }

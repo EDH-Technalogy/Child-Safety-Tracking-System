@@ -29,6 +29,9 @@ router.get(
   alert.getUnreadCount
 );
 
+// Delete Alert (Flutter calls: DELETE /api/alerts/:alertId)
+router.delete("/:alert_id", requireAuthenticatedAccess, alert.deleteAlert);
+
 // Low Battery Alert
 router.post("/low-battery", attachOptionalAuth, alert.lowBatteryAlert);
 

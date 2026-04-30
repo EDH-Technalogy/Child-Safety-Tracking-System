@@ -15,7 +15,9 @@ import '../providers/location_provider.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 import '../utils/timestamp_utils.dart';
+import '../widgets/google_map_guard.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/hover_icon_button.dart';
 
 class MapScreen extends StatefulWidget {
   final String? childId;
@@ -38,6 +40,7 @@ class _MapScreenState extends State<MapScreen> {
   double _defaultZoom = 16.0;
   MapType _mapType = MapType.normal;
   String? _alertMonitorOwnerId;
+  String? _hoveredActionKey;
 
   @override
   void initState() {
@@ -674,8 +677,19 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: Text(l10n.map),
         leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
+          builder: (context) => HoverIconButton(
+            icon: Icons.menu_rounded,
+            isHovered: _hoveredActionKey == 'menu',
+            isDimmed: _hoveredActionKey != null && _hoveredActionKey != 'menu',
+            onHoverChanged: (value) {
+              setState(() {
+                if (value) {
+                  _hoveredActionKey = 'menu';
+                } else if (_hoveredActionKey == 'menu') {
+                  _hoveredActionKey = null;
+                }
+              });
+            },
             onPressed: () {
               Scaffold.of(context).openDrawer();
             },
@@ -683,20 +697,56 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
+          HoverIconButton(
+            icon: Icons.tune_rounded,
+            isHovered: _hoveredActionKey == 'settings',
+            isDimmed:
+                _hoveredActionKey != null && _hoveredActionKey != 'settings',
+            onHoverChanged: (value) {
+              setState(() {
+                if (value) {
+                  _hoveredActionKey = 'settings';
+                } else if (_hoveredActionKey == 'settings') {
+                  _hoveredActionKey = null;
+                }
+              });
+            },
             onPressed: _showMapSettings,
             tooltip: l10n.settings,
           ),
-          IconButton(
-            icon: const Icon(Icons.child_care),
+          HoverIconButton(
+            icon: Icons.person_add_alt_1_rounded,
+            isHovered: _hoveredActionKey == 'add_child',
+            isDimmed:
+                _hoveredActionKey != null && _hoveredActionKey != 'add_child',
+            onHoverChanged: (value) {
+              setState(() {
+                if (value) {
+                  _hoveredActionKey = 'add_child';
+                } else if (_hoveredActionKey == 'add_child') {
+                  _hoveredActionKey = null;
+                }
+              });
+            },
             onPressed: () {
               Navigator.pushNamed(context, '/add-child');
             },
             tooltip: l10n.addChild,
           ),
-          IconButton(
-            icon: const Icon(Icons.my_location),
+          HoverIconButton(
+            icon: Icons.gps_fixed_rounded,
+            isHovered: _hoveredActionKey == 'my_location',
+            isDimmed:
+                _hoveredActionKey != null && _hoveredActionKey != 'my_location',
+            onHoverChanged: (value) {
+              setState(() {
+                if (value) {
+                  _hoveredActionKey = 'my_location';
+                } else if (_hoveredActionKey == 'my_location') {
+                  _hoveredActionKey = null;
+                }
+              });
+            },
             onPressed: () async {
               await _getCurrentLocation();
               if (_currentPosition != null && _mapController != null) {
@@ -768,24 +818,31 @@ class _MapScreenState extends State<MapScreen> {
                       child: Stack(
                         children: [
                           if (canRenderMap)
-                            GoogleMap(
-                              onMapCreated: _onMapCreated,
-                              initialCameraPosition: CameraPosition(
-                                target: _getInitialPosition(
-                                  activeLocation,
-                                  geofenceProvider,
+                            GoogleMapAvailabilityGuard(
+                              mapBuilder: (_) => GoogleMap(
+                                onMapCreated: _onMapCreated,
+                                initialCameraPosition: CameraPosition(
+                                  target: _getInitialPosition(
+                                    activeLocation,
+                                    geofenceProvider,
+                                  ),
+                                  zoom: _defaultZoom,
                                 ),
-                                zoom: _defaultZoom,
+                                mapType: _mapType,
+                                markers: markers,
+                                circles: circles,
+                                myLocationEnabled: true,
+                                myLocationButtonEnabled: false,
+                                zoomControlsEnabled: false,
+                                mapToolbarEnabled: false,
+                                compassEnabled: true,
+                                buildingsEnabled: true,
                               ),
-                              mapType: _mapType,
-                              markers: markers,
-                              circles: circles,
-                              myLocationEnabled: true,
-                              myLocationButtonEnabled: false,
-                              zoomControlsEnabled: false,
-                              mapToolbarEnabled: false,
-                              compassEnabled: true,
-                              buildingsEnabled: true,
+                              fallbackBuilder: (_) => _buildUnavailableMapState(
+                                title: 'Map unavailable',
+                                message:
+                                    'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+                              ),
                             )
                           else
                             _buildUnavailableMapState(
@@ -814,7 +871,7 @@ class _MapScreenState extends State<MapScreen> {
                               onPressed: _showMapSettings,
                               backgroundColor: Colors.white,
                               child: const Icon(
-                                Icons.layers,
+                                Icons.layers_rounded,
                                 color: AppColors.primaryColor,
                               ),
                             ),

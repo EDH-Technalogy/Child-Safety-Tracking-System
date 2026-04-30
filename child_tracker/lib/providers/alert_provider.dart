@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/alert_model.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/realtime_database_auth_service.dart';
 import '../utils/constants.dart';
 import '../utils/firebase_bootstrap.dart';
 
@@ -35,9 +36,11 @@ class AlertProvider with ChangeNotifier {
   final Set<String> _knownAlertIds = <String>{};
   final Set<String> _backgroundKnownAlertIds = <String>{};
   final Set<String> _handledAlertIds = <String>{};
+  final Map<String, int> _unreadCountsByChild = <String, int>{};
 
   List<AlertModel> _alerts = [];
   int _unreadCount = 0;
+  int _totalUnreadCount = 0;
   bool _isLoading = false;
   String? _error;
   String? _monitoredChildId;
@@ -48,23 +51,74 @@ class AlertProvider with ChangeNotifier {
 
   List<AlertModel> get alerts => _alerts;
   int get unreadCount => _unreadCount;
+  int get totalUnreadCount => _totalUnreadCount;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isMonitoring => _liveAlertSubscription != null;
   String? get monitoredChildId => _monitoredChildId;
 
+  String _childAlertsPath(String childId) => 'alerts_live/$childId';
+
   Future<List<AlertModel>> _fetchAlerts(String childId) async {
-    final response = await _apiService.getAlerts(childId);
-    final alerts = response
-        .map((json) => AlertModel.fromJson(json))
-        .toList(growable: false);
-    alerts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return alerts;
+    final database = await _database();
+    final snapshot = await database.ref(_childAlertsPath(childId)).get();
+    return _alertsFromRealtimePayload(
+      rawValue: snapshot.value,
+      childIdFallback: childId,
+    );
   }
 
-  void _applyAlerts(List<AlertModel> alerts) {
+  int unreadCountForChild(String childId) {
+    return _unreadCountsByChild[childId.trim()] ?? 0;
+  }
+
+  void _setUnreadCountForChild(String childId, int count) {
+    final normalizedChildId = childId.trim();
+    if (normalizedChildId.isEmpty) {
+      return;
+    }
+
+    _unreadCountsByChild[normalizedChildId] = count;
+    _totalUnreadCount = _unreadCountsByChild.values.fold<int>(
+      0,
+      (sum, value) => sum + value,
+    );
+  }
+
+  void _applyAlerts(List<AlertModel> alerts, {String? childId}) {
     _alerts = alerts;
-    _unreadCount = alerts.where((alert) => !alert.isRead).length;
+    final normalizedChildId = childId?.trim() ?? '';
+    if (normalizedChildId.isNotEmpty) {
+      _setUnreadCountForChild(
+        normalizedChildId,
+        alerts.where((alert) => !alert.isRead).length,
+      );
+      _unreadCount = unreadCountForChild(normalizedChildId);
+    } else {
+      _unreadCount = alerts.where((alert) => !alert.isRead).length;
+      _totalUnreadCount = _unreadCount;
+    }
+  }
+
+  void _applyAggregateAlerts(List<AlertModel> alerts) {
+    final nextCounts = <String, int>{};
+    for (final alert in alerts) {
+      if (alert.isRead || alert.childId.isEmpty) {
+        continue;
+      }
+      nextCounts[alert.childId] = (nextCounts[alert.childId] ?? 0) + 1;
+    }
+
+    _unreadCountsByChild
+      ..clear()
+      ..addAll(nextCounts);
+    _totalUnreadCount = nextCounts.values.fold<int>(
+      0,
+      (sum, value) => sum + value,
+    );
+    final childId = _monitoredChildId;
+    _unreadCount =
+        childId == null ? _totalUnreadCount : unreadCountForChild(childId);
   }
 
   Future<bool> loadAlerts(
@@ -81,7 +135,7 @@ class AlertProvider with ChangeNotifier {
 
     try {
       final alerts = await _fetchAlerts(childId);
-      _applyAlerts(alerts);
+      _applyAlerts(alerts, childId: childId);
       _isLoading = false;
       notifyListeners();
       return true;
@@ -95,14 +149,39 @@ class AlertProvider with ChangeNotifier {
 
   Future<bool> getUnreadCount(String childId) async {
     try {
-      final response = await _apiService.getUnreadAlertsCount(childId);
-      _unreadCount = response['count'] ?? 0;
+      final normalizedChildId = childId.trim();
+      if (normalizedChildId.isNotEmpty &&
+          normalizedChildId == _monitoredChildId) {
+        _setUnreadCountForChild(
+          normalizedChildId,
+          _alerts.where((alert) => !alert.isRead).length,
+        );
+      } else {
+        final alerts = await _fetchAlerts(normalizedChildId);
+        _setUnreadCountForChild(
+          normalizedChildId,
+          alerts.where((alert) => !alert.isRead).length,
+        );
+      }
+      _unreadCount = unreadCountForChild(normalizedChildId);
       notifyListeners();
       return true;
     } catch (error) {
       _error = error.toString();
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<void> _reloadForegroundMonitoring() async {
+    final childId = _monitoredChildId;
+    if (childId == null) {
+      return;
+    }
+
+    await loadAlerts(childId, showLoader: false);
+    if (_error == null) {
+      await _ensureForegroundLiveAlertListener();
     }
   }
 
@@ -145,7 +224,11 @@ class AlertProvider with ChangeNotifier {
     if (_monitoredChildId == null) {
       unawaited(_stopLiveAlertListener());
       _knownAlertIds.clear();
+      clearAlerts();
+      return;
     }
+
+    unawaited(_reloadForegroundMonitoring());
   }
 
   Future<void> syncBackgroundMonitoring({
@@ -183,6 +266,12 @@ class AlertProvider with ChangeNotifier {
     _backgroundLiveAlertSubscription = null;
     _backgroundLiveAlertPath = null;
     _backgroundKnownAlertIds.clear();
+    if (_monitoredChildId == null) {
+      _unreadCountsByChild.clear();
+      _totalUnreadCount = 0;
+      _unreadCount = 0;
+      notifyListeners();
+    }
 
     debugPrint('[AlertProvider.background] stop owner=$ownerId remaining=0');
   }
@@ -214,6 +303,7 @@ class AlertProvider with ChangeNotifier {
 
   Future<FirebaseDatabase> _database() async {
     await FirebaseBootstrap.ensureInitialized();
+    await RealtimeDatabaseAuthService.ensureSignedIn();
     return FirebaseDatabase.instanceFor(
       app: Firebase.app(),
       databaseURL: AppConstants.firebaseDatabaseUrl,
@@ -243,12 +333,13 @@ class AlertProvider with ChangeNotifier {
   }
 
   Future<void> _ensureForegroundLiveAlertListener() async {
-    final scope = await _resolveLiveAlertScope();
-    if (scope == null) {
+    final childId = _monitoredChildId?.trim() ?? '';
+    if (childId.isEmpty) {
       return;
     }
 
-    if (_liveAlertSubscription != null && _liveAlertPath == scope.path) {
+    final path = _childAlertsPath(childId);
+    if (_liveAlertSubscription != null && _liveAlertPath == path) {
       return;
     }
 
@@ -256,45 +347,51 @@ class AlertProvider with ChangeNotifier {
 
     try {
       final database = await _database();
-      final ref = database.ref(scope.path);
-      _liveAlertPath = scope.path;
-      _knownAlertIds.clear();
-      await _primeKnownAlertIds(ref, _knownAlertIds, label: 'live');
+      final ref = database.ref(path);
+      _liveAlertPath = path;
+      _knownAlertIds
+        ..clear()
+        ..addAll(
+          _alerts
+              .where((alert) => alert.childId == childId)
+              .map((alert) => alert.id),
+        );
 
       debugPrint(
-        '[AlertProvider.live] listening role=${scope.role} userId=${scope.userId} rtdbPath=/${scope.path}',
+        '[AlertProvider.live] listening childId=$childId rtdbPath=/$path',
       );
 
-      _liveAlertSubscription = ref.onChildAdded.listen(
+      _liveAlertSubscription = ref.onValue.listen(
         (event) {
-          final alert = _alertFromLivePayload(
-            rawKey: event.snapshot.key,
+          final previousIds = Set<String>.from(_knownAlertIds);
+          final alerts = _alertsFromRealtimePayload(
             rawValue: event.snapshot.value,
+            childIdFallback: childId,
           );
-          if (alert == null) {
-            return;
-          }
+          final newAlerts =
+              alerts.where((alert) => !previousIds.contains(alert.id)).toList();
 
-          if (!_knownAlertIds.add(alert.id)) {
+          _knownAlertIds
+            ..clear()
+            ..addAll(alerts.map((alert) => alert.id));
+          _applyAlerts(alerts, childId: childId);
+          notifyListeners();
+
+          for (final alert in newAlerts) {
             debugPrint(
-              '[AlertProvider.live] skipped duplicate alert=${alert.id}',
+              '[AlertProvider.live] received alert=${alert.id} type=${alert.type} child=${alert.childId}',
             );
-            return;
+            unawaited(_handleRealtimeAlert(alert, playSound: true));
           }
-
-          debugPrint(
-            '[AlertProvider.live] received alert=${alert.id} type=${alert.type} child=${alert.childId}',
-          );
-          unawaited(_handleRealtimeAlert(alert, scope: scope, refreshList: true));
         },
         onError: (error) {
           debugPrint(
-            '[AlertProvider.live] listener error path=/${scope.path} error=$error',
+            '[AlertProvider.live] listener error path=/$path error=$error',
           );
         },
       );
     } catch (error) {
-      debugPrint('[AlertProvider.live] failed path=/${scope.path} error=$error');
+      debugPrint('[AlertProvider.live] failed path=/$path error=$error');
     }
   }
 
@@ -328,33 +425,36 @@ class AlertProvider with ChangeNotifier {
         '[AlertProvider.background] listening role=${scope.role} userId=${scope.userId} rtdbPath=/${scope.path}',
       );
 
-      _backgroundLiveAlertSubscription = ref.onChildAdded.listen(
+      _backgroundLiveAlertSubscription = ref.onValue.listen(
         (event) {
-          final alert = _alertFromLivePayload(
-            rawKey: event.snapshot.key,
+          final activeChildIds = _backgroundMonitorOwners.values
+              .expand((childSet) => childSet)
+              .toSet();
+          final previousIds = Set<String>.from(_backgroundKnownAlertIds);
+          final alerts = _alertsFromRealtimePayload(
             rawValue: event.snapshot.value,
-          );
-          if (alert == null) {
-            return;
-          }
+            childIdFallback: '',
+          ).where((alert) {
+            if (activeChildIds.isEmpty || alert.childId.isEmpty) {
+              return true;
+            }
+            return activeChildIds.contains(alert.childId);
+          }).toList();
+          final newAlerts =
+              alerts.where((alert) => !previousIds.contains(alert.id)).toList();
 
-          if (!_backgroundKnownAlertIds.add(alert.id)) {
+          _backgroundKnownAlertIds
+            ..clear()
+            ..addAll(alerts.map((alert) => alert.id));
+          _applyAggregateAlerts(alerts);
+          notifyListeners();
+
+          for (final alert in newAlerts) {
             debugPrint(
-              '[AlertProvider.background] skipped duplicate alert=${alert.id}',
+              '[AlertProvider.background] received alert=${alert.id} type=${alert.type} child=${alert.childId}',
             );
-            return;
+            unawaited(_handleRealtimeAlert(alert, playSound: !scope.isAdmin));
           }
-
-          debugPrint(
-            '[AlertProvider.background] received alert=${alert.id} type=${alert.type} child=${alert.childId}',
-          );
-          unawaited(
-            _handleRealtimeAlert(
-              alert,
-              scope: scope,
-              refreshList: false,
-            ),
-          );
         },
         onError: (error) {
           debugPrint(
@@ -378,35 +478,63 @@ class AlertProvider with ChangeNotifier {
   AlertModel? _alertFromLivePayload({
     required String? rawKey,
     required Object? rawValue,
+    String? childIdFallback,
   }) {
     final data = _asMap(rawValue);
     if (data.isEmpty) {
       return null;
     }
 
-    final createdAt = _parseInt(data['created_at']);
-    final type = (data['type'] ?? '').toString().trim();
-    if (type.isEmpty || createdAt <= 0) {
+    final createdAt = _parseInt(data['created_at']) > 0
+        ? _parseInt(data['created_at'])
+        : _parseInt(data['timestamp']);
+    final rawType = (data['type'] ?? '').toString().trim();
+    final type = rawType.isNotEmpty ? rawType : 'SOS';
+    if (createdAt <= 0) {
       return null;
     }
 
     final alertId =
         (data['alert_id'] ?? data['id'] ?? rawKey ?? '$type:$createdAt')
             .toString();
+    final isRead = data['is_read'] == true || data['isRead'] == true;
+    final status =
+        (data['status'] ?? (isRead ? 'read' : 'unread')).toString().trim();
 
     return AlertModel.fromJson({
       'id': alertId,
-      'child_id': (data['child_id'] ?? '').toString(),
+      'child_id': (data['child_id'] ?? childIdFallback ?? '').toString(),
       'child_name': (data['child_name'] ?? '').toString(),
       'type': type,
       'message': (data['message'] ?? '').toString(),
       'created_at': createdAt,
-      'status': (data['status'] ?? 'unread').toString(),
+      'status': status,
+      'is_read': isRead,
       'zone_name': data['zone_name'],
       'location_text': data['location_text'],
       'latitude': data['latitude'],
       'longitude': data['longitude'],
     });
+  }
+
+  List<AlertModel> _alertsFromRealtimePayload({
+    required Object? rawValue,
+    String? childIdFallback,
+  }) {
+    final data = _asMap(rawValue);
+    final alerts = data.entries
+        .map(
+          (entry) => _alertFromLivePayload(
+            rawKey: entry.key,
+            rawValue: entry.value,
+            childIdFallback: childIdFallback,
+          ),
+        )
+        .whereType<AlertModel>()
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    return alerts;
   }
 
   Map<String, dynamic> _asMap(Object? rawValue) {
@@ -437,9 +565,13 @@ class AlertProvider with ChangeNotifier {
 
   bool _isAudibleAlert(AlertModel alert) {
     switch (alert.type.trim().toUpperCase()) {
+      case 'SOS':
       case 'OUT_ZONE':
       case 'SAFE_ZONE_EXIT':
       case 'ZONE_EXIT':
+      case 'IN_ZONE':
+      case 'SAFE_ZONE_ENTER':
+      case 'ZONE_ENTER':
         return true;
       default:
         return false;
@@ -448,18 +580,11 @@ class AlertProvider with ChangeNotifier {
 
   Future<void> _handleRealtimeAlert(
     AlertModel alert, {
-    required _LiveAlertScope scope,
-    required bool refreshList,
+    required bool playSound,
   }) async {
-    if (refreshList &&
-        _monitoredChildId != null &&
-        _monitoredChildId == alert.childId) {
-      await loadAlerts(alert.childId, showLoader: false);
-    }
-
-    if (scope.isAdmin) {
+    if (!playSound) {
       debugPrint(
-        '[AlertProvider.monitor] sound skipped alert=${alert.id} reason=admin_scope',
+        '[AlertProvider.monitor] sound skipped alert=${alert.id} reason=playback_disabled',
       );
       return;
     }
@@ -478,30 +603,47 @@ class AlertProvider with ChangeNotifier {
       return;
     }
 
-    final fallbackBody = alert.message.trim().isNotEmpty
-        ? alert.message.trim()
-        : 'A child moved outside the configured safe zone.';
+    final type = alert.type.trim().toUpperCase();
+    final payload = 'alert:${alert.childId}:${alert.id}';
+
+    if (type == 'SOS') {
+      await _notificationService.sendSosAlert(
+        alertId: alert.id,
+        childName: alert.childName,
+        body: alert.message,
+        payload: payload,
+      );
+      return;
+    }
+
+    if (type == 'IN_ZONE' ||
+        type == 'SAFE_ZONE_ENTER' ||
+        type == 'ZONE_ENTER') {
+      await _notificationService.sendSafeZoneEnterAlert(
+        alertId: alert.id,
+        childName: alert.childName,
+        body: alert.message,
+        payload: payload,
+      );
+      return;
+    }
 
     await _notificationService.sendSafeZoneExitAlert(
       alertId: alert.id,
-      childName: alert.childName.isNotEmpty ? alert.childName : null,
-      body: fallbackBody,
-      payload: alert.childId,
-    );
-
-    debugPrint(
-      '[AlertProvider.monitor] sound played alert=${alert.id} type=${alert.type}',
+      childName: alert.childName,
+      body: alert.message,
+      payload: payload,
     );
   }
 
   Future<bool> markAsRead(String alertId, String childId) async {
     try {
-      await _apiService.markAlertAsRead(alertId);
-      await loadAlerts(childId, showLoader: false);
+      await _apiService.markAlertAsRead(alertId, childId: childId);
+      await loadAlerts(childId);
       await getUnreadCount(childId);
       return true;
-    } catch (error) {
-      _error = error.toString();
+    } catch (e) {
+      _error = e.toString();
       notifyListeners();
       return false;
     }
@@ -510,11 +652,44 @@ class AlertProvider with ChangeNotifier {
   Future<bool> markAllAsRead(String childId) async {
     try {
       await _apiService.markAllAlertsAsRead(childId);
-      await loadAlerts(childId, showLoader: false);
+      await loadAlerts(childId);
       await getUnreadCount(childId);
       return true;
-    } catch (error) {
-      _error = error.toString();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteAlert(String alertId, String childId) async {
+    final previousAlerts = List<AlertModel>.from(_alerts);
+    try {
+      final normalizedChildId = childId.trim();
+      if (normalizedChildId.isNotEmpty) {
+        _alerts = _alerts.where((alert) => alert.id != alertId).toList();
+        _setUnreadCountForChild(
+          normalizedChildId,
+          _alerts
+              .where((alert) =>
+                  alert.childId == normalizedChildId && !alert.isRead)
+              .length,
+        );
+        _unreadCount = unreadCountForChild(normalizedChildId);
+        notifyListeners();
+      }
+
+      await _apiService.deleteAlert(alertId, childId: childId);
+      await loadAlerts(childId, showLoader: false);
+      return true;
+    } catch (e) {
+      _alerts = previousAlerts;
+      _setUnreadCountForChild(
+        childId,
+        previousAlerts.where((alert) => !alert.isRead).length,
+      );
+      _unreadCount = unreadCountForChild(childId);
+      _error = e.toString();
       notifyListeners();
       return false;
     }
@@ -522,7 +697,9 @@ class AlertProvider with ChangeNotifier {
 
   void clearAlerts() {
     _alerts = [];
-    _unreadCount = 0;
+    final childId = _monitoredChildId;
+    _unreadCount =
+        childId == null ? _totalUnreadCount : unreadCountForChild(childId);
     notifyListeners();
   }
 
@@ -533,8 +710,8 @@ class AlertProvider with ChangeNotifier {
 
   @override
   void dispose() {
-    unawaited(_stopLiveAlertListener());
-    unawaited(_backgroundLiveAlertSubscription?.cancel() ?? Future<void>.value());
+    _stopLiveAlertListener();
+    _backgroundLiveAlertSubscription?.cancel();
     super.dispose();
   }
 }

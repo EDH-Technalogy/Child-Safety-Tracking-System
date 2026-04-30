@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
-import '../providers/locale_provider.dart';
 import '../providers/child_provider.dart';
-import '../utils/photo_provider.dart';
+import '../providers/locale_provider.dart';
 import '../screens/alerts_screen.dart';
 import '../screens/location_history_screen.dart';
+import '../utils/photo_provider.dart';
+import 'animated_nav_item.dart';
 
-class AppDrawer extends StatelessWidget {
+class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
+
+  @override
+  State<AppDrawer> createState() => _AppDrawerState();
+}
+
+class _AppDrawerState extends State<AppDrawer> {
+  String? _hoveredItemKey;
 
   @override
   Widget build(BuildContext context) {
@@ -81,17 +90,23 @@ class AppDrawer extends StatelessWidget {
               ],
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.home),
-            title: Text(l10n.home),
+          AnimatedNavItem(
+            icon: Icons.home_rounded,
+            title: l10n.home,
+            isHovered: _hoveredItemKey == 'home',
+            isDimmed: _hoveredItemKey != null && _hoveredItemKey != 'home',
+            onHoverChanged: (value) => _handleHoverChanged('home', value),
             onTap: () {
               Navigator.pop(context);
               Navigator.pushReplacementNamed(context, '/home');
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.map),
-            title: Text(l10n.map),
+          AnimatedNavItem(
+            icon: Icons.travel_explore_rounded,
+            title: l10n.map,
+            isHovered: _hoveredItemKey == 'map',
+            isDimmed: _hoveredItemKey != null && _hoveredItemKey != 'map',
+            onHoverChanged: (value) => _handleHoverChanged('map', value),
             onTap: () {
               final childProvider =
                   Provider.of<ChildProvider>(context, listen: false);
@@ -109,16 +124,17 @@ class AppDrawer extends StatelessWidget {
               );
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.child_care),
-            title: Text(l10n.addChild),
+          AnimatedNavItem(
+            icon: Icons.person_add_alt_1_rounded,
+            title: l10n.addChild,
+            isHovered: _hoveredItemKey == 'add_child',
+            isDimmed: _hoveredItemKey != null && _hoveredItemKey != 'add_child',
+            onHoverChanged: (value) => _handleHoverChanged('add_child', value),
             onTap: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/add-child');
             },
           ),
-
-          // Monitoring Section
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
@@ -132,9 +148,10 @@ class AppDrawer extends StatelessWidget {
           ),
           _buildDrawerItem(
             context,
-            Icons.notifications,
-            l10n.alerts,
-            () {
+            itemKey: 'alerts',
+            icon: Icons.crisis_alert_rounded,
+            title: l10n.alerts,
+            onTap: () {
               final childProvider =
                   Provider.of<ChildProvider>(context, listen: false);
               Navigator.pop(context);
@@ -146,7 +163,10 @@ class AppDrawer extends StatelessWidget {
                 }
                 return;
               }
-              final firstChildId = childProvider.children.first.id;
+              final selectedChild = childProvider.selectedChild;
+              final firstChildId = (selectedChild?.id.trim() ?? '').isNotEmpty
+                  ? selectedChild!.id.trim()
+                  : childProvider.children.first.id;
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -157,9 +177,10 @@ class AppDrawer extends StatelessWidget {
           ),
           _buildDrawerItem(
             context,
-            Icons.history,
-            l10n.locationHistory,
-            () {
+            itemKey: 'history',
+            icon: Icons.timeline_rounded,
+            title: l10n.locationHistory,
+            onTap: () {
               final childProvider =
                   Provider.of<ChildProvider>(context, listen: false);
               Navigator.pop(context);
@@ -171,8 +192,8 @@ class AppDrawer extends StatelessWidget {
                 }
                 return;
               }
-              final child = childProvider.selectedChild ??
-                  childProvider.children.first;
+              final child =
+                  childProvider.selectedChild ?? childProvider.children.first;
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -185,38 +206,51 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           const Divider(),
-          ListTile(
-            leading: const Icon(Icons.language),
-            title: Text(l10n.language),
-            subtitle: Text(localeProvider.locale.languageCode == 'ps'
+          AnimatedNavItem(
+            icon: Icons.translate_rounded,
+            title: l10n.language,
+            subtitle: localeProvider.locale.languageCode == 'ps'
                 ? l10n.pashto
                 : localeProvider.locale.languageCode == 'fa'
                     ? l10n.dari
-                    : l10n.english),
+                    : l10n.english,
+            isHovered: _hoveredItemKey == 'language',
+            isDimmed: _hoveredItemKey != null && _hoveredItemKey != 'language',
+            onHoverChanged: (value) => _handleHoverChanged('language', value),
             onTap: () {
               _showLanguageDialog(context);
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: Text(l10n.settings),
+          AnimatedNavItem(
+            icon: Icons.settings_suggest_rounded,
+            title: l10n.settings,
+            isHovered: _hoveredItemKey == 'settings',
+            isDimmed: _hoveredItemKey != null && _hoveredItemKey != 'settings',
+            onHoverChanged: (value) => _handleHoverChanged('settings', value),
             onTap: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/settings');
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: Text(l10n.about),
+          AnimatedNavItem(
+            icon: Icons.info_rounded,
+            title: l10n.about,
+            isHovered: _hoveredItemKey == 'about',
+            isDimmed: _hoveredItemKey != null && _hoveredItemKey != 'about',
+            onHoverChanged: (value) => _handleHoverChanged('about', value),
             onTap: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/about');
             },
           ),
           const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: Text(l10n.logout, style: const TextStyle(color: Colors.red)),
+          AnimatedNavItem(
+            icon: Icons.logout_rounded,
+            title: l10n.logout,
+            isDanger: true,
+            isHovered: _hoveredItemKey == 'logout',
+            isDimmed: _hoveredItemKey != null && _hoveredItemKey != 'logout',
+            onHoverChanged: (value) => _handleHoverChanged('logout', value),
             onTap: () async {
               final authProvider =
                   Provider.of<AuthProvider>(context, listen: false);
@@ -235,19 +269,33 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
+  void _handleHoverChanged(String itemKey, bool isHovered) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (isHovered) {
+        _hoveredItemKey = itemKey;
+      } else if (_hoveredItemKey == itemKey) {
+        _hoveredItemKey = null;
+      }
+    });
+  }
+
   Widget _buildDrawerItem(
-    BuildContext context,
-    IconData icon,
-    String title,
-    VoidCallback onTap,
-  ) {
-    final Color itemColor = Colors.grey[700]!;
-    return ListTile(
-      leading: Icon(icon, color: itemColor),
-      title: Text(
-        title,
-        style: TextStyle(color: itemColor),
-      ),
+    BuildContext context, {
+    required String itemKey,
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return AnimatedNavItem(
+      icon: icon,
+      title: title,
+      isHovered: _hoveredItemKey == itemKey,
+      isDimmed: _hoveredItemKey != null && _hoveredItemKey != itemKey,
+      onHoverChanged: (value) => _handleHoverChanged(itemKey, value),
       onTap: onTap,
     );
   }

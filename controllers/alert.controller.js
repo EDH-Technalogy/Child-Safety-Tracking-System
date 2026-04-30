@@ -44,18 +44,128 @@ async function getAlertOrThrow(alertId) {
   return { alertRef, alertDoc };
 }
 
+function normalizeId(value) {
+  return value?.toString().trim() || "";
+}
+
+function requestChildId(req) {
+  return normalizeId(req.query?.child_id || req.body?.child_id);
+}
+
+function realtimeAlertMirrorUpdates(alertId, alertData = {}, childData = {}, value) {
+  const childId = normalizeId(alertData.child_id || childData.id);
+  const userId = normalizeId(alertData.user_id || childData.user_id);
+  const updates = {};
+
+  if (userId) {
+    updates[`alerts/${userId}/${alertId}`] = value;
+  }
+  if (childId) {
+    updates[`alerts_by_child/${childId}/${alertId}`] = value;
+    updates[`alerts_live/${childId}/${alertId}`] = value;
+  }
+  updates[`admin_alerts/${alertId}`] = value;
+
+  return updates;
+}
+
+async function resolveAlertMutationContext(req, alertId, { allowMissing = false } = {}) {
+  const normalizedAlertId = normalizeId(alertId);
+  if (!normalizedAlertId) {
+    throw createHttpError(400, "alert_id is required");
+  }
+
+  const alertRef = firestore.collection("alerts").doc(normalizedAlertId);
+  const alertDoc = await alertRef.get();
+
+  if (alertDoc.exists) {
+    const alertData = alertDoc.data() || {};
+    const { childDoc } = await getChildWithAccessOrThrow(req, alertData.child_id);
+    return {
+      alertId: normalizedAlertId,
+      alertRef,
+      alertDoc,
+      alertData,
+      childData: {
+        id: childDoc.id,
+        ...(childDoc.data() || {}),
+      },
+      existsInFirestore: true,
+      existsInRealtime: true,
+    };
+  }
+
+  const childId = requestChildId(req);
+  if (!childId) {
+    if (allowMissing) {
+      return {
+        alertId: normalizedAlertId,
+        alertRef,
+        alertDoc: null,
+        alertData: {},
+        childData: {},
+        existsInFirestore: false,
+        existsInRealtime: false,
+      };
+    }
+    throw createHttpError(404, "Alert not found");
+  }
+
+  const { childDoc } = await getChildWithAccessOrThrow(req, childId);
+  const liveSnapshot = await realtimeDB
+    .ref(`alerts_by_child/${childId}/${normalizedAlertId}`)
+    .once("value");
+  const liveData = liveSnapshot.val();
+
+  if (!liveSnapshot.exists() && !allowMissing) {
+    throw createHttpError(404, "Alert not found");
+  }
+
+  return {
+    alertId: normalizedAlertId,
+    alertRef,
+    alertDoc: null,
+    alertData: liveData && typeof liveData === "object"
+      ? {
+          ...liveData,
+          child_id: liveData.child_id || childId,
+          user_id: liveData.user_id || childDoc.data()?.user_id || "",
+        }
+      : {
+          child_id: childId,
+          user_id: childDoc.data()?.user_id || "",
+        },
+    childData: {
+      id: childDoc.id,
+      ...(childDoc.data() || {}),
+    },
+    existsInFirestore: false,
+    existsInRealtime: liveSnapshot.exists(),
+  };
+}
+
 async function syncRealtimeAlertStatus(alertId, alertData = {}, status = "read") {
   const childId = alertData.child_id?.toString().trim() || "";
   const userId = alertData.user_id?.toString().trim() || "";
   const updates = {};
+  const isRead = status === "read";
 
   if (userId) {
     updates[`alerts/${userId}/${alertId}/status`] = status;
+    updates[`alerts/${userId}/${alertId}/is_read`] = isRead;
+    updates[`alerts/${userId}/${alertId}/isRead`] = isRead;
   }
   if (childId) {
     updates[`alerts_by_child/${childId}/${alertId}/status`] = status;
+    updates[`alerts_by_child/${childId}/${alertId}/is_read`] = isRead;
+    updates[`alerts_by_child/${childId}/${alertId}/isRead`] = isRead;
+    updates[`alerts_live/${childId}/${alertId}/status`] = status;
+    updates[`alerts_live/${childId}/${alertId}/is_read`] = isRead;
+    updates[`alerts_live/${childId}/${alertId}/isRead`] = isRead;
   }
   updates[`admin_alerts/${alertId}/status`] = status;
+  updates[`admin_alerts/${alertId}/is_read`] = isRead;
+  updates[`admin_alerts/${alertId}/isRead`] = isRead;
 
   if (Object.keys(updates).length > 0) {
     await realtimeDB.ref().update(updates);
@@ -278,24 +388,30 @@ exports.getAlerts = async (req, res, next) => {
 
 exports.markAsRead = async (req, res, next) => {
   try {
-    const { alertRef, alertDoc } = await getAlertOrThrow(req.params.alert_id);
-    const alertData = alertDoc.data() || {};
+    const {
+      alertId,
+      alertRef,
+      alertData,
+      existsInFirestore,
+    } = await resolveAlertMutationContext(req, req.params.alert_id);
 
-    await getChildWithAccessOrThrow(req, alertData.child_id);
-
-    await alertRef.update({
-      status: "read",
-      updated_at: Date.now(),
-    });
-    await syncRealtimeAlertStatus(req.params.alert_id, alertData, "read");
+    if (existsInFirestore) {
+      await alertRef.update({
+        status: "read",
+        is_read: true,
+        isRead: true,
+        updated_at: Date.now(),
+      });
+    }
+    await syncRealtimeAlertStatus(alertId, alertData, "read");
 
     await logAlertEvent(req, {
       eventType: "alert_acknowledged",
       entityType: "alert",
-      entityId: req.params.alert_id,
+      entityId: alertId,
       title: "Alert acknowledged",
-      description: `Alert ${alertData.type || req.params.alert_id} was marked as read.`,
-      target: buildAlertTarget(req.params.alert_id, {
+      description: `Alert ${alertData.type || alertId} was marked as read.`,
+      target: buildAlertTarget(alertId, {
         ...alertData,
         status: "read",
       }),
@@ -475,7 +591,8 @@ exports.getUnreadCount = async (req, res, next) => {
 exports.markAllAsRead = async (req, res, next) => {
   try {
     const childId = req.params.child_id?.toString().trim();
-    await getChildWithAccessOrThrow(req, childId);
+    const { childDoc } = await getChildWithAccessOrThrow(req, childId);
+    const childData = childDoc.data() || {};
 
     const snap = await firestore
       .collection("alerts")
@@ -489,21 +606,73 @@ exports.markAllAsRead = async (req, res, next) => {
     unreadDocs.forEach((doc) => {
       batch.update(doc.ref, {
         status: "read",
+        is_read: true,
+        isRead: true,
         updated_at: Date.now(),
       });
     });
-    await batch.commit();
+    if (unreadDocs.length > 0) {
+      await batch.commit();
+    }
 
     const realtimeUpdates = {};
+    const affectedAlertIds = new Set(unreadDocs.map((doc) => doc.id));
+
     unreadDocs.forEach((doc) => {
       const alertData = doc.data() || {};
-      const userId = alertData.user_id?.toString().trim() || "";
+      const userId =
+        alertData.user_id?.toString().trim() ||
+        childData.user_id?.toString().trim() ||
+        "";
       if (userId) {
         realtimeUpdates[`alerts/${userId}/${doc.id}/status`] = "read";
+        realtimeUpdates[`alerts/${userId}/${doc.id}/is_read`] = true;
+        realtimeUpdates[`alerts/${userId}/${doc.id}/isRead`] = true;
       }
       realtimeUpdates[`alerts_by_child/${childId}/${doc.id}/status`] = "read";
+      realtimeUpdates[`alerts_by_child/${childId}/${doc.id}/is_read`] = true;
+      realtimeUpdates[`alerts_by_child/${childId}/${doc.id}/isRead`] = true;
+      realtimeUpdates[`alerts_live/${childId}/${doc.id}/status`] = "read";
+      realtimeUpdates[`alerts_live/${childId}/${doc.id}/is_read`] = true;
+      realtimeUpdates[`alerts_live/${childId}/${doc.id}/isRead`] = true;
       realtimeUpdates[`admin_alerts/${doc.id}/status`] = "read";
+      realtimeUpdates[`admin_alerts/${doc.id}/is_read`] = true;
+      realtimeUpdates[`admin_alerts/${doc.id}/isRead`] = true;
     });
+
+    const liveSnapshot = await realtimeDB.ref(`alerts_live/${childId}`).once("value");
+    const liveAlerts = liveSnapshot.val() || {};
+    Object.entries(liveAlerts).forEach(([alertId, rawAlert]) => {
+      const alertData = rawAlert && typeof rawAlert === "object" ? rawAlert : {};
+      const isUnread =
+        alertData.is_read !== true &&
+        alertData.isRead !== true &&
+        (alertData.status || "unread") !== "read";
+      if (!isUnread) {
+        return;
+      }
+
+      affectedAlertIds.add(alertId);
+      const userId =
+        alertData.user_id?.toString().trim() ||
+        childData.user_id?.toString().trim() ||
+        "";
+      if (userId) {
+        realtimeUpdates[`alerts/${userId}/${alertId}/status`] = "read";
+        realtimeUpdates[`alerts/${userId}/${alertId}/is_read`] = true;
+        realtimeUpdates[`alerts/${userId}/${alertId}/isRead`] = true;
+      }
+      realtimeUpdates[`alerts_by_child/${childId}/${alertId}/status`] = "read";
+      realtimeUpdates[`alerts_by_child/${childId}/${alertId}/is_read`] = true;
+      realtimeUpdates[`alerts_by_child/${childId}/${alertId}/isRead`] = true;
+      realtimeUpdates[`alerts_live/${childId}/${alertId}/status`] = "read";
+      realtimeUpdates[`alerts_live/${childId}/${alertId}/is_read`] = true;
+      realtimeUpdates[`alerts_live/${childId}/${alertId}/isRead`] = true;
+      realtimeUpdates[`admin_alerts/${alertId}/status`] = "read";
+      realtimeUpdates[`admin_alerts/${alertId}/is_read`] = true;
+      realtimeUpdates[`admin_alerts/${alertId}/isRead`] = true;
+    });
+
     if (Object.keys(realtimeUpdates).length > 0) {
       await realtimeDB.ref().update(realtimeUpdates);
     }
@@ -522,9 +691,9 @@ exports.markAllAsRead = async (req, res, next) => {
       result: "success",
       metadata: {
         child_id: childId,
-        affectedCount: unreadDocs.length,
+        affectedCount: affectedAlertIds.size,
         relatedIds: {
-          alertIds: unreadDocs.map((doc) => doc.id),
+          alertIds: Array.from(affectedAlertIds),
         },
       },
     });
@@ -538,6 +707,70 @@ exports.markAllAsRead = async (req, res, next) => {
       title: "Alert acknowledge failed",
       description: `Failed to mark all alerts as read for child ${req.params.child_id}.`,
       target: { child_id: req.params.child_id || null },
+      status: "failed",
+      result: "failed",
+      metadata: {
+        reason: error.message,
+      },
+    });
+    next(error);
+  }
+};
+
+exports.deleteAlert = async (req, res, next) => {
+  try {
+    const {
+      alertId,
+      alertRef,
+      alertData,
+      childData,
+      existsInFirestore,
+      existsInRealtime,
+    } = await resolveAlertMutationContext(req, req.params.alert_id, {
+      allowMissing: true,
+    });
+
+    if (!existsInFirestore && !existsInRealtime && !alertData.child_id) {
+      throw createHttpError(404, "Alert not found");
+    }
+
+    if (existsInFirestore) {
+      await alertRef.delete();
+    }
+
+    const realtimeUpdates = realtimeAlertMirrorUpdates(
+      alertId,
+      alertData,
+      childData,
+      null
+    );
+    if (Object.keys(realtimeUpdates).length > 0) {
+      await realtimeDB.ref().update(realtimeUpdates);
+    }
+
+    await logAlertEvent(req, {
+      eventType: "alert_deleted",
+      entityType: "alert",
+      entityId: alertId,
+      title: "Alert deleted",
+      description: `Alert ${alertData.type || alertId} was deleted.`,
+      target: buildAlertTarget(alertId, alertData),
+      status: "success",
+      result: "success",
+      metadata: {
+        oldValues: alertData,
+      },
+    });
+
+    res.json({ message: "Alert deleted successfully" });
+  } catch (error) {
+    await logAlertEvent(req, {
+      eventType: "alert_deleted",
+      entityType: "alert",
+      entityId: req.params.alert_id || null,
+      title: "Alert delete failed",
+      description: `Failed to delete alert ${req.params.alert_id}.`,
+      target: { id: req.params.alert_id || null },
       status: "failed",
       result: "failed",
       metadata: {

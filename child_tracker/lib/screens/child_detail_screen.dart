@@ -11,6 +11,7 @@ import '../providers/geofence_provider.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 import '../utils/timestamp_utils.dart';
+import '../widgets/google_map_guard.dart';
 
 class ChildDetailScreen extends StatefulWidget {
   final String childId;
@@ -256,6 +257,14 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     );
   }
 
+  Widget _buildWebMapUnavailableState() {
+    return const GoogleMapUnavailableState(
+      title: 'Map unavailable',
+      message:
+          'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+    );
+  }
+
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     _updateMarkers();
@@ -275,6 +284,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         actions: [
           Consumer<AlertProvider>(
             builder: (context, alertProvider, child) {
+              final unreadCount =
+                  alertProvider.unreadCountForChild(widget.childId);
               return Stack(
                 children: [
                   IconButton(
@@ -284,7 +295,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           arguments: widget.childId);
                     },
                   ),
-                  if (alertProvider.unreadCount > 0)
+                  if (unreadCount > 0)
                     Positioned(
                       right: 8,
                       top: 8,
@@ -295,7 +306,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Text(
-                          '${alertProvider.unreadCount}',
+                          '$unreadCount',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -454,18 +465,22 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                     child: Stack(
                       children: [
                         if (canRenderLiveMap)
-                          GoogleMap(
-                            onMapCreated: _onMapCreated,
-                            initialCameraPosition: CameraPosition(
-                              target: _getInitialPosition(),
-                              zoom: AppConstants.defaultZoom,
+                          GoogleMapAvailabilityGuard(
+                            mapBuilder: (_) => GoogleMap(
+                              onMapCreated: _onMapCreated,
+                              initialCameraPosition: CameraPosition(
+                                target: _getInitialPosition(),
+                                zoom: AppConstants.defaultZoom,
+                              ),
+                              markers: _markers,
+                              circles: _circles,
+                              myLocationEnabled: false,
+                              myLocationButtonEnabled: false,
+                              zoomControlsEnabled: false,
+                              mapToolbarEnabled: false,
                             ),
-                            markers: _markers,
-                            circles: _circles,
-                            myLocationEnabled: false,
-                            myLocationButtonEnabled: false,
-                            zoomControlsEnabled: false,
-                            mapToolbarEnabled: false,
+                            fallbackBuilder: (_) =>
+                                _buildWebMapUnavailableState(),
                           )
                         else
                           _buildUnavailableMapState(),

@@ -13,6 +13,7 @@ import '../models/geofence_model.dart';
 import '../models/location_model.dart';
 import 'add_safe_zone_screen.dart';
 import 'safe_zone_detail_screen.dart';
+import '../widgets/google_map_guard.dart';
 
 class SafeZonesScreen extends StatefulWidget {
   final String? childId;
@@ -268,22 +269,29 @@ class _SafeZonesScreenState extends State<SafeZonesScreen> {
           ),
           SizedBox(
             height: 240,
-            child: GoogleMap(
-              onMapCreated: (controller) {
-                _mapController = controller;
-              },
-              initialCameraPosition: CameraPosition(
-                target: LatLng(
-                  liveLocation.latitude,
-                  liveLocation.longitude,
+            child: GoogleMapAvailabilityGuard(
+              mapBuilder: (_) => GoogleMap(
+                onMapCreated: (controller) {
+                  _mapController = controller;
+                },
+                initialCameraPosition: CameraPosition(
+                  target: LatLng(
+                    liveLocation.latitude,
+                    liveLocation.longitude,
+                  ),
+                  zoom: AppConstants.defaultZoom,
                 ),
-                zoom: AppConstants.defaultZoom,
+                markers: markers,
+                circles: circles,
+                mapToolbarEnabled: false,
+                zoomControlsEnabled: false,
+                myLocationButtonEnabled: false,
               ),
-              markers: markers,
-              circles: circles,
-              mapToolbarEnabled: false,
-              zoomControlsEnabled: false,
-              myLocationButtonEnabled: false,
+              fallbackBuilder: (_) => const GoogleMapUnavailableState(
+                title: 'Map unavailable',
+                message:
+                    'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+              ),
             ),
           ),
           Padding(

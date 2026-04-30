@@ -612,8 +612,7 @@ class ApiService {
         queryParameters: timezoneOffsetMinutes == null
             ? null
             : {
-                'timezone_offset_minutes':
-                    timezoneOffsetMinutes.toString(),
+                'timezone_offset_minutes': timezoneOffsetMinutes.toString(),
               },
       );
       final response = await http.get(
@@ -644,8 +643,7 @@ class ApiService {
         queryParameters: timezoneOffsetMinutes == null
             ? null
             : {
-                'timezone_offset_minutes':
-                    timezoneOffsetMinutes.toString(),
+                'timezone_offset_minutes': timezoneOffsetMinutes.toString(),
               },
       );
       final response = await http.get(
@@ -684,10 +682,16 @@ class ApiService {
   }
 
   // Mark Alert as Read
-  Future<Map<String, dynamic>> markAlertAsRead(String alertId) async {
+  Future<Map<String, dynamic>> markAlertAsRead(
+    String alertId, {
+    String? childId,
+  }) async {
     try {
+      final query = childId == null
+          ? ''
+          : '?child_id=${Uri.encodeQueryComponent(childId)}';
       final response = await http.patch(
-        Uri.parse('$baseUrl${ApiConfig.alerts}/read/$alertId'),
+        Uri.parse('$baseUrl${ApiConfig.alerts}/read/$alertId$query'),
         headers: await _buildAuthHeaders(),
       );
 
@@ -734,6 +738,33 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Failed to get unread alerts count: $e');
+    }
+  }
+
+  // Delete Alert
+  Future<Map<String, dynamic>> deleteAlert(
+    String alertId, {
+    String? childId,
+  }) async {
+    try {
+      final query = childId == null
+          ? ''
+          : '?child_id=${Uri.encodeQueryComponent(childId)}';
+      final response = await http.delete(
+        Uri.parse('$baseUrl${ApiConfig.alerts}/$alertId$query'),
+        headers: await _buildAuthHeaders(),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (response.body.trim().isEmpty) {
+          return <String, dynamic>{};
+        }
+        return jsonDecode(response.body);
+      } else {
+        throw Exception(response.body);
+      }
+    } catch (e) {
+      throw Exception('Failed to delete alert: $e');
     }
   }
 
@@ -965,6 +996,24 @@ class ApiService {
   }
 
   // ==================== SUMMARY API ====================
+
+  // Get rolling last-24-hour summary
+  Future<Map<String, dynamic>> getLast24HourSummary(String childId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl${ApiConfig.summaries}/last-24-hours/$childId'),
+        headers: await _buildAuthHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception(response.body);
+      }
+    } catch (e) {
+      throw Exception('Failed to get last 24 hour summary: $e');
+    }
+  }
 
   // Get Today's Summary
   Future<Map<String, dynamic>> getTodaySummary(String childId) async {

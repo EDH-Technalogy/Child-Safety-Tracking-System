@@ -205,7 +205,12 @@ function buildStatusMetadata({
 }) {
   const trackingNodeMap = asMap(trackingNode);
   const childNodeMap = asMap(childNode);
-  const computedStatus = computeDeviceConnectivityStatus(liveTimestamp, now);
+  const statusNode = asMap(trackingNodeMap.status);
+  const heartbeatTimestamp =
+    normalizeEpochMillisecondsOrNull(statusNode.lastSeen) ??
+    normalizeEpochMillisecondsOrNull(statusNode.updatedAt) ??
+    liveTimestamp;
+  const computedStatus = computeDeviceConnectivityStatus(heartbeatTimestamp, now);
 
   const connection =
     asMap(trackingNodeMap.connection).status !== undefined
@@ -216,8 +221,23 @@ function buildStatusMetadata({
       ? asMap(trackingNodeMap.device_status)
       : asMap(childNodeMap.device_status);
   const childStatus = asMap(childNodeMap.child_status);
+  const explicitConnectionState =
+    statusNode.connectionState?.toString().trim().toLowerCase() ||
+    (statusNode.online === false
+      ? "offline"
+      : statusNode.online === true
+        ? "online"
+        : "");
+  const resolvedStatus =
+    explicitConnectionState === "offline"
+      ? "offline"
+      : computedStatus.status;
 
   const timestamps = [
+    normalizeEpochMillisecondsOrNull(statusNode.lastSeen),
+    normalizeEpochMillisecondsOrNull(statusNode.updatedAt),
+    normalizeEpochMillisecondsOrNull(statusNode.lastOfflineAt),
+    normalizeEpochMillisecondsOrNull(statusNode.lastOnlineAt),
     normalizeEpochMillisecondsOrNull(connection.updated_at),
     normalizeEpochMillisecondsOrNull(connection.time),
     normalizeEpochMillisecondsOrNull(deviceStatus.updated_at),
@@ -226,12 +246,15 @@ function buildStatusMetadata({
 
   return {
     raw: {
+      ...(Object.keys(statusNode).length > 0 ? { status: statusNode } : {}),
       ...(Object.keys(childStatus).length > 0 ? { child_status: childStatus } : {}),
       ...(Object.keys(deviceStatus).length > 0 ? { device_status: deviceStatus } : {}),
       ...(Object.keys(connection).length > 0 ? { connection } : {}),
     },
-    latestStatus: computedStatus.status,
+    latestStatus: resolvedStatus,
     rawLatestStatus:
+      statusNode.connectionState?.toString().trim() ||
+      statusNode.deviceStatus?.toString().trim() ||
       connection.status?.toString().trim() ||
       deviceStatus.status?.toString().trim() ||
       childStatus.status?.toString().trim() ||

@@ -4,6 +4,18 @@ const {
   buildDateKey,
   listChildLocationHistory,
 } = require("../utils/location-history");
+const {
+  readChildLogsBucket,
+  readConnectionEventsBucket,
+} = require("../utils/child-logs");
+const {
+  getTrackingContextForChild,
+  getResolvedLiveTrackingSnapshot,
+} = require("../utils/live-tracking");
+
+const LAST_24_HOURS_MS = 24 * 60 * 60 * 1000;
+// Ignore obvious GPS spikes that would imply implausible ground travel.
+const MAX_REASONABLE_SPEED_MPS = 120;
 
 async function listChildSummaryRecords(childId) {
   const snap = await firestore
@@ -25,6 +37,173 @@ async function listChildAlerts(childId) {
   const alerts = [];
   snap.forEach((doc) => alerts.push({ id: doc.id, ...doc.data() }));
   return alerts;
+}
+
+function isWithinWindow(timestamp, startTimestamp, endTimestamp) {
+  return (
+    Number.isFinite(Number(timestamp)) &&
+    Number(timestamp) >= startTimestamp &&
+    Number(timestamp) <= endTimestamp
+  );
+}
+
+function normalizeConnectionState(value) {
+  const normalized = value?.toString().trim().toLowerCase() || "";
+  if (normalized === "offline" || normalized === "disconnected") {
+    return "offline";
+  }
+
+  if (
+    normalized === "online" ||
+    normalized === "connected" ||
+    normalized === "active" ||
+    normalized === "delayed"
+  ) {
+    return "online";
+  }
+
+  return "unknown";
+}
+
+function uniqueDateKeys(...timestamps) {
+  return [...new Set(timestamps.map((value) => buildDateKey(value)))];
+}
+
+function dedupeById(items = [], idResolver) {
+  const seen = new Set();
+  const deduped = [];
+
+  items.forEach((item) => {
+    const key = idResolver(item);
+    if (!key || seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    deduped.push(item);
+  });
+
+  return deduped;
+}
+
+function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calculateDistanceKm(locations = []) {
+  const sortedLocations = [...locations].sort(
+    (a, b) => (a.recorded_at || 0) - (b.recorded_at || 0)
+  );
+
+  let totalMeters = 0;
+
+  for (let index = 1; index < sortedLocations.length; index += 1) {
+    const previous = sortedLocations[index - 1];
+    const current = sortedLocations[index];
+    const timeDeltaMs = (current.recorded_at || 0) - (previous.recorded_at || 0);
+
+    if (timeDeltaMs <= 0) {
+      continue;
+    }
+
+    const distanceMeters = calculateDistanceMeters(
+      previous.latitude,
+      previous.longitude,
+      current.latitude,
+      current.longitude
+    );
+    const speedMps = distanceMeters / (timeDeltaMs / 1000);
+    if (speedMps > MAX_REASONABLE_SPEED_MPS) {
+      continue;
+    }
+
+    totalMeters += distanceMeters;
+  }
+
+  return Number((totalMeters / 1000).toFixed(2));
+}
+
+async function loadLast24HourLocations(childId, dateKeys, startTimestamp, endTimestamp) {
+  const locationBuckets = await Promise.all(
+    dateKeys.map((dateKey) => listChildLocationHistory(childId, { dateKey }))
+  );
+
+  const locations = locationBuckets
+    .flatMap((bucket) => bucket)
+    .filter((entry) =>
+      isWithinWindow(entry.recorded_at || entry.timestamp, startTimestamp, endTimestamp)
+    )
+    .sort((a, b) => (a.recorded_at || 0) - (b.recorded_at || 0));
+
+  return dedupeById(
+    locations,
+    (entry) =>
+      [
+        entry.tracking_key || "",
+        entry.recorded_at || 0,
+        Number(entry.latitude || 0).toFixed(6),
+        Number(entry.longitude || 0).toFixed(6),
+      ].join("|")
+  );
+}
+
+async function loadLast24HourChildLogs(childId, dateKeys, startTimestamp, endTimestamp) {
+  const logBuckets = await Promise.all(
+    dateKeys.map((dateKey) => readChildLogsBucket(childId, dateKey))
+  );
+
+  const logs = logBuckets
+    .flatMap((bucket) => bucket)
+    .filter((log) => isWithinWindow(log.timestamp, startTimestamp, endTimestamp));
+
+  return dedupeById(
+    logs,
+    (log) => `${log.id || ""}|${log.type || ""}|${log.timestamp || 0}`
+  );
+}
+
+async function loadLast24HourConnectionEvents(
+  childId,
+  dateKeys,
+  startTimestamp,
+  endTimestamp
+) {
+  const eventBuckets = await Promise.all(
+    dateKeys.map((dateKey) => readConnectionEventsBucket(childId, dateKey))
+  );
+
+  const events = eventBuckets.flatMap((bucket) => bucket);
+  return dedupeById(
+    events.filter((event) => {
+      if (event.type === "DEVICE_DISCONNECTED") {
+        return isWithinWindow(
+          event.metadata?.disconnectedAt ?? event.timestamp,
+          startTimestamp,
+          endTimestamp
+        );
+      }
+
+      if (event.type === "DEVICE_RECONNECTED") {
+        return isWithinWindow(
+          event.metadata?.reconnectedAt ?? event.timestamp,
+          startTimestamp,
+          endTimestamp
+        );
+      }
+
+      return isWithinWindow(event.timestamp, startTimestamp, endTimestamp);
+    }),
+    (event) => event.metadata?.eventId || event.id || `${event.type}|${event.timestamp || 0}`
+  );
 }
 
 // Get Today's Summary
@@ -87,6 +266,72 @@ exports.weekly = async (req,res)=>{
     total_zone_exit_count: totalZoneExitCount,
     days_tracked: list.length
   });
+};
+
+exports.last24Hours = async (req, res, next) => {
+  try {
+    const childId = req.params.child_id?.toString().trim();
+    const { childDoc } = await getChildWithAccessOrThrow(req, childId);
+    const childData = childDoc.data() || {};
+    const now = Date.now();
+    const fromTime = now - LAST_24_HOURS_MS;
+    const dateKeys = uniqueDateKeys(fromTime, now);
+
+    const [trackingContext, liveSnapshot, locations, childLogs, connectionEvents] =
+      await Promise.all([
+        getTrackingContextForChild(childId),
+        getResolvedLiveTrackingSnapshot(childId),
+        loadLast24HourLocations(childId, dateKeys, fromTime, now),
+        loadLast24HourChildLogs(childId, dateKeys, fromTime, now),
+        loadLast24HourConnectionEvents(childId, dateKeys, fromTime, now),
+      ]);
+
+    const safeZoneExitCount = childLogs.filter(
+      (log) => log.type === "GEOFENCE_BREACH"
+    ).length;
+    const safeZoneReturnCount = childLogs.filter(
+      (log) => log.type === "GEOFENCE_RETURN"
+    ).length;
+    const deviceDisconnectCount =
+      connectionEvents.filter((event) => event.type === "DEVICE_DISCONNECTED")
+        .length ||
+      childLogs.filter((log) => log.type === "DEVICE_DISCONNECTED").length;
+    const deviceReconnectCount =
+      connectionEvents.filter((event) => event.type === "DEVICE_RECONNECTED")
+        .length ||
+      childLogs.filter((log) => log.type === "DEVICE_RECONNECTED").length;
+
+    const latestLocationFromWindow =
+      locations.length > 0 ? locations[locations.length - 1].recorded_at : null;
+    const liveLocationTimestamp =
+      liveSnapshot?.location?.recorded_at || liveSnapshot?.location?.timestamp || null;
+    const lastLocationUpdateAt =
+      [liveLocationTimestamp, latestLocationFromWindow]
+        .filter((value) => Number.isFinite(Number(value)))
+        .sort((a, b) => Number(b) - Number(a))[0] ??
+      liveSnapshot?.latestTimestamp ??
+      null;
+
+    res.json({
+      childId,
+      childName: childData.name?.toString().trim() || "",
+      parentUserId: childData.user_id?.toString().trim() || "",
+      trackingKey: trackingContext?.trackingKey?.toString().trim() || "",
+      fromTime,
+      toTime: now,
+      distanceKm: calculateDistanceKm(locations),
+      locationPointsCount: locations.length,
+      safeZoneExitCount,
+      safeZoneReturnCount,
+      deviceDisconnectCount,
+      deviceReconnectCount,
+      lastLocationUpdateAt,
+      currentConnectionState: normalizeConnectionState(liveSnapshot?.latestStatus),
+      generatedAt: now,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // Get SOS Count
@@ -203,9 +448,5 @@ exports.generateDailySummary = async (req,res)=>{
 };
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return calculateDistanceMeters(lat1, lon1, lat2, lon2);
 }

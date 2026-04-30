@@ -110,7 +110,8 @@ class RouteDataModel {
       lastLocationTime: TimestampUtils.normalizeEpochMilliseconds(
               json['last_location_time']) ??
           0,
-      totalDistanceMeters: LocationModel._parseInt(json['total_distance_meters']),
+      totalDistanceMeters:
+          LocationModel._parseInt(json['total_distance_meters']),
       totalDistanceKm: json['total_distance_km'] ?? '0',
       locationCount: LocationModel._parseInt(json['location_count']),
       eventCount: LocationModel._parseInt(json['event_count']),
@@ -152,8 +153,14 @@ class HistoryEventModel {
   final String childId;
   final String trackingKey;
   final String parentUserId;
+  final String title;
   final String message;
+  final double? latitude;
+  final double? longitude;
+  final double? accuracy;
   final int timestamp;
+  final int createdAt;
+  final String dateKey;
   final Map<String, dynamic> metadata;
 
   const HistoryEventModel({
@@ -162,12 +169,23 @@ class HistoryEventModel {
     required this.childId,
     required this.trackingKey,
     required this.parentUserId,
+    required this.title,
     required this.message,
+    required this.latitude,
+    required this.longitude,
+    required this.accuracy,
     required this.timestamp,
+    required this.createdAt,
+    required this.dateKey,
     required this.metadata,
   });
 
   factory HistoryEventModel.fromJson(Map<String, dynamic> json) {
+    final metadata = json['metadata'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['metadata'] as Map<String, dynamic>)
+        : json['metadata'] is Map
+            ? Map<String, dynamic>.from(json['metadata'] as Map)
+            : <String, dynamic>{};
     return HistoryEventModel(
       id: (json['id'] ?? '').toString(),
       type: (json['type'] ?? '').toString(),
@@ -176,17 +194,44 @@ class HistoryEventModel {
           (json['trackingKey'] ?? json['tracking_key'] ?? '').toString(),
       parentUserId:
           (json['parentUserId'] ?? json['parent_user_id'] ?? '').toString(),
+      title: (json['title'] ?? json['eventTitle'] ?? json['type'] ?? '')
+          .toString(),
       message: (json['message'] ?? '').toString(),
-      timestamp:
-          TimestampUtils.normalizeEpochMilliseconds(
-                json['timestamp'] ?? json['createdAt'] ?? json['created_at'],
-              ) ??
-              0,
-      metadata: json['metadata'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(json['metadata'] as Map<String, dynamic>)
-          : json['metadata'] is Map
-              ? Map<String, dynamic>.from(json['metadata'] as Map)
-              : <String, dynamic>{},
+      latitude: _parseNullableDouble(
+        json['latitude'] ??
+            json['lat'] ??
+            metadata['reconnectedLat'] ??
+            metadata['lastKnownLat'],
+      ),
+      longitude: _parseNullableDouble(
+        json['longitude'] ??
+            json['lng'] ??
+            metadata['reconnectedLng'] ??
+            metadata['lastKnownLng'],
+      ),
+      accuracy: _parseNullableDouble(
+        json['accuracy'] ??
+            metadata['reconnectedAccuracy'] ??
+            metadata['lastKnownAccuracy'],
+      ),
+      timestamp: TimestampUtils.normalizeEpochMilliseconds(
+            json['timestamp'] ?? json['createdAt'] ?? json['created_at'],
+          ) ??
+          0,
+      createdAt: TimestampUtils.normalizeEpochMilliseconds(
+            json['createdAt'] ?? json['created_at'] ?? json['timestamp'],
+          ) ??
+          0,
+      dateKey: (json['dateKey'] ?? json['date_key'] ?? '').toString(),
+      metadata: metadata,
     );
+  }
+
+  static double? _parseNullableDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '');
   }
 }

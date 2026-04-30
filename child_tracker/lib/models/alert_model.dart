@@ -29,17 +29,19 @@ class AlertModel {
 
   factory AlertModel.fromJson(Map<String, dynamic> json) {
     final status = (json['status'] ?? '').toString().toLowerCase();
+    final normalizedCreatedAt =
+        TimestampUtils.normalizeEpochMilliseconds(json['created_at']) ??
+            TimestampUtils.normalizeEpochMilliseconds(json['timestamp']) ??
+            0;
     return AlertModel(
       id: (json['id'] ?? '').toString(),
       childId: (json['child_id'] ?? '').toString(),
       childName: (json['child_name'] ?? '').toString(),
       type: (json['type'] ?? '').toString(),
       message: (json['message'] ?? '').toString(),
-      createdAt: TimestampUtils.normalizeEpochMilliseconds(
-            json['created_at'],
-          ) ??
-          0,
-      isRead: json['is_read'] == true || status == 'read',
+      createdAt: normalizedCreatedAt,
+      isRead:
+          json['is_read'] == true || json['isRead'] == true || status == 'read',
       zoneName: json['zone_name']?.toString(),
       locationText: json['location_text']?.toString(),
       latitude: json['latitude'] is num

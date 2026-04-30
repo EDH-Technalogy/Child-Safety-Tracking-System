@@ -1427,4 +1427,133 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get yearsOld => 'ساله';
+
+  @override
+  String get adminOverviewSubtitle =>
+      'نمای زنده و عملیاتی از وضعیت سیستم مدیریت';
+
+  @override
+  String get noDataAvailableYet => 'هنوز داده‌ای موجود نیست';
+
+  @override
+  String get dashboardPartialData =>
+      'بخشی از اطلاعات داشبورد بارگیری نشد. داده‌های موجود نمایش داده می‌شود.';
+
+  @override
+  String get systemStatus => 'وضعیت سیستم';
+
+  @override
+  String get chartsAndInsights => 'نمودارها و بینش‌ها';
+
+  @override
+  String get monitorUsersDevicesAlertsLocations =>
+      'کاربران، دستگاه‌ها، هشدارها و فعالیت مکانی را پایش کنید';
+
+  @override
+  String welcomeBackAdmin(Object name) {
+    return 'خوش برگشتید، $name';
+  }
+
+  @override
+  String get lastUpdated => 'آخرین به‌روزرسانی';
+
+  @override
+  String get refreshData => 'به‌روزرسانی داده‌ها';
+
+  @override
+  String get todayAlerts => 'هشدارهای امروز';
+
+  @override
+  String get safeZonesCount => 'تعداد مناطق امن';
+
+  @override
+  String get liveDeviceStatus => 'وضعیت زنده دستگاه‌ها';
+
+  @override
+  String get latestAlertVolume => 'حجم اخیر هشدارها';
+
+  @override
+  String get totalParentsNormalUsers => 'والدین / کاربران عادی';
+
+  @override
+  String get offlineDevices => 'دستگاه‌های آفلاین';
+
+  @override
+  String get vsYesterday => 'نسبت به دیروز';
+
+  @override
+  String get locationUpdates => 'به‌روزرسانی‌های موقعیت';
+
+  @override
+  String get recentActivity => 'فعالیت‌های اخیر';
+
+  @override
+  String get latestAuditEvents => 'آخرین رویدادهای حسابرسی و فعالیت';
+
+  @override
+  String get openCoreAdminAreas => 'بخش‌های اصلی مدیریت را باز کنید';
+
+  @override
+  String get usersActionSubtitle =>
+      'حساب‌ها، نقش‌ها و دسترسی کاربران را بررسی کنید';
+
+  @override
+  String get childrenActionSubtitle => 'پروفایل‌ها و تخصیص کودکان را باز کنید';
+
+  @override
+  String get devicesActionSubtitle => 'سلامت و تخصیص دستگاه‌ها را پایش کنید';
+
+  @override
+  String get viewMapActionSubtitle => 'نمایش پایش زنده روی نقشه';
+
+  @override
+  String get viewAlertsActionSubtitle => 'هشدارهای فعال و گذشته را بررسی کنید';
+
+  @override
+  String get viewReportsHistory => 'گزارش‌ها و تاریخچه';
+
+  @override
+  String get viewReportsActionSubtitle =>
+      'گزارش‌ها و تاریخچه سیستم را باز کنید';
+
+  @override
+  String get safeZonesActionSubtitle => 'مناطق امن تنظیم‌شده را بررسی کنید';
+
+  @override
+  String get usersByRole => 'کاربران بر اساس نقش';
+
+  @override
+  String get userRoleDistribution => 'توزیع حساب‌های والدین و مدیران';
+
+  @override
+  String get deviceStatusChart => 'وضعیت دستگاه‌ها';
+
+  @override
+  String get liveFleetHealth => 'سلامت زنده ناوگان بر اساس وضعیت اتصال';
+
+  @override
+  String get alertsByType => 'هشدارها بر اساس نوع';
+
+  @override
+  String get alertBreakdownAcrossThePlatform => 'تفکیک هشدارها در سراسر سامانه';
+
+  @override
+  String get locationUpdatesLast7Days =>
+      'حجم به‌روزرسانی موقعیت در ۷ روز گذشته';
+
+  @override
+  String get noAggregatedLocationData =>
+      'هیچ داده تجمیعی از موقعیت در دسترس نیست';
+
+  @override
+  String get allAccessibleSafeZones => 'همه مناطق امن قابل دسترسی';
+
+  @override
+  String get todayLocationUpdates => 'به‌روزرسانی‌های موقعیت امروز';
+
+  @override
+  String get last7Days => '۷ روز اخیر';
+
+  @override
+  String get geofenceBreachesToday => 'نقض‌های ژئوفنس امروز';
 }

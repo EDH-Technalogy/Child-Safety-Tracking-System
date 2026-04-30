@@ -278,6 +278,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         actions: [
           Consumer<AlertProvider>(
             builder: (context, alertProvider, child) {
+              final unreadCount =
+                  alertProvider.unreadCountForChild(widget.childId);
               return Stack(
                 children: [
                   IconButton(
@@ -287,7 +289,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           arguments: widget.childId);
                     },
                   ),
-                  if (alertProvider.unreadCount > 0)
+                  if (unreadCount > 0)
                     Positioned(
                       right: 8,
                       top: 8,
@@ -298,7 +300,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Text(
-                          '${alertProvider.unreadCount}',
+                          '$unreadCount',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,

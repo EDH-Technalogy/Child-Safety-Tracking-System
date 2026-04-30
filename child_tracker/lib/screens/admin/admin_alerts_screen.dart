@@ -1,7 +1,12 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import '../../services/admin_api_service.dart';
+import '../../services/realtime_database_auth_service.dart';
+import '../../utils/constants.dart';
+import '../../utils/firebase_bootstrap.dart';
 import '../../utils/localization_helpers.dart';
 import '../../utils/timestamp_utils.dart';
 import '../../widgets/admin_drawer.dart';
@@ -18,24 +23,64 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
   List<dynamic> _alerts = [];
   bool _isLoading = true;
   String? _error;
-  Timer? _refreshTimer;
+  StreamSubscription<DatabaseEvent>? _alertsSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadAlerts();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (!mounted || _isLoading) {
-        return;
-      }
-      _loadAlerts();
-    });
+    _startRealtimeAlerts();
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    unawaited(_alertsSubscription?.cancel() ?? Future<void>.value());
     super.dispose();
+  }
+
+  Future<FirebaseDatabase> _database() async {
+    await FirebaseBootstrap.ensureInitialized();
+    await RealtimeDatabaseAuthService.ensureSignedIn();
+    return FirebaseDatabase.instanceFor(
+      app: Firebase.app(),
+      databaseURL: AppConstants.firebaseDatabaseUrl,
+    );
+  }
+
+  Map<String, dynamic> _asMap(Object? rawValue) {
+    if (rawValue is Map<String, dynamic>) {
+      return rawValue;
+    }
+    if (rawValue is Map) {
+      return rawValue.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return const <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _parseAlerts(Object? rawValue) {
+    final data = _asMap(rawValue);
+    final alerts = data.entries.map((entry) {
+      final item = _asMap(entry.value);
+      final createdAt =
+          TimestampUtils.normalizeEpochMilliseconds(item['created_at']) ??
+              TimestampUtils.normalizeEpochMilliseconds(item['timestamp']) ??
+              0;
+      return <String, dynamic>{
+        'id': (item['alert_id'] ?? item['id'] ?? entry.key).toString(),
+        'type': (item['type'] ?? 'SOS').toString(),
+        'message': (item['message'] ?? '').toString(),
+        'child_id': (item['child_id'] ?? '').toString(),
+        'child_name': (item['child_name'] ?? '').toString(),
+        'location_text': (item['location_text'] ?? '').toString(),
+        'zone_name': (item['zone_name'] ?? '').toString(),
+        'created_at': createdAt,
+      };
+    }).toList()
+      ..sort(
+        (a, b) => ((b['created_at'] as int?) ?? 0)
+            .compareTo((a['created_at'] as int?) ?? 0),
+      );
+
+    return alerts;
   }
 
   Future<void> _loadAlerts() async {
@@ -45,11 +90,53 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
     });
 
     try {
-      final alerts = await _adminApi.getAllAlerts();
+      final database = await _database();
+      final snapshot = await database.ref('admin_alerts').get();
+      final alerts = _parseAlerts(snapshot.value);
       setState(() {
         _alerts = alerts;
         _isLoading = false;
       });
+    } catch (e) {
+      setState(() {
+        _error = localizeErrorMessage(context.l10n, e);
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _startRealtimeAlerts() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final database = await _database();
+      final ref = database.ref('admin_alerts');
+      await _alertsSubscription?.cancel();
+      _alertsSubscription = ref.onValue.listen(
+        (event) {
+          final alerts = _parseAlerts(event.snapshot.value);
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _alerts = alerts;
+            _isLoading = false;
+            _error = null;
+          });
+        },
+        onError: (error) {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _error = localizeErrorMessage(context.l10n, error);
+            _isLoading = false;
+          });
+        },
+      );
     } catch (e) {
       setState(() {
         _error = localizeErrorMessage(context.l10n, e);
@@ -230,6 +317,10 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
         return Colors.orange;
       case 'LOW_BATTERY':
         return Colors.yellow.shade700;
+      case 'DEVICE_DISCONNECTED':
+        return Colors.blueGrey;
+      case 'DEVICE_RECONNECTED':
+        return Colors.green;
       default:
         return Colors.blue;
     }
@@ -244,6 +335,10 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
         return Icons.location_off;
       case 'LOW_BATTERY':
         return Icons.battery_alert;
+      case 'DEVICE_DISCONNECTED':
+        return Icons.portable_wifi_off;
+      case 'DEVICE_RECONNECTED':
+        return Icons.wifi;
       default:
         return Icons.notifications;
     }

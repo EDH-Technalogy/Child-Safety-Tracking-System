@@ -1390,8 +1390,21 @@ exports.getAllAlerts = async (req, res) => {
     const snap = await firestore.collection("alerts")
       .orderBy("created_at", "desc")
       .get();
-    const list = [];
-    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+    const listById = new Map();
+    snap.forEach(d => listById.set(d.id, { id: d.id, ...d.data() }));
+
+    const adminAlertsSnapshot = await realtimeDB.ref("admin_alerts").once("value");
+    const adminAlerts = adminAlertsSnapshot.val() || {};
+    Object.entries(adminAlerts).forEach(([id, value]) => {
+      if (value && typeof value === "object" && !listById.has(id)) {
+        listById.set(id, { id, ...value });
+      }
+    });
+
+    const list = Array.from(listById.values()).sort(
+      (a, b) => Number(b.created_at || b.timestamp || 0) -
+        Number(a.created_at || a.timestamp || 0)
+    );
     res.json(list);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1401,37 +1414,50 @@ exports.getAllAlerts = async (req, res) => {
 // ==================== DELETE ALERT ====================
 exports.deleteAlert = async (req, res) => {
   try {
-    const alertRef = firestore.collection("alerts").doc(req.params.id);
-    const alertDoc = await alertRef.get();
-
-    if (!alertDoc.exists) {
-      return res.status(404).json({ error: "Alert not found" });
+    const alertId = req.params.id?.toString().trim();
+    if (!alertId) {
+      throw createHttpError(400, "Alert id is required");
     }
 
-    const alertData = alertDoc.data();
-    await alertRef.delete();
+    const alertRef = firestore.collection("alerts").doc(alertId);
+    const alertDoc = await alertRef.get();
+    const adminAlertSnapshot = await realtimeDB
+      .ref(`admin_alerts/${alertId}`)
+      .once("value");
+
+    if (!alertDoc.exists && !adminAlertSnapshot.exists()) {
+      return res.json({ message: "Alert already deleted" });
+    }
+
+    const alertData = alertDoc.exists
+      ? alertDoc.data()
+      : adminAlertSnapshot.val() || {};
+    if (alertDoc.exists) {
+      await alertRef.delete();
+    }
     const realtimeAlertUpdates = {
-      [`admin_alerts/${req.params.id}`]: null,
+      [`admin_alerts/${alertId}`]: null,
     };
     if (alertData.user_id) {
-      realtimeAlertUpdates[`alerts/${alertData.user_id}/${req.params.id}`] =
-        null;
+      realtimeAlertUpdates[`alerts/${alertData.user_id}/${alertId}`] = null;
     }
     if (alertData.child_id) {
       realtimeAlertUpdates[
-        `alerts_by_child/${alertData.child_id}/${req.params.id}`
+        `alerts_by_child/${alertData.child_id}/${alertId}`
       ] = null;
+      realtimeAlertUpdates[`alerts_live/${alertData.child_id}/${alertId}`] =
+        null;
     }
     await realtimeDB.ref().update(realtimeAlertUpdates);
 
     await logAdminAudit(req, {
       eventType: "alert_resolved",
       entityType: "alert",
-      entityId: req.params.id,
+      entityId: alertId,
       title: "Alert resolved",
       description: `Alert ${alertData.type || "alert"} was resolved and removed.`,
       target: {
-        id: req.params.id,
+        id: alertId,
         child_id: alertData.child_id || null,
         type: alertData.type || null,
       },

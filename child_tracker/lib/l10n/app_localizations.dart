@@ -2835,6 +2835,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'years old'**
   String get yearsOld;
+
+  /// No description provided for @adminOverviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live operational overview for the admin system'**
+  String get adminOverviewSubtitle;
+
+  /// No description provided for @noDataAvailableYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No data available yet'**
+  String get noDataAvailableYet;
+
+  /// No description provided for @dashboardPartialData.
+  ///
+  /// In en, this message translates to:
+  /// **'Some dashboard sections could not be loaded. Available data is still shown.'**
+  String get dashboardPartialData;
+
+  /// No description provided for @systemStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'System Status'**
+  String get systemStatus;
+
+  /// No description provided for @chartsAndInsights.
+  ///
+  /// In en, this message translates to:
+  /// **'Charts & Insights'**
+  String get chartsAndInsights;
+
+  /// No description provided for @monitorUsersDevicesAlertsLocations.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitor users, devices, alerts, and location activity'**
+  String get monitorUsersDevicesAlertsLocations;
+
+  /// No description provided for @welcomeBackAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back, {name}'**
+  String welcomeBackAdmin(Object name);
+
+  /// No description provided for @lastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated'**
+  String get lastUpdated;
+
+  /// No description provided for @refreshData.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh data'**
+  String get refreshData;
+
+  /// No description provided for @todayAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s Alerts'**
+  String get todayAlerts;
+
+  /// No description provided for @safeZonesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe Zones'**
+  String get safeZonesCount;
+
+  /// No description provided for @liveDeviceStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Live device status'**
+  String get liveDeviceStatus;
+
+  /// No description provided for @latestAlertVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest alert volume'**
+  String get latestAlertVolume;
+
+  /// No description provided for @totalParentsNormalUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Parent / Normal Users'**
+  String get totalParentsNormalUsers;
+
+  /// No description provided for @offlineDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Devices'**
+  String get offlineDevices;
+
+  /// No description provided for @vsYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'vs yesterday'**
+  String get vsYesterday;
+
+  /// No description provided for @locationUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Location Updates'**
+  String get locationUpdates;
+
+  /// No description provided for @recentActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Activity'**
+  String get recentActivity;
+
+  /// No description provided for @latestAuditEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest audit and activity events'**
+  String get latestAuditEvents;
+
+  /// No description provided for @openCoreAdminAreas.
+  ///
+  /// In en, this message translates to:
+  /// **'Open core admin areas'**
+  String get openCoreAdminAreas;
+
+  /// No description provided for @usersActionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review accounts, roles, and user access'**
+  String get usersActionSubtitle;
+
+  /// No description provided for @childrenActionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open child profiles and assignments'**
+  String get childrenActionSubtitle;
+
+  /// No description provided for @devicesActionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitor device health and assignments'**
+  String get devicesActionSubtitle;
+
+  /// No description provided for @viewMapActionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open live map monitoring'**
+  String get viewMapActionSubtitle;
+
+  /// No description provided for @viewAlertsActionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review active and historical alerts'**
+  String get viewAlertsActionSubtitle;
+
+  /// No description provided for @viewReportsHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports & History'**
+  String get viewReportsHistory;
+
+  /// No description provided for @viewReportsActionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open logs and historical reports'**
+  String get viewReportsActionSubtitle;
+
+  /// No description provided for @safeZonesActionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review configured safe zones'**
+  String get safeZonesActionSubtitle;
+
+  /// No description provided for @usersByRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Users by Role'**
+  String get usersByRole;
+
+  /// No description provided for @userRoleDistribution.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution of parent and admin accounts'**
+  String get userRoleDistribution;
+
+  /// No description provided for @deviceStatusChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Device Status'**
+  String get deviceStatusChart;
+
+  /// No description provided for @liveFleetHealth.
+  ///
+  /// In en, this message translates to:
+  /// **'Live fleet health by connection state'**
+  String get liveFleetHealth;
+
+  /// No description provided for @alertsByType.
+  ///
+  /// In en, this message translates to:
+  /// **'Alerts by Type'**
+  String get alertsByType;
+
+  /// No description provided for @alertBreakdownAcrossThePlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Alert breakdown across the platform'**
+  String get alertBreakdownAcrossThePlatform;
+
+  /// No description provided for @locationUpdatesLast7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Location update volume over the last 7 days'**
+  String get locationUpdatesLast7Days;
+
+  /// No description provided for @noAggregatedLocationData.
+  ///
+  /// In en, this message translates to:
+  /// **'No aggregated location data available'**
+  String get noAggregatedLocationData;
+
+  /// No description provided for @allAccessibleSafeZones.
+  ///
+  /// In en, this message translates to:
+  /// **'All accessible safe zones'**
+  String get allAccessibleSafeZones;
+
+  /// No description provided for @todayLocationUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s Location Updates'**
+  String get todayLocationUpdates;
+
+  /// No description provided for @last7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 Days'**
+  String get last7Days;
+
+  /// No description provided for @geofenceBreachesToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Geofence Breaches Today'**
+  String get geofenceBreachesToday;
 }
 
 class _AppLocalizationsDelegate
