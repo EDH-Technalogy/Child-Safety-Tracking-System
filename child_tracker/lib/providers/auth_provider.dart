@@ -223,6 +223,7 @@ class AuthProvider with ChangeNotifier {
     _error = null;
     SessionTokenStore.currentToken =
         normalizedToken.isNotEmpty ? normalizedToken : null;
+    RealtimeDatabaseAuthService.invalidateCachedSignIn();
     unawaited(SOSAlertDebugLogger.start());
 
     if (kDebugMode) {

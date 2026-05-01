@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../services/admin_api_service.dart';
 import '../../services/realtime_database_auth_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/firebase_bootstrap.dart';
@@ -18,10 +19,14 @@ class AdminAlertsScreen extends StatefulWidget {
 }
 
 class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
-  List<dynamic> _alerts = [];
+  final AdminApiService _adminApi = AdminApiService();
+  List<Map<String, dynamic>> _alerts = [];
+  List<Map<String, dynamic>> _liveAlerts = [];
+  List<Map<String, dynamic>> _adminAlerts = [];
   bool _isLoading = true;
   String? _error;
-  StreamSubscription<DatabaseEvent>? _alertsSubscription;
+  StreamSubscription<DatabaseEvent>? _liveAlertsSubscription;
+  StreamSubscription<DatabaseEvent>? _adminAlertsSubscription;
 
   @override
   void initState() {
@@ -31,7 +36,8 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
 
   @override
   void dispose() {
-    unawaited(_alertsSubscription?.cancel() ?? Future<void>.value());
+    unawaited(_liveAlertsSubscription?.cancel() ?? Future<void>.value());
+    unawaited(_adminAlertsSubscription?.cancel() ?? Future<void>.value());
     super.dispose();
   }
 
@@ -66,7 +72,10 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
         data.containsKey('is_read');
   }
 
-  List<Map<String, dynamic>> _parseAlerts(Object? rawValue) {
+  List<Map<String, dynamic>> _parseAlerts(
+    Object? rawValue, {
+    required String source,
+  }) {
     final data = _asMap(rawValue);
     final alerts = data.entries.where((entry) {
       final item = _asMap(entry.value);
@@ -86,6 +95,7 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
         'location_text': (item['location_text'] ?? '').toString(),
         'zone_name': (item['zone_name'] ?? '').toString(),
         'created_at': createdAt,
+        'source': source,
       };
     }).toList()
       ..sort(
@@ -96,6 +106,22 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
     return alerts;
   }
 
+  void _applyCombinedAlerts() {
+    final combined = <Map<String, dynamic>>[
+      ..._adminAlerts,
+      ..._liveAlerts,
+    ]..sort(
+        (a, b) => ((b['created_at'] as int?) ?? 0)
+            .compareTo((a['created_at'] as int?) ?? 0),
+      );
+
+    setState(() {
+      _alerts = combined;
+      _isLoading = false;
+      _error = null;
+    });
+  }
+
   Future<void> _loadAlerts() async {
     setState(() {
       _isLoading = true;
@@ -104,13 +130,26 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
 
     try {
       final database = await _database();
-      final snapshot = await database.ref('alerts_live').get();
-      final alerts = _parseAlerts(snapshot.value);
-      setState(() {
-        _alerts = alerts;
-        _isLoading = false;
-      });
+      final snapshots = await Future.wait([
+        database.ref('alerts_live').get(),
+        database.ref('admin_alerts').get(),
+      ]);
+      _liveAlerts = _parseAlerts(
+        snapshots[0].value,
+        source: 'alerts_live',
+      );
+      _adminAlerts = _parseAlerts(
+        snapshots[1].value,
+        source: 'admin_alerts',
+      );
+      if (!mounted) {
+        return;
+      }
+      _applyCombinedAlerts();
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _error = localizeErrorMessage(context.l10n, e);
         _isLoading = false;
@@ -126,19 +165,41 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
 
     try {
       final database = await _database();
-      final ref = database.ref('alerts_live');
-      await _alertsSubscription?.cancel();
-      _alertsSubscription = ref.onValue.listen(
+      await _liveAlertsSubscription?.cancel();
+      await _adminAlertsSubscription?.cancel();
+
+      _liveAlertsSubscription = database.ref('alerts_live').onValue.listen(
         (event) {
-          final alerts = _parseAlerts(event.snapshot.value);
+          if (!mounted) {
+            return;
+          }
+          _liveAlerts = _parseAlerts(
+            event.snapshot.value,
+            source: 'alerts_live',
+          );
+          _applyCombinedAlerts();
+        },
+        onError: (error) {
           if (!mounted) {
             return;
           }
           setState(() {
-            _alerts = alerts;
+            _error = localizeErrorMessage(context.l10n, error);
             _isLoading = false;
-            _error = null;
           });
+        },
+      );
+
+      _adminAlertsSubscription = database.ref('admin_alerts').onValue.listen(
+        (event) {
+          if (!mounted) {
+            return;
+          }
+          _adminAlerts = _parseAlerts(
+            event.snapshot.value,
+            source: 'admin_alerts',
+          );
+          _applyCombinedAlerts();
         },
         onError: (error) {
           if (!mounted) {
@@ -151,6 +212,9 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
         },
       );
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _error = localizeErrorMessage(context.l10n, e);
         _isLoading = false;
@@ -181,8 +245,16 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
 
     if (confirm == true) {
       try {
-        final database = await _database();
-        await database.ref('alerts_live/$alertId').remove();
+        final alert = _alerts.firstWhere(
+          (item) => item['id'] == alertId,
+          orElse: () => const <String, dynamic>{},
+        );
+        if (alert['source'] == 'alerts_live') {
+          final database = await _database();
+          await database.ref('alerts_live/$alertId').remove();
+        } else {
+          await _adminApi.deleteAlert(alertId);
+        }
         if (!mounted) {
           return;
         }

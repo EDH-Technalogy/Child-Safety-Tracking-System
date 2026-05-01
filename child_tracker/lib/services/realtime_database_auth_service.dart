@@ -18,6 +18,10 @@ class RealtimeDatabaseAuthService {
     return _signInFuture!;
   }
 
+  static void invalidateCachedSignIn() {
+    _signInFuture = null;
+  }
+
   static Future<void> reset() async {
     _signInFuture = null;
     try {
@@ -36,6 +40,7 @@ class RealtimeDatabaseAuthService {
     final expectedUid = prefs.getString(AppConstants.userIdKey) ?? '';
 
     if (appToken == null || appToken.isEmpty || expectedUid.isEmpty) {
+      _signInFuture = null;
       return;
     }
 
