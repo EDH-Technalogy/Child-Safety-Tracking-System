@@ -90,9 +90,6 @@ class AlertProvider with ChangeNotifier {
     String childId,
   ) async {
     final normalizedChildId = childId.trim();
-    if (normalizedChildId.isEmpty) {
-      return const <AlertModel>[];
-    }
 
     try {
       final snapshot = await database.ref('alerts_live').get();
@@ -105,21 +102,13 @@ class AlertProvider with ChangeNotifier {
           continue;
         }
 
-        final payloadChildId =
-            (alertData['child_id'] ?? alertData['childId'] ?? '')
-                .toString()
-                .trim();
-        if (payloadChildId.isNotEmpty && payloadChildId != normalizedChildId) {
-          continue;
-        }
-
         final alert = _alertFromLivePayload(
           rawKey: entry.key,
           rawValue: entry.value,
           childIdFallback: normalizedChildId,
         );
 
-        if (alert == null || alert.childId != normalizedChildId) {
+        if (alert == null) {
           continue;
         }
 
@@ -608,7 +597,7 @@ class AlertProvider with ChangeNotifier {
       childIdFallback: childId,
     );
 
-    if (alert == null || alert.childId != childId) {
+    if (alert == null) {
       return;
     }
 
