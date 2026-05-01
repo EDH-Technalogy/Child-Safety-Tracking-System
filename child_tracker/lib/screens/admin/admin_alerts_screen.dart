@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import '../../services/admin_api_service.dart';
 import '../../services/realtime_database_auth_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/firebase_bootstrap.dart';
@@ -19,7 +18,6 @@ class AdminAlertsScreen extends StatefulWidget {
 }
 
 class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
-  final AdminApiService _adminApi = AdminApiService();
   List<dynamic> _alerts = [];
   bool _isLoading = true;
   String? _error;
@@ -56,9 +54,24 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
     return const <String, dynamic>{};
   }
 
+  bool _looksLikeSingleAlertPayload(Map<String, dynamic> data) {
+    if (data.isEmpty) {
+      return false;
+    }
+
+    return data.containsKey('message') ||
+        data.containsKey('timestamp') ||
+        data.containsKey('created_at') ||
+        data.containsKey('isRead') ||
+        data.containsKey('is_read');
+  }
+
   List<Map<String, dynamic>> _parseAlerts(Object? rawValue) {
     final data = _asMap(rawValue);
-    final alerts = data.entries.map((entry) {
+    final alerts = data.entries.where((entry) {
+      final item = _asMap(entry.value);
+      return _looksLikeSingleAlertPayload(item);
+    }).map((entry) {
       final item = _asMap(entry.value);
       final createdAt =
           TimestampUtils.normalizeEpochMilliseconds(item['created_at']) ??
@@ -91,7 +104,7 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
 
     try {
       final database = await _database();
-      final snapshot = await database.ref('admin_alerts').get();
+      final snapshot = await database.ref('alerts_live').get();
       final alerts = _parseAlerts(snapshot.value);
       setState(() {
         _alerts = alerts;
@@ -113,7 +126,7 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
 
     try {
       final database = await _database();
-      final ref = database.ref('admin_alerts');
+      final ref = database.ref('alerts_live');
       await _alertsSubscription?.cancel();
       _alertsSubscription = ref.onValue.listen(
         (event) {
@@ -168,7 +181,8 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
 
     if (confirm == true) {
       try {
-        await _adminApi.deleteAlert(alertId);
+        final database = await _database();
+        await database.ref('alerts_live/$alertId').remove();
         if (!mounted) {
           return;
         }
