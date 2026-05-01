@@ -4,9 +4,14 @@ const {
   createAlertRecord,
 } = require("./alert-service");
 const { getChildOrThrow } = require("./child-access");
+const {
+  createSystemActor,
+  safeWriteAuditLogWithId,
+} = require("./audit-log");
 
 let isInitialized = false;
 let rootChildAddedHandler = null;
+let rootChildChangedHandler = null;
 let rootChildRemovedHandler = null;
 
 const childAlertListeners = new Map();
@@ -120,6 +125,42 @@ function alertTitle(type) {
     default:
       return "SOS Alert";
   }
+}
+
+async function logFlatRootAlert(snapshot) {
+  const alertId = normalizeAlertId(snapshot.key);
+  const payload = snapshot.val();
+  if (!alertId || !looksLikeSingleAlertPayload(payload)) {
+    return;
+  }
+
+  const data = isPlainObject(payload) ? payload : {};
+  const message = extractMessage(data);
+  const alertType = normalizeAlertType(data, message);
+  const createdAt = parseTimestamp(data.timestamp || data.created_at) || Date.now();
+
+  await safeWriteAuditLogWithId(`alert_received_${alertId}_${createdAt}`, {
+    eventType: "alert_received",
+    entityType: "alert",
+    entityId: alertId,
+    title: `${alertType} alert received`,
+    description: message || alertTitle(alertType),
+    performedBy: createSystemActor("Alert System"),
+    target: {
+      id: alertId,
+      type: "alerts_live",
+    },
+    status: "success",
+    source: "alerts_live",
+    metadata: {
+      alertId,
+      alertType,
+      message,
+      timestamp: createdAt,
+      rtdbPath: `alerts_live/${alertId}`,
+      raw: data,
+    },
+  });
 }
 
 function normalizeInitialStatus(payload = {}) {
@@ -405,7 +446,17 @@ function initSosAlertLiveListener() {
   const rootRef = realtimeDB.ref("alerts_live");
 
   rootChildAddedHandler = (snapshot) => {
+    void logFlatRootAlert(snapshot);
     console.info("[sos-alert-live-listener] direct Flutter path only", {
+      key: normalizeAlertId(snapshot.key),
+      path: `/alerts_live/${snapshot.key}`,
+      isFlatAlert: looksLikeSingleAlertPayload(snapshot.val()),
+    });
+  };
+
+  rootChildChangedHandler = (snapshot) => {
+    void logFlatRootAlert(snapshot);
+    console.info("[sos-alert-live-listener] direct Flutter path changed", {
       key: normalizeAlertId(snapshot.key),
       path: `/alerts_live/${snapshot.key}`,
       isFlatAlert: looksLikeSingleAlertPayload(snapshot.val()),
@@ -421,6 +472,7 @@ function initSosAlertLiveListener() {
   };
 
   rootRef.on("child_added", rootChildAddedHandler);
+  rootRef.on("child_changed", rootChildChangedHandler);
   rootRef.on("child_removed", rootChildRemovedHandler);
 
   console.info("[sos-alert-live-listener] initialized path=/alerts_live");

@@ -182,9 +182,56 @@ async function writeAuditLog({
   };
 }
 
+async function writeAuditLogWithId(id, entry) {
+  const normalizedId = id?.toString().trim().replace(/[^\w.-]/g, "_") || "";
+  if (!normalizedId) {
+    return writeAuditLog(entry);
+  }
+
+  const timestamp = Date.now();
+  const payload = {
+    eventType: entry.eventType,
+    entityType: entry.entityType,
+    entityId: entry.entityId ?? null,
+    title: entry.title,
+    description: entry.description,
+    performedBy: sanitizeAuditValue(entry.performedBy) || null,
+    target: sanitizeAuditValue(entry.target) || null,
+    status: entry.status || "success",
+    result: entry.result || entry.status || "success",
+    timestamp,
+    created_at: timestamp,
+    source: entry.source || "backend",
+    metadata: sanitizeAuditValue(entry.metadata) || {},
+    serverTimestamp: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  try {
+    await firestore.collection(AUDIT_LOG_COLLECTION).doc(normalizedId).create(payload);
+    return {
+      id: normalizedId,
+      ...payload,
+    };
+  } catch (error) {
+    if (error.code === 6 || error.code === "already-exists") {
+      return null;
+    }
+    throw error;
+  }
+}
+
 async function safeWriteAuditLog(entry) {
   try {
     return await writeAuditLog(entry);
+  } catch (error) {
+    console.error("[AUDIT_LOG_ERROR]", error.message || error);
+    return null;
+  }
+}
+
+async function safeWriteAuditLogWithId(id, entry) {
+  try {
+    return await writeAuditLogWithId(id, entry);
   } catch (error) {
     console.error("[AUDIT_LOG_ERROR]", error.message || error);
     return null;
@@ -201,5 +248,7 @@ module.exports = {
   normalizeAuditLogRecord,
   mapLegacyActivityLog,
   writeAuditLog,
+  writeAuditLogWithId,
   safeWriteAuditLog,
+  safeWriteAuditLogWithId,
 };

@@ -2,6 +2,10 @@ const { realtimeDB, firestore } = require("../firebase");
 const { createHttpError, getChildOrThrow } = require("./child-access");
 const { getTrackingContextForChild } = require("./live-tracking");
 const { appendChildLog, normalizeLogType } = require("./child-logs");
+const {
+  createSystemActor,
+  safeWriteAuditLogWithId,
+} = require("./audit-log");
 
 function isFiniteNumber(value) {
   return Number.isFinite(Number(value));
@@ -169,29 +173,62 @@ async function createAlertRecord({
   }
   await realtimeDB.ref().update(realtimeUpdates);
 
-  if (writeChildLog && !alreadyExists) {
+  if (!alreadyExists) {
     const trackingContext = await getTrackingContextForChild(childId);
     const resolvedTrackingKey =
       extraFields.tracking_key?.toString().trim() ||
       trackingContext?.trackingKey ||
       "";
-    const normalizedLogType = normalizeLogType(normalizedType);
-    await appendChildLog({
-      childId,
-      trackingKey: resolvedTrackingKey,
-      parentUserId: childData.user_id || "",
-      type: normalizedLogType,
-      message,
-      timestamp: time,
+
+    if (writeChildLog) {
+      const normalizedLogType = normalizeLogType(normalizedType);
+      await appendChildLog({
+        childId,
+        trackingKey: resolvedTrackingKey,
+        parentUserId: childData.user_id || "",
+        type: normalizedLogType,
+        message,
+        timestamp: time,
+        metadata: {
+          source: "alert_service",
+          alertId: resolvedAlertId,
+          zoneName,
+          locationText,
+          latitude: alertPayload.latitude,
+          longitude: alertPayload.longitude,
+          batteryLevel,
+          originalType: normalizedType,
+        },
+      });
+    }
+
+    await safeWriteAuditLogWithId(`alert_received_${resolvedAlertId}`, {
+      eventType: "alert_received",
+      entityType: "alert",
+      entityId: resolvedAlertId,
+      title: `${normalizedType} alert received`,
+      description: message,
+      performedBy: createSystemActor("Alert System"),
+      target: {
+        id: childId,
+        child_id: childId,
+        name: childData.name || "",
+        type: "child",
+      },
+      status: "success",
+      source: "alert_service",
       metadata: {
-        source: "alert_service",
         alertId: resolvedAlertId,
+        childId,
+        parentUserId: childData.user_id || "",
+        alertType: normalizedType,
         zoneName,
         locationText,
         latitude: alertPayload.latitude,
         longitude: alertPayload.longitude,
         batteryLevel,
-        originalType: normalizedType,
+        trackingKey: resolvedTrackingKey,
+        realtimePath: `admin_alerts/${resolvedAlertId}`,
       },
     });
   }
