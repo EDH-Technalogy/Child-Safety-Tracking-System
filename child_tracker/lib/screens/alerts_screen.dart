@@ -37,9 +37,17 @@ class _AlertsScreenState extends State<AlertsScreen> {
     if (!mounted) {
       return;
     }
-    if (alertProvider.unreadCount > 0) {
-      await alertProvider.markAllAsRead(widget.childId);
-    }
+
+    // Mark alerts as read AFTER the first frame renders so the user
+    // actually sees the unread alerts before the badge is cleared.
+    // Non-blocking — the API call runs in the background.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = Provider.of<AlertProvider>(context, listen: false);
+      if (provider.unreadCountForChild(widget.childId) > 0) {
+        provider.markAllAsRead(widget.childId);
+      }
+    });
   }
 
   Future<void> _refreshAlerts() async {

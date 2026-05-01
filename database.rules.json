@@ -19,11 +19,9 @@
       }
     },
     "alerts_live": {
-      "$childId": {
-        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_child').child($childId).child('user_id').val() == auth.uid)",
-        "$alertId": {
-          ".write": "(auth != null && auth.token.role == 'admin') || (!data.exists() && newData.exists() && root.child('device_registry_by_child').child($childId).exists() && newData.child('message').val() != null && newData.child('timestamp').val() != null && newData.child('isRead').val() != null)"
-        }
+      ".read": "auth != null",
+      "$alertId": {
+        ".write": "auth != null && (!newData.exists() || (newData.child('message').val() != null && newData.child('timestamp').val() != null))"
       }
     },
     "admin_alerts": {

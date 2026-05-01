@@ -36,6 +36,7 @@ class AlertProvider with ChangeNotifier {
   final Set<String> _knownAlertIds = <String>{};
   final Set<String> _backgroundKnownAlertIds = <String>{};
   final Set<String> _handledAlertIds = <String>{};
+  final Set<String> _rootSosAlertIds = <String>{};
   final Map<String, int> _unreadCountsByChild = <String, int>{};
 
   List<AlertModel> _alerts = [];
@@ -46,8 +47,15 @@ class AlertProvider with ChangeNotifier {
   String? _monitoredChildId;
   StreamSubscription<DatabaseEvent>? _liveAlertSubscription;
   StreamSubscription<DatabaseEvent>? _backgroundLiveAlertSubscription;
+  StreamSubscription<DatabaseEvent>? _liveAlertChangedSubscription;
+  StreamSubscription<DatabaseEvent>? _liveAlertRemovedSubscription;
+  StreamSubscription<DatabaseEvent>? _sosRootAlertSubscription;
+  StreamSubscription<DatabaseEvent>? _sosRootAlertChangedSubscription;
+  StreamSubscription<DatabaseEvent>? _sosRootAlertRemovedSubscription;
   String? _liveAlertPath;
   String? _backgroundLiveAlertPath;
+  String? _sosRootListeningChildId;
+  int _sosRootListenerStartedAt = 0;
 
   List<AlertModel> get alerts => _alerts;
   int get unreadCount => _unreadCount;
@@ -62,10 +70,82 @@ class AlertProvider with ChangeNotifier {
   Future<List<AlertModel>> _fetchAlerts(String childId) async {
     final database = await _database();
     final snapshot = await database.ref(_childAlertsPath(childId)).get();
-    return _alertsFromRealtimePayload(
+    final childAlerts = _alertsFromRealtimePayload(
       rawValue: snapshot.value,
       childIdFallback: childId,
     );
+    final rootSosAlerts = await _fetchRootSosAlertsForChild(
+      database,
+      childId,
+    );
+
+    return _mergeAndSortAlerts([
+      ...rootSosAlerts,
+      ...childAlerts,
+    ]);
+  }
+
+  Future<List<AlertModel>> _fetchRootSosAlertsForChild(
+    FirebaseDatabase database,
+    String childId,
+  ) async {
+    final normalizedChildId = childId.trim();
+    if (normalizedChildId.isEmpty) {
+      return const <AlertModel>[];
+    }
+
+    try {
+      final snapshot = await database.ref('alerts_live').get();
+      final data = _asMap(snapshot.value);
+      final alerts = <AlertModel>[];
+
+      for (final entry in data.entries) {
+        final alertData = _asMap(entry.value);
+        if (!_looksLikeSingleAlertPayload(alertData)) {
+          continue;
+        }
+
+        final payloadChildId =
+            (alertData['child_id'] ?? alertData['childId'] ?? '')
+                .toString()
+                .trim();
+        if (payloadChildId.isNotEmpty && payloadChildId != normalizedChildId) {
+          continue;
+        }
+
+        final alert = _alertFromLivePayload(
+          rawKey: entry.key,
+          rawValue: entry.value,
+          childIdFallback: normalizedChildId,
+        );
+
+        if (alert == null || alert.childId != normalizedChildId) {
+          continue;
+        }
+
+        _rootSosAlertIds.add(alert.id);
+        alerts.add(alert);
+      }
+
+      return alerts;
+    } catch (error) {
+      debugPrint('[AlertProvider.sos] root fetch skipped: $error');
+      return const <AlertModel>[];
+    }
+  }
+
+  List<AlertModel> _mergeAndSortAlerts(Iterable<AlertModel> alerts) {
+    final alertsById = <String, AlertModel>{};
+    for (final alert in alerts) {
+      if (alert.id.trim().isEmpty) {
+        continue;
+      }
+
+      alertsById[alert.id] = alert;
+    }
+
+    return alertsById.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   int unreadCountForChild(String childId) {
@@ -340,6 +420,7 @@ class AlertProvider with ChangeNotifier {
 
     final path = _childAlertsPath(childId);
     if (_liveAlertSubscription != null && _liveAlertPath == path) {
+      await _ensureRootSosAlertListener(childId);
       return;
     }
 
@@ -358,31 +439,40 @@ class AlertProvider with ChangeNotifier {
         );
 
       debugPrint(
-        '[AlertProvider.live] listening childId=$childId rtdbPath=/$path',
+        '[AlertProvider.live] listening to alerts_live for childId=$childId',
       );
 
-      _liveAlertSubscription = ref.onValue.listen(
+      // Use onChildAdded for real-time new alerts
+      _liveAlertSubscription = ref.onChildAdded.listen(
         (event) {
-          final previousIds = Set<String>.from(_knownAlertIds);
-          final alerts = _alertsFromRealtimePayload(
+          debugPrint('🚨 NEW SOS ALERT DETECTED: ${event.snapshot.key}');
+          final alert = _alertFromLivePayload(
+            rawKey: event.snapshot.key,
             rawValue: event.snapshot.value,
             childIdFallback: childId,
           );
-          final newAlerts =
-              alerts.where((alert) => !previousIds.contains(alert.id)).toList();
 
-          _knownAlertIds
-            ..clear()
-            ..addAll(alerts.map((alert) => alert.id));
-          _applyAlerts(alerts, childId: childId);
+          if (alert == null || alert.childId != childId) {
+            debugPrint(
+                '[AlertProvider.live] alert ignored - childId mismatch or null');
+            return;
+          }
+
+          if (_knownAlertIds.contains(alert.id)) {
+            debugPrint('[AlertProvider.live] alert ignored - duplicate');
+            return;
+          }
+
+          debugPrint(
+            '[AlertProvider.live] received alert=${alert.id} type=${alert.type} child=${alert.childId}',
+          );
+
+          _knownAlertIds.add(alert.id);
+          _alerts.insert(0, alert); // Add to beginning for newest first
+          _applyAlerts(_alerts, childId: childId);
           notifyListeners();
 
-          for (final alert in newAlerts) {
-            debugPrint(
-              '[AlertProvider.live] received alert=${alert.id} type=${alert.type} child=${alert.childId}',
-            );
-            unawaited(_handleRealtimeAlert(alert, playSound: true));
-          }
+          unawaited(_handleRealtimeAlert(alert, playSound: true));
         },
         onError: (error) {
           debugPrint(
@@ -390,9 +480,172 @@ class AlertProvider with ChangeNotifier {
           );
         },
       );
+
+      // Also listen to onChildChanged for updates (mark-as-read, etc.)
+      _liveAlertChangedSubscription = ref.onChildChanged.listen(
+        (event) {
+          debugPrint('🔄 ALERT UPDATED: ${event.snapshot.key}');
+          final alert = _alertFromLivePayload(
+            rawKey: event.snapshot.key,
+            rawValue: event.snapshot.value,
+            childIdFallback: childId,
+          );
+
+          if (alert == null || alert.childId != childId) {
+            return;
+          }
+
+          final index = _alerts.indexWhere((a) => a.id == alert.id);
+          if (index != -1) {
+            _alerts[index] = alert;
+            _applyAlerts(_alerts, childId: childId);
+            notifyListeners();
+          }
+        },
+        onError: (error) {
+          debugPrint('[AlertProvider.live] update error: $error');
+        },
+      );
+
+      // Also listen to onChildRemoved for deletions
+      _liveAlertRemovedSubscription = ref.onChildRemoved.listen(
+        (event) {
+          debugPrint('🗑️ ALERT DELETED: ${event.snapshot.key}');
+          _alerts.removeWhere((alert) => alert.id == event.snapshot.key);
+          _knownAlertIds.remove(event.snapshot.key);
+          _applyAlerts(_alerts, childId: childId);
+          notifyListeners();
+        },
+        onError: (error) {
+          debugPrint('[AlertProvider.live] delete error: $error');
+        },
+      );
+
+      await _ensureRootSosAlertListener(childId);
     } catch (error) {
       debugPrint('[AlertProvider.live] failed path=/$path error=$error');
     }
+  }
+
+  Future<void> _ensureRootSosAlertListener(String childId) async {
+    final normalizedChildId = childId.trim();
+    if (normalizedChildId.isEmpty) {
+      return;
+    }
+
+    if (_sosRootAlertSubscription != null &&
+        _sosRootListeningChildId == normalizedChildId) {
+      return;
+    }
+
+    await _stopRootSosAlertListener();
+
+    try {
+      final database = await _database();
+      final ref = database.ref('alerts_live');
+      _sosRootListeningChildId = normalizedChildId;
+      _sosRootListenerStartedAt = DateTime.now().millisecondsSinceEpoch;
+
+      debugPrint('[AlertProvider.sos] Listening to SOS alerts...');
+
+      _sosRootAlertSubscription = ref.onChildAdded.listen(
+        (event) => _handleRootSosEvent(
+          event,
+          normalizedChildId,
+          isNewEvent: true,
+        ),
+        onError: (error) {
+          debugPrint('[AlertProvider.sos] listener error: $error');
+        },
+      );
+
+      _sosRootAlertChangedSubscription = ref.onChildChanged.listen(
+        (event) => _handleRootSosEvent(
+          event,
+          normalizedChildId,
+          isNewEvent: false,
+        ),
+        onError: (error) {
+          debugPrint('[AlertProvider.sos] update error: $error');
+        },
+      );
+
+      _sosRootAlertRemovedSubscription = ref.onChildRemoved.listen(
+        (event) {
+          final alertId = event.snapshot.key;
+          if (alertId == null) {
+            return;
+          }
+
+          _alerts.removeWhere((alert) => alert.id == alertId);
+          _knownAlertIds.remove(alertId);
+          _rootSosAlertIds.remove(alertId);
+          _applyAlerts(_alerts, childId: normalizedChildId);
+          notifyListeners();
+        },
+        onError: (error) {
+          debugPrint('[AlertProvider.sos] delete error: $error');
+        },
+      );
+    } catch (error) {
+      debugPrint('[AlertProvider.sos] failed path=/alerts_live error=$error');
+    }
+  }
+
+  void _handleRootSosEvent(
+    DatabaseEvent event,
+    String childId, {
+    required bool isNewEvent,
+  }) {
+    final data = _asMap(event.snapshot.value);
+    if (!_looksLikeSingleAlertPayload(data)) {
+      return;
+    }
+
+    final alert = _alertFromLivePayload(
+      rawKey: event.snapshot.key,
+      rawValue: event.snapshot.value,
+      childIdFallback: childId,
+    );
+
+    if (alert == null || alert.childId != childId) {
+      return;
+    }
+
+    final index = _alerts.indexWhere((item) => item.id == alert.id);
+    final alreadyKnown = _knownAlertIds.contains(alert.id);
+
+    if (index == -1) {
+      _alerts.insert(0, alert);
+    } else {
+      _alerts[index] = alert;
+    }
+
+    _alerts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _knownAlertIds.add(alert.id);
+    _rootSosAlertIds.add(alert.id);
+    _applyAlerts(_alerts, childId: childId);
+    notifyListeners();
+
+    final shouldPlaySound = isNewEvent &&
+        !alreadyKnown &&
+        alert.createdAt >= _sosRootListenerStartedAt - 5000;
+    if (shouldPlaySound) {
+      debugPrint('[AlertProvider.sos] SOS received: ${alert.message}');
+      unawaited(_handleRealtimeAlert(alert, playSound: true));
+    }
+  }
+
+  bool _looksLikeSingleAlertPayload(Map<String, dynamic> data) {
+    if (data.isEmpty) {
+      return false;
+    }
+
+    return data.containsKey('message') ||
+        data.containsKey('timestamp') ||
+        data.containsKey('created_at') ||
+        data.containsKey('isRead') ||
+        data.containsKey('is_read');
   }
 
   Future<void> _ensureBackgroundLiveAlertListener() async {
@@ -471,8 +724,25 @@ class AlertProvider with ChangeNotifier {
 
   Future<void> _stopLiveAlertListener() async {
     await _liveAlertSubscription?.cancel();
+    await _liveAlertChangedSubscription?.cancel();
+    await _liveAlertRemovedSubscription?.cancel();
+    await _stopRootSosAlertListener();
     _liveAlertSubscription = null;
+    _liveAlertChangedSubscription = null;
+    _liveAlertRemovedSubscription = null;
     _liveAlertPath = null;
+  }
+
+  Future<void> _stopRootSosAlertListener() async {
+    await _sosRootAlertSubscription?.cancel();
+    await _sosRootAlertChangedSubscription?.cancel();
+    await _sosRootAlertRemovedSubscription?.cancel();
+    _sosRootAlertSubscription = null;
+    _sosRootAlertChangedSubscription = null;
+    _sosRootAlertRemovedSubscription = null;
+    _sosRootListeningChildId = null;
+    _sosRootListenerStartedAt = 0;
+    _rootSosAlertIds.clear();
   }
 
   AlertModel? _alertFromLivePayload({
@@ -636,11 +906,129 @@ class AlertProvider with ChangeNotifier {
     );
   }
 
+  AlertModel _withReadStatus(AlertModel alert, bool isRead) {
+    return AlertModel.fromJson({
+      ...alert.toJson(),
+      'is_read': isRead,
+      'isRead': isRead,
+      'status': isRead ? 'read' : 'unread',
+    });
+  }
+
+  void _markLocalAlertAsRead(String alertId, String childId) {
+    final normalizedChildId = childId.trim();
+    _alerts = _alerts
+        .map(
+          (alert) => alert.id == alertId ? _withReadStatus(alert, true) : alert,
+        )
+        .toList();
+    _applyAlerts(_alerts, childId: normalizedChildId);
+    notifyListeners();
+  }
+
+  void _markLocalAlertsAsRead(String childId) {
+    final normalizedChildId = childId.trim();
+    _alerts = _alerts.map((alert) {
+      if (normalizedChildId.isNotEmpty &&
+          alert.childId.isNotEmpty &&
+          alert.childId != normalizedChildId) {
+        return alert;
+      }
+
+      return _withReadStatus(alert, true);
+    }).toList();
+    _applyAlerts(_alerts, childId: normalizedChildId);
+    notifyListeners();
+  }
+
+  Future<bool> _markRootSosAlertAsRead(String alertId) async {
+    if (!_rootSosAlertIds.contains(alertId)) {
+      return false;
+    }
+
+    try {
+      final database = await _database();
+      await database.ref('alerts_live/$alertId').update({
+        'isRead': true,
+        'is_read': true,
+        'status': 'read',
+      });
+      return true;
+    } catch (error) {
+      debugPrint('[AlertProvider.sos] direct read update skipped: $error');
+      return false;
+    }
+  }
+
+  Future<bool> _markAllRootSosAlertsAsRead() async {
+    final updates = <String, Object?>{};
+    for (final alert in _alerts) {
+      if (alert.isRead || !_rootSosAlertIds.contains(alert.id)) {
+        continue;
+      }
+
+      updates['alerts_live/${alert.id}/isRead'] = true;
+      updates['alerts_live/${alert.id}/is_read'] = true;
+      updates['alerts_live/${alert.id}/status'] = 'read';
+    }
+
+    if (updates.isEmpty) {
+      return false;
+    }
+
+    try {
+      final database = await _database();
+      await database.ref().update(updates);
+      return true;
+    } catch (error) {
+      debugPrint('[AlertProvider.sos] direct read-all update skipped: $error');
+      return false;
+    }
+  }
+
+  Future<bool> _deleteRootSosAlert(String alertId) async {
+    if (!_rootSosAlertIds.contains(alertId)) {
+      return false;
+    }
+
+    try {
+      final database = await _database();
+      await database.ref('alerts_live/$alertId').remove();
+      _rootSosAlertIds.remove(alertId);
+      return true;
+    } catch (error) {
+      debugPrint('[AlertProvider.sos] direct delete skipped: $error');
+      return false;
+    }
+  }
+
   Future<bool> markAsRead(String alertId, String childId) async {
     try {
-      await _apiService.markAlertAsRead(alertId, childId: childId);
-      await loadAlerts(childId);
-      await getUnreadCount(childId);
+      if (_rootSosAlertIds.contains(alertId)) {
+        final rootUpdated = await _markRootSosAlertAsRead(alertId);
+        if (!rootUpdated) {
+          throw Exception('Failed to mark alert as read');
+        }
+
+        _markLocalAlertAsRead(alertId, childId);
+        return true;
+      }
+
+      Object? apiError;
+      var backendUpdated = false;
+      try {
+        await _apiService.markAlertAsRead(alertId, childId: childId);
+        backendUpdated = true;
+      } catch (error) {
+        apiError = error;
+      }
+
+      final rootUpdated = await _markRootSosAlertAsRead(alertId);
+      if (!backendUpdated && !rootUpdated) {
+        throw apiError ?? Exception('Failed to mark alert as read');
+      }
+
+      _markLocalAlertAsRead(alertId, childId);
       return true;
     } catch (e) {
       _error = e.toString();
@@ -651,9 +1039,26 @@ class AlertProvider with ChangeNotifier {
 
   Future<bool> markAllAsRead(String childId) async {
     try {
-      await _apiService.markAllAlertsAsRead(childId);
-      await loadAlerts(childId);
-      await getUnreadCount(childId);
+      final hasNonRootAlerts = _alerts.any(
+        (alert) => !_rootSosAlertIds.contains(alert.id),
+      );
+      Object? apiError;
+      var backendUpdated = false;
+      if (hasNonRootAlerts) {
+        try {
+          await _apiService.markAllAlertsAsRead(childId);
+          backendUpdated = true;
+        } catch (error) {
+          apiError = error;
+        }
+      }
+
+      final rootUpdated = await _markAllRootSosAlertsAsRead();
+      if (hasNonRootAlerts && !backendUpdated && !rootUpdated) {
+        throw apiError ?? Exception('Failed to mark alerts as read');
+      }
+
+      _markLocalAlertsAsRead(childId);
       return true;
     } catch (e) {
       _error = e.toString();
@@ -667,6 +1072,7 @@ class AlertProvider with ChangeNotifier {
     try {
       final normalizedChildId = childId.trim();
       if (normalizedChildId.isNotEmpty) {
+        // Optimistic UI removal
         _alerts = _alerts.where((alert) => alert.id != alertId).toList();
         _setUnreadCountForChild(
           normalizedChildId,
@@ -679,8 +1085,20 @@ class AlertProvider with ChangeNotifier {
         notifyListeners();
       }
 
-      await _apiService.deleteAlert(alertId, childId: childId);
-      await loadAlerts(childId, showLoader: false);
+      if (_rootSosAlertIds.contains(alertId)) {
+        final rootDeleted = await _deleteRootSosAlert(alertId);
+        if (!rootDeleted) {
+          throw Exception('Failed to delete alert');
+        }
+      } else {
+        await _apiService.deleteAlert(alertId, childId: childId);
+      }
+      _rootSosAlertIds.remove(alertId);
+
+      // The RTDB listener fires when the backend removes the alert from
+      // alerts_live/{childId}/{alertId}, which automatically updates local
+      // state. Calling loadAlerts() here would cause a redundant rebuild
+      // and a second network fetch.
       return true;
     } catch (e) {
       _alerts = previousAlerts;

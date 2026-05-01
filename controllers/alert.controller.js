@@ -64,6 +64,7 @@ function realtimeAlertMirrorUpdates(alertId, alertData = {}, childData = {}, val
     updates[`alerts_by_child/${childId}/${alertId}`] = value;
     updates[`alerts_live/${childId}/${alertId}`] = value;
   }
+  updates[`alerts_live/${alertId}`] = value;
   updates[`admin_alerts/${alertId}`] = value;
 
   return updates;
@@ -112,10 +113,28 @@ async function resolveAlertMutationContext(req, alertId, { allowMissing = false 
   }
 
   const { childDoc } = await getChildWithAccessOrThrow(req, childId);
-  const liveSnapshot = await realtimeDB
+
+  // Try alerts_by_child first (backend-mirrored alerts)
+  let liveSnapshot = await realtimeDB
     .ref(`alerts_by_child/${childId}/${normalizedAlertId}`)
     .once("value");
-  const liveData = liveSnapshot.val();
+  let liveData = liveSnapshot.val();
+
+  // Fallback: check alerts_live (device-pushed RTDB-only alerts)
+  if (!liveSnapshot.exists()) {
+    liveSnapshot = await realtimeDB
+      .ref(`alerts_live/${childId}/${normalizedAlertId}`)
+      .once("value");
+    liveData = liveSnapshot.val();
+  }
+  let sourceFlatLive = false;
+  if (!liveSnapshot.exists()) {
+    liveSnapshot = await realtimeDB
+      .ref(`alerts_live/${normalizedAlertId}`)
+      .once("value");
+    liveData = liveSnapshot.val();
+    sourceFlatLive = liveSnapshot.exists();
+  }
 
   if (!liveSnapshot.exists() && !allowMissing) {
     throw createHttpError(404, "Alert not found");
@@ -130,10 +149,12 @@ async function resolveAlertMutationContext(req, alertId, { allowMissing = false 
           ...liveData,
           child_id: liveData.child_id || childId,
           user_id: liveData.user_id || childDoc.data()?.user_id || "",
+          source_flat_live: sourceFlatLive,
         }
       : {
           child_id: childId,
           user_id: childDoc.data()?.user_id || "",
+          source_flat_live: sourceFlatLive,
         },
     childData: {
       id: childDoc.id,
@@ -162,6 +183,11 @@ async function syncRealtimeAlertStatus(alertId, alertData = {}, status = "read")
     updates[`alerts_live/${childId}/${alertId}/status`] = status;
     updates[`alerts_live/${childId}/${alertId}/is_read`] = isRead;
     updates[`alerts_live/${childId}/${alertId}/isRead`] = isRead;
+  }
+  if (alertData.source_flat_live === true) {
+    updates[`alerts_live/${alertId}/status`] = status;
+    updates[`alerts_live/${alertId}/is_read`] = isRead;
+    updates[`alerts_live/${alertId}/isRead`] = isRead;
   }
   updates[`admin_alerts/${alertId}/status`] = status;
   updates[`admin_alerts/${alertId}/is_read`] = isRead;

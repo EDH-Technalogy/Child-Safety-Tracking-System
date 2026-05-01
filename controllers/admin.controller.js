@@ -1424,14 +1424,17 @@ exports.deleteAlert = async (req, res) => {
     const adminAlertSnapshot = await realtimeDB
       .ref(`admin_alerts/${alertId}`)
       .once("value");
+    const flatLiveSnapshot = await realtimeDB
+      .ref(`alerts_live/${alertId}`)
+      .once("value");
 
-    if (!alertDoc.exists && !adminAlertSnapshot.exists()) {
+    if (!alertDoc.exists && !adminAlertSnapshot.exists() && !flatLiveSnapshot.exists()) {
       return res.json({ message: "Alert already deleted" });
     }
 
     const alertData = alertDoc.exists
       ? alertDoc.data()
-      : adminAlertSnapshot.val() || {};
+      : adminAlertSnapshot.val() || flatLiveSnapshot.val() || {};
     if (alertDoc.exists) {
       await alertRef.delete();
     }
@@ -1448,6 +1451,7 @@ exports.deleteAlert = async (req, res) => {
       realtimeAlertUpdates[`alerts_live/${alertData.child_id}/${alertId}`] =
         null;
     }
+    realtimeAlertUpdates[`alerts_live/${alertId}`] = null;
     await realtimeDB.ref().update(realtimeAlertUpdates);
 
     await logAdminAudit(req, {

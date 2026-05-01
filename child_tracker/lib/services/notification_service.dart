@@ -446,6 +446,22 @@ class NotificationService {
       dedupeKey: alertId,
       playAlertTone: true,
     );
+
+    // Extra alarm bursts for SOS urgency (complements the notification sound)
+    await _playUrgentAlarmBursts();
+  }
+
+  Future<void> _playUrgentAlarmBursts() async {
+    for (int i = 0; i < 3; i++) {
+      try {
+        await SystemSound.play(SystemSoundType.alert);
+      } catch (_) {
+        // Silently ignored — SystemSound may be unsupported on web
+      }
+      if (i < 2) {
+        await Future.delayed(const Duration(milliseconds: 400));
+      }
+    }
   }
 
   Future<void> cancelAll() async {

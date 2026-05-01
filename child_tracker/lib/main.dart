@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -32,6 +34,7 @@ import 'screens/admin/admin_login_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/edit_child_screen.dart';
 import 'services/notification_service.dart';
+import 'services/sos_alert_debug_logger.dart';
 import 'utils/constants.dart';
 
 Future<void> main() async {
@@ -45,6 +48,7 @@ Future<void> main() async {
   // await Firebase.initializeApp();
   final localeProvider = await LocaleProvider.load();
   await NotificationService().init();
+  unawaited(SOSAlertDebugLogger.start());
   runApp(MyApp(localeProvider: localeProvider));
 }
 

@@ -37,6 +37,24 @@ function extractMessage(payload = {}) {
   return payload.message?.toString().trim() || "";
 }
 
+function isPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function looksLikeSingleAlertPayload(value) {
+  if (!isPlainObject(value)) {
+    return false;
+  }
+
+  return (
+    Object.prototype.hasOwnProperty.call(value, "message") ||
+    Object.prototype.hasOwnProperty.call(value, "timestamp") ||
+    Object.prototype.hasOwnProperty.call(value, "created_at") ||
+    Object.prototype.hasOwnProperty.call(value, "isRead") ||
+    Object.prototype.hasOwnProperty.call(value, "is_read")
+  );
+}
+
 function normalizeAlertType(payload = {}, message = "") {
   const rawType =
     payload.type ||
@@ -221,6 +239,8 @@ async function processSosIngressAlert(childId, snapshot) {
     if (
       payload.processed_at ||
       payload.rejected_at ||
+      payload.source_live_ingress === true ||
+      payload.ingress_alert_id ||
       payload.server_status === "processed" ||
       payload.server_status === "rejected"
     ) {
@@ -385,11 +405,11 @@ function initSosAlertLiveListener() {
   const rootRef = realtimeDB.ref("alerts_live");
 
   rootChildAddedHandler = (snapshot) => {
-    const childId = normalizeChildId(snapshot.key);
-    if (!childId) {
-      return;
-    }
-    attachChildListener(childId);
+    console.info("[sos-alert-live-listener] direct Flutter path only", {
+      key: normalizeAlertId(snapshot.key),
+      path: `/alerts_live/${snapshot.key}`,
+      isFlatAlert: looksLikeSingleAlertPayload(snapshot.val()),
+    });
   };
 
   rootChildRemovedHandler = (snapshot) => {
