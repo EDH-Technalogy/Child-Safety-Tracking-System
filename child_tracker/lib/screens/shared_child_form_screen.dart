@@ -846,7 +846,7 @@ class _SharedChildFormScreenState extends State<SharedChildFormScreen> {
                                           _registerDevice = value;
                                         });
                                       },
-                                      activeColor: AppColors.primaryColor,
+                                      activeThumbColor: AppColors.primaryColor,
                                     ),
                                   ],
                                 ),

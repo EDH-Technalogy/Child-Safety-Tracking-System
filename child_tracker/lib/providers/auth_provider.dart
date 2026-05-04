@@ -422,24 +422,51 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<bool> register({
-    required String name,
-    required String phone,
+    required String fullName,
     required String email,
     required String password,
+    required String confirmPassword,
   }) async {
     _setLoading(true);
     _error = null;
 
     try {
       final result = await _apiService.register(
-        name: name,
-        phone: phone,
+        fullName: fullName,
         email: email,
         password: password,
+        confirmPassword: confirmPassword,
       );
 
       if (result['success'] == false) {
         _error = result['message'] ?? "Registration failed";
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      _error = _formatError(e);
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> verifySignupOtp({
+    required String email,
+    required String otp,
+  }) async {
+    _setLoading(true);
+    _error = null;
+
+    try {
+      final result = await _apiService.verifySignupOtp(
+        email: email,
+        otp: otp,
+      );
+
+      if (result['success'] == false) {
+        _error = result['message'] ?? "OTP verification failed";
         return false;
       }
 
@@ -453,6 +480,21 @@ class AuthProvider with ChangeNotifier {
         userData: userData,
         token: result['token']?.toString() ?? '',
       );
+      return true;
+    } catch (e) {
+      _error = _formatError(e);
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> resendSignupOtp(String email) async {
+    _setLoading(true);
+    _error = null;
+
+    try {
+      await _apiService.sendOtp(email: email, type: 'signup');
       return true;
     } catch (e) {
       _error = _formatError(e);

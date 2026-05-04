@@ -20,12 +20,14 @@
     },
     "alerts_live": {
       ".read": "auth != null",
+      ".indexOn": ["child_id"],
       "$alertId": {
         ".write": "auth != null && (!newData.exists() || (newData.child('message').val() != null && newData.child('timestamp').val() != null))"
       }
     },
     "admin_alerts": {
       ".read": "auth != null && auth.token.role == 'admin'",
+      ".indexOn": ["child_id"],
       "$alertId": {
         ".write": "auth != null && auth.token.role == 'admin'"
       }

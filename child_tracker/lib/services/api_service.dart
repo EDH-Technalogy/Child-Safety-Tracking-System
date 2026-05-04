@@ -130,21 +130,24 @@ class ApiService {
 
   // Register
   Future<Map<String, dynamic>> register({
-    required String name,
-    required String phone,
+    required String fullName,
     required String email,
     required String password,
+    required String confirmPassword,
   }) async {
+    final payload = {
+      'fullName': fullName.trim(),
+      'email': email.trim(),
+      'password': password,
+      'confirmPassword': confirmPassword,
+      'type': 'signup',
+    };
+
     final response = await _sendRequest(
       http.post(
-        Uri.parse('$baseUrl${ApiConfig.users}/register'),
+        Uri.parse('${ApiConfig.authBaseUrl}/send-otp'),
         headers: headers,
-        body: jsonEncode({
-          'name': name,
-          'phone': phone,
-          'email': email,
-          'password': password,
-        }),
+        body: jsonEncode(payload),
       ),
       'register',
     );
@@ -158,6 +161,53 @@ class ApiService {
       Map<String, dynamic>.from(decoded),
       successMessage: 'Registration successful',
     );
+  }
+
+  Future<Map<String, dynamic>> verifySignupOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final response = await _sendRequest(
+      http.post(
+        Uri.parse('${ApiConfig.authBaseUrl}/verify-otp'),
+        headers: headers,
+        body: jsonEncode({
+          'email': email.trim(),
+          'otp': otp.trim(),
+          'type': 'signup',
+        }),
+      ),
+      'verify OTP',
+    );
+
+    final decoded = _decodeResponse(response, 'verify OTP');
+    if (decoded is! Map) {
+      throw Exception('Invalid response format');
+    }
+
+    return _normalizeAuthResponse(
+      Map<String, dynamic>.from(decoded),
+      successMessage: 'Email verified successfully',
+    );
+  }
+
+  Future<Map<String, dynamic>> sendOtp({
+    required String email,
+    required String type,
+  }) async {
+    final response = await _sendRequest(
+      http.post(
+        Uri.parse('${ApiConfig.authBaseUrl}/send-otp'),
+        headers: headers,
+        body: jsonEncode({
+          'email': email.trim(),
+          'type': type,
+        }),
+      ),
+      'send OTP',
+    );
+
+    return Map<String, dynamic>.from(_decodeResponse(response, 'send OTP'));
   }
 
   // Login
@@ -282,21 +332,21 @@ class ApiService {
 
   // Request Password Reset
   Future<Map<String, dynamic>> requestPasswordReset(String email) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl${ApiConfig.users}/request-password-reset'),
+    final response = await _sendRequest(
+      http.post(
+        Uri.parse('${ApiConfig.authBaseUrl}/send-otp'),
         headers: headers,
-        body: jsonEncode({'email': email}),
-      );
+        body: jsonEncode({
+          'email': email.trim(),
+          'type': 'forgot',
+        }),
+      ),
+      'request password reset',
+    );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception(response.body);
-      }
-    } catch (e) {
-      throw Exception('Failed to request password reset: $e');
-    }
+    return Map<String, dynamic>.from(
+      _decodeResponse(response, 'request password reset'),
+    );
   }
 
   // Logout
@@ -333,25 +383,23 @@ class ApiService {
     required String otp,
     required String newPassword,
   }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl${ApiConfig.users}/verify-otp-reset'),
+    final response = await _sendRequest(
+      http.post(
+        Uri.parse('${ApiConfig.authBaseUrl}/verify-otp'),
         headers: headers,
         body: jsonEncode({
-          'email': email,
-          'otp': otp,
+          'email': email.trim(),
+          'otp': otp.trim(),
+          'type': 'forgot',
           'newPassword': newPassword,
         }),
-      );
+      ),
+      'reset password',
+    );
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception(response.body);
-      }
-    } catch (e) {
-      throw Exception('Failed to reset password: $e');
-    }
+    return Map<String, dynamic>.from(
+      _decodeResponse(response, 'reset password'),
+    );
   }
 
   // ==================== CHILD API ====================

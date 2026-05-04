@@ -77,40 +77,101 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
     required String source,
   }) {
     final data = _asMap(rawValue);
-    final alerts = data.entries.where((entry) {
-      final item = _asMap(entry.value);
-      return _looksLikeSingleAlertPayload(item);
-    }).map((entry) {
-      final item = _asMap(entry.value);
+    final alerts = <Map<String, dynamic>>[];
+
+    void addAlert(
+      String key,
+      Map<String, dynamic> item, {
+      String childIdFallback = '',
+    }) {
       final createdAt =
           TimestampUtils.normalizeEpochMilliseconds(item['created_at']) ??
               TimestampUtils.normalizeEpochMilliseconds(item['timestamp']) ??
               0;
-      return <String, dynamic>{
-        'id': (item['alert_id'] ?? item['id'] ?? entry.key).toString(),
+      alerts.add(<String, dynamic>{
+        'id': (item['alert_id'] ?? item['id'] ?? key).toString(),
         'type': (item['type'] ?? 'SOS').toString(),
         'message': (item['message'] ?? '').toString(),
-        'child_id': (item['child_id'] ?? '').toString(),
+        'child_id': (item['child_id'] ?? childIdFallback).toString(),
         'child_name': (item['child_name'] ?? '').toString(),
         'location_text': (item['location_text'] ?? '').toString(),
         'zone_name': (item['zone_name'] ?? '').toString(),
         'created_at': createdAt,
         'source': source,
-      };
-    }).toList()
-      ..sort(
-        (a, b) => ((b['created_at'] as int?) ?? 0)
-            .compareTo((a['created_at'] as int?) ?? 0),
-      );
+      });
+    }
+
+    for (final entry in data.entries) {
+      final item = _asMap(entry.value);
+      if (_looksLikeSingleAlertPayload(item)) {
+        addAlert(entry.key, item);
+        continue;
+      }
+
+      for (final nestedEntry in item.entries) {
+        final nestedItem = _asMap(nestedEntry.value);
+        if (_looksLikeSingleAlertPayload(nestedItem)) {
+          addAlert(
+            nestedEntry.key,
+            nestedItem,
+            childIdFallback: entry.key,
+          );
+        }
+      }
+    }
+
+    alerts.sort(
+      (a, b) => ((b['created_at'] as int?) ?? 0)
+          .compareTo((a['created_at'] as int?) ?? 0),
+    );
 
     return alerts;
   }
 
+  bool _isSafeZoneType(String type) {
+    switch (type.toUpperCase()) {
+      case 'SAFE_ZONE':
+      case 'OUT_ZONE':
+      case 'IN_ZONE':
+      case 'ZONE_EXIT':
+      case 'ZONE_ENTER':
+      case 'ZONE_ENTRY':
+      case 'SAFE_ZONE_EXIT':
+      case 'SAFE_ZONE_ENTER':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  int _alertPriority(Map<String, dynamic> alert) {
+    final source = (alert['source'] ?? '').toString();
+    final type = (alert['type'] ?? '').toString();
+    if (source == 'admin_alerts' && _isSafeZoneType(type)) {
+      return 50;
+    }
+    if (source == 'alerts_live' && type.toUpperCase() == 'SOS') {
+      return 50;
+    }
+    return source == 'admin_alerts' || source == 'alerts_live' ? 40 : 10;
+  }
+
   void _applyCombinedAlerts() {
-    final combined = <Map<String, dynamic>>[
-      ..._adminAlerts,
+    final byAlertId = <String, Map<String, dynamic>>{};
+    for (final alert in <Map<String, dynamic>>[
       ..._liveAlerts,
-    ]..sort(
+      ..._adminAlerts,
+    ]) {
+      final key = '${alert['child_id'] ?? ''}:${alert['id'] ?? ''}';
+      final existing = byAlertId[key];
+      if (existing == null ||
+          _alertPriority(alert) >= _alertPriority(existing)) {
+        byAlertId[key] = alert;
+      }
+    }
+
+    final combined = byAlertId.values.toList()
+      ..sort(
         (a, b) => ((b['created_at'] as int?) ?? 0)
             .compareTo((a['created_at'] as int?) ?? 0),
       );
@@ -245,16 +306,7 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
 
     if (confirm == true) {
       try {
-        final alert = _alerts.firstWhere(
-          (item) => item['id'] == alertId,
-          orElse: () => const <String, dynamic>{},
-        );
-        if (alert['source'] == 'alerts_live') {
-          final database = await _database();
-          await database.ref('alerts_live/$alertId').remove();
-        } else {
-          await _adminApi.deleteAlert(alertId);
-        }
+        await _adminApi.deleteAlert(alertId);
         if (!mounted) {
           return;
         }
@@ -399,7 +451,13 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
       case 'SOS':
         return Colors.red;
       case 'OUT_ZONE':
+      case 'IN_ZONE':
+      case 'SAFE_ZONE':
       case 'SAFE_ZONE_EXIT':
+      case 'SAFE_ZONE_ENTER':
+      case 'ZONE_EXIT':
+      case 'ZONE_ENTER':
+      case 'ZONE_ENTRY':
         return Colors.orange;
       case 'LOW_BATTERY':
         return Colors.yellow.shade700;
@@ -417,7 +475,13 @@ class _AdminAlertsScreenState extends State<AdminAlertsScreen> {
       case 'SOS':
         return Icons.warning;
       case 'OUT_ZONE':
+      case 'IN_ZONE':
+      case 'SAFE_ZONE':
       case 'SAFE_ZONE_EXIT':
+      case 'SAFE_ZONE_ENTER':
+      case 'ZONE_EXIT':
+      case 'ZONE_ENTER':
+      case 'ZONE_ENTRY':
         return Icons.location_off;
       case 'LOW_BATTERY':
         return Icons.battery_alert;

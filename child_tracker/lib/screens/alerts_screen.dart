@@ -404,11 +404,16 @@ class _AlertCard extends StatelessWidget {
       case 'SOS':
         return Icons.warning;
       case 'OUT_ZONE':
-        return Icons.exit_to_app;
+      case 'ZONE_EXIT':
       case 'SAFE_ZONE_EXIT':
         return Icons.exit_to_app;
       case 'IN_ZONE':
+      case 'ZONE_ENTER':
+      case 'ZONE_ENTRY':
+      case 'SAFE_ZONE_ENTER':
         return Icons.login;
+      case 'SAFE_ZONE':
+        return Icons.location_on;
       case 'LOW_BATTERY':
         return Icons.battery_alert;
       case 'DEVICE_OFF':
@@ -427,11 +432,16 @@ class _AlertCard extends StatelessWidget {
       case 'SOS':
         return AppColors.sosColor;
       case 'OUT_ZONE':
-        return AppColors.outZoneColor;
+      case 'ZONE_EXIT':
       case 'SAFE_ZONE_EXIT':
         return AppColors.outZoneColor;
       case 'IN_ZONE':
+      case 'ZONE_ENTER':
+      case 'ZONE_ENTRY':
+      case 'SAFE_ZONE_ENTER':
         return AppColors.inZoneColor;
+      case 'SAFE_ZONE':
+        return AppColors.outZoneColor;
       case 'LOW_BATTERY':
         return AppColors.lowBatteryColor;
       case 'DEVICE_OFF':

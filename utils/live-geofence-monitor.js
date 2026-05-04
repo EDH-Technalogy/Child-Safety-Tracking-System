@@ -200,6 +200,8 @@ async function createGeofenceTransitionLog({
     eventType,
     entityType: "safe_zone",
     entityId: zone?.id || childId || null,
+    userId: zone?.user_id || zone?.parent_user_id || "",
+    childId,
     title: isExit ? "Safe zone exit detected" : "Safe zone re-entry detected",
     description: message,
     performedBy: createSystemActor("Geofence Monitor"),

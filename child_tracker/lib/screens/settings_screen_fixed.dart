@@ -460,46 +460,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.selectLanguage),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Radio<String>(
-                value: 'en',
-                groupValue: localeProvider.locale.languageCode,
-                onChanged: null,
+        content: RadioGroup<String>(
+          groupValue: localeProvider.locale.languageCode,
+          onChanged: (value) {
+            if (value == null) {
+              return;
+            }
+            localeProvider.setLocale(Locale(value));
+            Navigator.pop(context);
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Radio<String>(value: 'en'),
+                title: Text(l10n.english),
+                onTap: () {
+                  localeProvider.setLocale(const Locale('en'));
+                  Navigator.pop(context);
+                },
               ),
-              title: Text(l10n.english),
-              onTap: () {
-                localeProvider.setLocale(const Locale('en'));
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'ps',
-                groupValue: localeProvider.locale.languageCode,
-                onChanged: null,
+              ListTile(
+                leading: const Radio<String>(value: 'ps'),
+                title: Text(l10n.pashto),
+                onTap: () {
+                  localeProvider.setLocale(const Locale('ps'));
+                  Navigator.pop(context);
+                },
               ),
-              title: Text(l10n.pashto),
-              onTap: () {
-                localeProvider.setLocale(const Locale('ps'));
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Radio<String>(
-                value: 'fa',
-                groupValue: localeProvider.locale.languageCode,
-                onChanged: null,
+              ListTile(
+                leading: const Radio<String>(value: 'fa'),
+                title: Text(l10n.dari),
+                onTap: () {
+                  localeProvider.setLocale(const Locale('fa'));
+                  Navigator.pop(context);
+                },
               ),
-              title: Text(l10n.dari),
-              onTap: () {
-                localeProvider.setLocale(const Locale('fa'));
-                Navigator.pop(context);
-              },
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(

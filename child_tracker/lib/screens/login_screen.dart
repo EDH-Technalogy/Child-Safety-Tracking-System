@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
+import '../utils/auth_validation.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 
@@ -34,8 +35,29 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _login() async {
+  void _navigateAfterLogin(AuthProvider authProvider) {
+    if (authProvider.isAdmin) {
+      Navigator.pushReplacementNamed(context, '/admin-dashboard');
+    } else {
+      Navigator.pushReplacementNamed(context, '/home');
+    }
+  }
+
+  void _showLoginFailure(AuthProvider authProvider) {
     final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          authProvider.error != null
+              ? localizeRawMessage(l10n, authProvider.error!)
+              : l10n.loginFailed,
+        ),
+        backgroundColor: AppColors.errorColor,
+      ),
+    );
+  }
+
+  Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -45,23 +67,9 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      // Navigate based on role
-      if (authProvider.isAdmin) {
-        Navigator.pushReplacementNamed(context, '/admin-dashboard');
-      } else {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
+      _navigateAfterLogin(authProvider);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            authProvider.error != null
-                ? localizeRawMessage(l10n, authProvider.error!)
-                : l10n.loginFailed,
-          ),
-          backgroundColor: AppColors.errorColor,
-        ),
-      );
+      _showLoginFailure(authProvider);
     }
   }
 
@@ -170,10 +178,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               horizontal: 20, vertical: 20),
                         ),
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return l10n.emailRequired;
-                          }
-                          return null;
+                          return validateGmailEmailInput(
+                            value,
+                            requiredMessage: l10n.emailRequired,
+                          );
                         },
                       ),
                       const SizedBox(height: 20),
@@ -221,9 +229,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return l10n.passwordRequired;
-                          }
-                          if (value.length < 6) {
-                            return l10n.passwordTooShort;
                           }
                           return null;
                         },

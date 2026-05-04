@@ -1,18 +1,15 @@
-import 'dart:html' as html;
-import 'dart:js_util' as js_util;
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 bool get isGoogleMapsJsAvailable {
   try {
-    if (!js_util.hasProperty(html.window, 'google')) {
+    final google = globalContext.getProperty<JSAny?>('google'.toJS);
+    if (google == null || google.isUndefinedOrNull) {
       return false;
     }
 
-    final google = js_util.getProperty<Object?>(html.window, 'google');
-    if (google == null) {
-      return false;
-    }
-
-    return js_util.hasProperty(google, 'maps');
+    final maps = (google as JSObject).getProperty<JSAny?>('maps'.toJS);
+    return maps != null && !maps.isUndefinedOrNull;
   } catch (_) {
     return false;
   }

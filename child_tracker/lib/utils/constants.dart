@@ -43,6 +43,16 @@ class ApiConfig {
     }
   }
 
+  static String get authBaseUrl {
+    final normalizedBaseUrl = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    if (normalizedBaseUrl.endsWith('/api')) {
+      return normalizedBaseUrl.substring(0, normalizedBaseUrl.length - 4);
+    }
+    return normalizedBaseUrl;
+  }
+
   // Endpoints
   static const String users = '/users';
   static const String children = '/children';

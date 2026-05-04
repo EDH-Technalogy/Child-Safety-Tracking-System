@@ -15,6 +15,13 @@ const {
   buildLocationText,
   createAlertRecord,
 } = require("../utils/alert-service");
+const {
+  collectAlertsFromRealtimeValue,
+  isSafeZoneAlert,
+  isUnreadAlert,
+  mergeNormalizedAlerts,
+  normalizeAlert,
+} = require("../utils/alert-normalizer");
 
 function buildAlertTarget(alertId, alertData = {}) {
   return {
@@ -96,7 +103,17 @@ async function resolveAlertMutationContext(req, alertId, { allowMissing = false 
     };
   }
 
-  const childId = requestChildId(req);
+  let childId = requestChildId(req);
+  let adminAlertSnapshot = null;
+  let adminAlertData = null;
+  if (!childId) {
+    adminAlertSnapshot = await realtimeDB
+      .ref(`admin_alerts/${normalizedAlertId}`)
+      .once("value");
+    adminAlertData = adminAlertSnapshot.val();
+    childId = normalizeId(adminAlertData?.child_id || adminAlertData?.childId);
+  }
+
   if (!childId) {
     if (allowMissing) {
       return {
@@ -135,6 +152,18 @@ async function resolveAlertMutationContext(req, alertId, { allowMissing = false 
     liveData = liveSnapshot.val();
     sourceFlatLive = liveSnapshot.exists();
   }
+  let sourceAdminAlert = false;
+  if (!liveSnapshot.exists()) {
+    if (!adminAlertSnapshot) {
+      adminAlertSnapshot = await realtimeDB
+        .ref(`admin_alerts/${normalizedAlertId}`)
+        .once("value");
+      adminAlertData = adminAlertSnapshot.val();
+    }
+    liveSnapshot = adminAlertSnapshot;
+    liveData = adminAlertData;
+    sourceAdminAlert = liveSnapshot.exists();
+  }
 
   if (!liveSnapshot.exists() && !allowMissing) {
     throw createHttpError(404, "Alert not found");
@@ -150,11 +179,13 @@ async function resolveAlertMutationContext(req, alertId, { allowMissing = false 
           child_id: liveData.child_id || childId,
           user_id: liveData.user_id || childDoc.data()?.user_id || "",
           source_flat_live: sourceFlatLive,
+          source_admin_alert: sourceAdminAlert,
         }
       : {
           child_id: childId,
           user_id: childDoc.data()?.user_id || "",
           source_flat_live: sourceFlatLive,
+          source_admin_alert: sourceAdminAlert,
         },
     childData: {
       id: childDoc.id,
@@ -170,13 +201,14 @@ async function syncRealtimeAlertStatus(alertId, alertData = {}, status = "read")
   const userId = alertData.user_id?.toString().trim() || "";
   const updates = {};
   const isRead = status === "read";
+  const shouldUpdateChildMirrors = alertData.source_admin_alert !== true;
 
-  if (userId) {
+  if (userId && shouldUpdateChildMirrors) {
     updates[`alerts/${userId}/${alertId}/status`] = status;
     updates[`alerts/${userId}/${alertId}/is_read`] = isRead;
     updates[`alerts/${userId}/${alertId}/isRead`] = isRead;
   }
-  if (childId) {
+  if (childId && shouldUpdateChildMirrors) {
     updates[`alerts_by_child/${childId}/${alertId}/status`] = status;
     updates[`alerts_by_child/${childId}/${alertId}/is_read`] = isRead;
     updates[`alerts_by_child/${childId}/${alertId}/isRead`] = isRead;
@@ -196,6 +228,68 @@ async function syncRealtimeAlertStatus(alertId, alertData = {}, status = "read")
   if (Object.keys(updates).length > 0) {
     await realtimeDB.ref().update(updates);
   }
+}
+
+function isAlertForChild(alert, childId) {
+  return normalizeId(alert.child_id || alert.childId) === childId;
+}
+
+async function listFirestoreAlertsForChild(childId) {
+  const snap = await firestore
+    .collection("alerts")
+    .where("child_id", "==", childId)
+    .get();
+
+  return snap.docs
+    .map((doc) => normalizeAlert({ id: doc.id, ...doc.data() }, "firestore_alerts"))
+    .filter(Boolean);
+}
+
+async function listRealtimeSosAlertsForChild(childId) {
+  const [childLiveSnapshot, flatLiveSnapshot] = await Promise.all([
+    realtimeDB.ref(`alerts_live/${childId}`).once("value"),
+    realtimeDB
+      .ref("alerts_live")
+      .orderByChild("child_id")
+      .equalTo(childId)
+      .once("value"),
+  ]);
+
+  return [
+    ...collectAlertsFromRealtimeValue(childLiveSnapshot.val(), "alerts_live", {
+      childIdFallback: childId,
+    }),
+    ...collectAlertsFromRealtimeValue(flatLiveSnapshot.val(), "alerts_live"),
+  ].filter((alert) => isAlertForChild(alert, childId));
+}
+
+async function listRealtimeSafeZoneAlertsForChild(childId) {
+  const adminAlertsSnapshot = await realtimeDB
+    .ref("admin_alerts")
+    .orderByChild("child_id")
+    .equalTo(childId)
+    .once("value");
+
+  return collectAlertsFromRealtimeValue(
+    adminAlertsSnapshot.val(),
+    "admin_alerts"
+  ).filter((alert) => isAlertForChild(alert, childId) && isSafeZoneAlert(alert));
+}
+
+async function listMergedAlertsForChild(childId) {
+  const [firestoreAlerts, sosAlerts, safeZoneAlerts] = await Promise.all([
+    listFirestoreAlertsForChild(childId),
+    listRealtimeSosAlertsForChild(childId),
+    listRealtimeSafeZoneAlertsForChild(childId),
+  ]);
+
+  const allAlerts = [
+    ...sosAlerts,
+    ...safeZoneAlerts,
+    ...firestoreAlerts,
+  ];
+
+  return mergeNormalizedAlerts(allAlerts);
 }
 
 async function createAndLogAlert(
@@ -238,6 +332,9 @@ async function createAndLogAlert(
       eventType: "alert_received",
       entityType: "alert",
       entityId: createdAlert.alertId,
+      userId: createdAlert.childData?.user_id || "",
+      childId,
+      alertId: createdAlert.alertId,
       title: `Alert received: ${type}`,
       description: message,
       target: buildAlertTarget(createdAlert.alertId, {
@@ -398,14 +495,7 @@ exports.getAlerts = async (req, res, next) => {
     const childId = req.params.child_id?.toString().trim();
     await getChildWithAccessOrThrow(req, childId);
 
-    const snap = await firestore
-      .collection("alerts")
-      .where("child_id", "==", childId)
-      .get();
-
-    const alerts = [];
-    snap.forEach((doc) => alerts.push({ id: doc.id, ...doc.data() }));
-    alerts.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+    const alerts = await listMergedAlertsForChild(childId);
     res.json(alerts);
   } catch (error) {
     next(error);
@@ -435,6 +525,9 @@ exports.markAsRead = async (req, res, next) => {
       eventType: "alert_acknowledged",
       entityType: "alert",
       entityId: alertId,
+      userId: alertData.user_id || "",
+      childId: alertData.child_id || "",
+      alertId,
       title: "Alert acknowledged",
       description: `Alert ${alertData.type || alertId} was marked as read.`,
       target: buildAlertTarget(alertId, {
@@ -599,14 +692,8 @@ exports.getUnreadCount = async (req, res, next) => {
     const childId = req.params.child_id?.toString().trim();
     await getChildWithAccessOrThrow(req, childId);
 
-    const snap = await firestore
-      .collection("alerts")
-      .where("child_id", "==", childId)
-      .get();
-
-    const unreadCount = snap.docs.filter(
-      (doc) => (doc.data().status || "unread") === "unread"
-    ).length;
+    const alerts = await listMergedAlertsForChild(childId);
+    const unreadCount = alerts.filter(isUnreadAlert).length;
 
     res.json({ count: unreadCount });
   } catch (error) {
@@ -699,6 +786,28 @@ exports.markAllAsRead = async (req, res, next) => {
       realtimeUpdates[`admin_alerts/${alertId}/isRead`] = true;
     });
 
+    const adminAlertsSnapshot = await realtimeDB
+      .ref("admin_alerts")
+      .orderByChild("child_id")
+      .equalTo(childId)
+      .once("value");
+    const adminAlerts = adminAlertsSnapshot.val() || {};
+    Object.entries(adminAlerts).forEach(([alertId, rawAlert]) => {
+      const alertData = rawAlert && typeof rawAlert === "object" ? rawAlert : {};
+      const isUnread =
+        alertData.is_read !== true &&
+        alertData.isRead !== true &&
+        (alertData.status || "unread") !== "read";
+      if (!isUnread) {
+        return;
+      }
+
+      affectedAlertIds.add(alertId);
+      realtimeUpdates[`admin_alerts/${alertId}/status`] = "read";
+      realtimeUpdates[`admin_alerts/${alertId}/is_read`] = true;
+      realtimeUpdates[`admin_alerts/${alertId}/isRead`] = true;
+    });
+
     if (Object.keys(realtimeUpdates).length > 0) {
       await realtimeDB.ref().update(realtimeUpdates);
     }
@@ -707,8 +816,10 @@ exports.markAllAsRead = async (req, res, next) => {
       eventType: "alert_acknowledged",
       entityType: "alert",
       entityId: null,
+      userId: childData.user_id || "",
+      childId,
       title: "Alerts acknowledged",
-      description: `${unreadDocs.length} alerts were marked as read for child ${childId}.`,
+      description: `${affectedAlertIds.size} alerts were marked as read for child ${childId}.`,
       target: buildAlertTarget(null, {
         child_id: childId,
         status: "read",
@@ -778,6 +889,9 @@ exports.deleteAlert = async (req, res, next) => {
       eventType: "alert_deleted",
       entityType: "alert",
       entityId: alertId,
+      userId: alertData.user_id || childData.user_id || "",
+      childId: alertData.child_id || childData.id || "",
+      alertId,
       title: "Alert deleted",
       description: `Alert ${alertData.type || alertId} was deleted.`,
       target: buildAlertTarget(alertId, alertData),

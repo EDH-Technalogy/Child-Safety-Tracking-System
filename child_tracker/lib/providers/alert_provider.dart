@@ -68,6 +68,18 @@ class AlertProvider with ChangeNotifier {
   String _childAlertsPath(String childId) => 'alerts_live/$childId';
 
   Future<List<AlertModel>> _fetchAlerts(String childId) async {
+    final apiAlerts = <AlertModel>[];
+    try {
+      final response = await _apiService.getAlerts(childId);
+      apiAlerts.addAll(
+        response
+            .map((item) => AlertModel.fromJson(Map<String, dynamic>.from(item)))
+            .toList(),
+      );
+    } catch (error) {
+      debugPrint('[AlertProvider.api] merged alert fetch skipped: $error');
+    }
+
     final database = await _database();
     final snapshot = await database.ref(_childAlertsPath(childId)).get();
     final childAlerts = _alertsFromRealtimePayload(
@@ -80,6 +92,7 @@ class AlertProvider with ChangeNotifier {
     );
 
     return _mergeAndSortAlerts([
+      ...apiAlerts,
       ...rootSosAlerts,
       ...childAlerts,
     ]);
@@ -99,6 +112,14 @@ class AlertProvider with ChangeNotifier {
       for (final entry in data.entries) {
         final alertData = _asMap(entry.value);
         if (!_looksLikeSingleAlertPayload(alertData)) {
+          continue;
+        }
+
+        final explicitChildId =
+            (alertData['child_id'] ?? alertData['childId'] ?? '')
+                .toString()
+                .trim();
+        if (explicitChildId != normalizedChildId) {
           continue;
         }
 
@@ -588,6 +609,12 @@ class AlertProvider with ChangeNotifier {
   }) {
     final data = _asMap(event.snapshot.value);
     if (!_looksLikeSingleAlertPayload(data)) {
+      return;
+    }
+
+    final explicitChildId =
+        (data['child_id'] ?? data['childId'] ?? '').toString().trim();
+    if (explicitChildId != childId) {
       return;
     }
 

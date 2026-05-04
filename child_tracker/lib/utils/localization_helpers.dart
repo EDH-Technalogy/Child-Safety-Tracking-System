@@ -210,9 +210,12 @@ String localizeAlertTypeLabel(AppLocalizations l10n, String? value) {
     case 'SAFE_ZONE_EXIT':
       return l10n.childOutOfSafeZone;
     case 'IN_ZONE':
+    case 'ZONE_ENTER':
     case 'ZONE_ENTRY':
     case 'SAFE_ZONE_ENTER':
       return l10n.childBackInSafeZone;
+    case 'SAFE_ZONE':
+      return l10n.safeZone;
     case 'LOW_BATTERY':
       return l10n.lowBattery;
     case 'DEVICE_OFF':

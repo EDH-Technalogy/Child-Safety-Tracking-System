@@ -373,7 +373,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                   title: Text(l10n.liveTracking),
                   subtitle: Text(l10n.showChildLocation),
                   value: _showLiveTracking,
-                  activeColor: AppColors.primaryColor,
+                  activeThumbColor: AppColors.primaryColor,
                   onChanged: (value) {
                     setState(() {
                       _showLiveTracking = value;
@@ -390,7 +390,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                   title: Text(l10n.safeZones),
                   subtitle: Text(l10n.showSafeZones),
                   value: _showSafeZones,
-                  activeColor: AppColors.primaryColor,
+                  activeThumbColor: AppColors.primaryColor,
                   onChanged: (value) {
                     setState(() {
                       _showSafeZones = value;
@@ -403,7 +403,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                   title: Text(l10n.childLocation),
                   subtitle: Text(l10n.showChildMarker),
                   value: _showChildLocation,
-                  activeColor: AppColors.primaryColor,
+                  activeThumbColor: AppColors.primaryColor,
                   onChanged: (value) {
                     setState(() {
                       _showChildLocation = value;

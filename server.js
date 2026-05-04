@@ -37,8 +37,11 @@ const summaryRoutes = require("./routes/summary.routes");
 const adminRoutes = require("./routes/admin.routes");
 const settingsRoutes = require("./routes/settings.routes");
 const geofenceRoutes = require("./routes/geofence.routes");
+const otpRoutes = require("./routes/otp.routes");
+const userController = require("./controllers/user.controller");
 
 // Mount all routes
+app.use("/", otpRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/children", childRoutes);
 app.use("/api/devices", deviceRoutes);
@@ -50,6 +53,7 @@ app.use("/api/summary", summaryRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/geofence", geofenceRoutes);
+app.post("/auth/social-login", userController.socialLogin);
 
 // Root endpoint
 app.get("/", (req, res) => {
@@ -86,8 +90,12 @@ async function startServer() {
     app.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
         console.log("API Endpoints:");
+        console.log("- POST   /send-otp");
+        console.log("- POST   /verify-otp");
+        console.log("- POST   /auth/signup");
         console.log("- POST   /api/users/register");
         console.log("- POST   /api/users/login");
+        console.log("- POST   /auth/verify-otp");
         console.log("- GET    /api/users/:id");
         console.log("- PUT    /api/users/:id");
         console.log("- POST   /api/children/add");

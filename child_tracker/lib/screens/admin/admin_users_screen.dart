@@ -370,7 +370,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedRole,
+                  initialValue: selectedRole,
                   decoration: InputDecoration(labelText: l10n.role),
                   items: [
                     DropdownMenuItem(
@@ -562,7 +562,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedRole,
+                  initialValue: selectedRole,
                   decoration: InputDecoration(labelText: l10n.role),
                   items: [
                     DropdownMenuItem(

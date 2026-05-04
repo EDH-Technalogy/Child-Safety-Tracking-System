@@ -37,9 +37,8 @@ class AnimatedNavItem extends StatelessWidget {
         : isHovered
             ? const Color(0xFF0F172A)
             : const Color(0xFF334155);
-    final subtitleColor = isDanger
-        ? Colors.red.withValues(alpha: 0.72)
-        : const Color(0xFF64748B);
+    final subtitleColor =
+        isDanger ? Colors.red.withValues(alpha: 0.72) : const Color(0xFF64748B);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -138,8 +137,7 @@ class AnimatedNavItem extends StatelessWidget {
                                     subtitle!,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style:
-                                        theme.textTheme.bodySmall?.copyWith(
+                                    style: theme.textTheme.bodySmall?.copyWith(
                                       color: subtitleColor,
                                       fontWeight: isHovered
                                           ? FontWeight.w600
@@ -155,7 +153,12 @@ class AnimatedNavItem extends StatelessWidget {
                             duration: _duration,
                             curve: _curve,
                             transform: Matrix4.identity()
-                              ..translate(isHovered ? 2.0 : 0.0),
+                              ..translateByDouble(
+                                isHovered ? 2.0 : 0.0,
+                                0,
+                                0,
+                                1,
+                              ),
                             child: Icon(
                               textDirection == TextDirection.rtl
                                   ? Icons.chevron_left_rounded

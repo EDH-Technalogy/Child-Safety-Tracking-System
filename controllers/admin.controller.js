@@ -20,6 +20,11 @@ const {
 const {
   getDailyLocationIndexStats,
 } = require("../utils/location-history");
+const {
+  collectAlertsFromRealtimeValue,
+  mergeNormalizedAlerts,
+  normalizeAlert,
+} = require("../utils/alert-normalizer");
 
 const VALID_USER_ROLES = new Set(["admin", "user"]);
 
@@ -1387,25 +1392,28 @@ exports.deleteChild = async (req, res) => {
 // ==================== GET ALL ALERTS ====================
 exports.getAllAlerts = async (req, res) => {
   try {
-    const snap = await firestore.collection("alerts")
+    const firestoreSnap = await firestore.collection("alerts")
       .orderBy("created_at", "desc")
       .get();
-    const listById = new Map();
-    snap.forEach(d => listById.set(d.id, { id: d.id, ...d.data() }));
+    const [adminAlertsSnapshot, liveAlertsSnapshot] = await Promise.all([
+      realtimeDB.ref("admin_alerts").once("value"),
+      realtimeDB.ref("alerts_live").once("value"),
+    ]);
 
-    const adminAlertsSnapshot = await realtimeDB.ref("admin_alerts").once("value");
-    const adminAlerts = adminAlertsSnapshot.val() || {};
-    Object.entries(adminAlerts).forEach(([id, value]) => {
-      if (value && typeof value === "object" && !listById.has(id)) {
-        listById.set(id, { id, ...value });
-      }
-    });
-
-    const list = Array.from(listById.values()).sort(
-      (a, b) => Number(b.created_at || b.timestamp || 0) -
-        Number(a.created_at || a.timestamp || 0)
+    const firestoreAlerts = firestoreSnap.docs
+      .map((doc) => normalizeAlert({ id: doc.id, ...doc.data() }, "firestore_alerts"))
+      .filter(Boolean);
+    const adminAlerts = collectAlertsFromRealtimeValue(
+      adminAlertsSnapshot.val(),
+      "admin_alerts"
     );
-    res.json(list);
+    const liveAlerts = collectAlertsFromRealtimeValue(
+      liveAlertsSnapshot.val(),
+      "alerts_live",
+      { includeNested: true }
+    );
+
+    res.json(mergeNormalizedAlerts([...liveAlerts, ...adminAlerts, ...firestoreAlerts]));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1427,14 +1435,37 @@ exports.deleteAlert = async (req, res) => {
     const flatLiveSnapshot = await realtimeDB
       .ref(`alerts_live/${alertId}`)
       .once("value");
-
+    let nestedLiveData = null;
     if (!alertDoc.exists && !adminAlertSnapshot.exists() && !flatLiveSnapshot.exists()) {
+      const liveRootSnapshot = await realtimeDB.ref("alerts_live").once("value");
+      const liveRoot = liveRootSnapshot.val() || {};
+      for (const [childId, childAlerts] of Object.entries(liveRoot)) {
+        if (!childAlerts || typeof childAlerts !== "object") {
+          continue;
+        }
+        const candidate = childAlerts[alertId];
+        if (candidate && typeof candidate === "object") {
+          nestedLiveData = {
+            ...candidate,
+            child_id: candidate.child_id || childId,
+          };
+          break;
+        }
+      }
+    }
+
+    if (
+      !alertDoc.exists &&
+      !adminAlertSnapshot.exists() &&
+      !flatLiveSnapshot.exists() &&
+      !nestedLiveData
+    ) {
       return res.json({ message: "Alert already deleted" });
     }
 
     const alertData = alertDoc.exists
       ? alertDoc.data()
-      : adminAlertSnapshot.val() || flatLiveSnapshot.val() || {};
+      : adminAlertSnapshot.val() || flatLiveSnapshot.val() || nestedLiveData || {};
     if (alertDoc.exists) {
       await alertRef.delete();
     }

@@ -8,6 +8,8 @@ const {
 // Authentication routes
 router.post("/register", user.register);
 router.post("/login", user.login);
+router.post("/verify-otp", user.verifyOtp);
+router.post("/social-login", user.socialLogin);
 router.post("/logout", user.logout);
 
 // Password reset routes (Flutter calls these endpoints)

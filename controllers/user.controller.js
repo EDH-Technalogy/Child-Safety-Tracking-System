@@ -1,6 +1,8 @@
 const crypto = require("crypto");
-const { admin, firestore, realtimeDB } = require("../firebase");
+const bcrypt = require("bcrypt");
+const { admin, firestore } = require("../firebase");
 const { createAuthToken, verifyAuthToken } = require("../utils/auth-token");
+const otpService = require("../services/otp.service");
 const {
   findFallbackAdminByCredentials,
   isFirestoreQuotaError,
@@ -11,12 +13,16 @@ const {
   inferSource,
   buildPerformedByFromRequest,
 } = require("../utils/audit-log");
-
 const VALID_USER_ROLES = new Set(["admin", "user"]);
 const PASSWORD_HASH_PREFIX = "pbkdf2_sha256";
 const PASSWORD_HASH_ITERATIONS = 120000;
 const PASSWORD_HASH_KEY_LENGTH = 32;
 const PASSWORD_HASH_DIGEST = "sha256";
+const PASSWORD_VALIDATION_ERROR =
+  "Password must be at least 8 characters and include letters, numbers, and special characters";
+const GMAIL_VALIDATION_ERROR = "Only Gmail addresses are allowed";
+const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/;
+const emailRegex = /^[^\s@]+@gmail\.com$/i;
 
 function createHttpError(status, message) {
   const error = new Error(message);
@@ -29,33 +35,30 @@ function normalizeStoredRole(role) {
   return VALID_USER_ROLES.has(normalizedRole) ? normalizedRole : "user";
 }
 
-function hashPassword(password) {
+function normalizeEmail(email) {
+  return email?.toString().trim().toLowerCase() || "";
+}
+
+function validateGmailEmail(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!emailRegex.test(normalizedEmail)) {
+    throw createHttpError(400, GMAIL_VALIDATION_ERROR);
+  }
+  return normalizedEmail;
+}
+
+function validateStrongPassword(password) {
   const normalizedPassword = password?.toString() || "";
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto
-    .pbkdf2Sync(
-      normalizedPassword,
-      salt,
-      PASSWORD_HASH_ITERATIONS,
-      PASSWORD_HASH_KEY_LENGTH,
-      PASSWORD_HASH_DIGEST
-    )
-    .toString("hex");
-
-  return `${PASSWORD_HASH_PREFIX}$${PASSWORD_HASH_ITERATIONS}$${salt}$${hash}`;
+  if (!passwordRegex.test(normalizedPassword)) {
+    throw createHttpError(400, PASSWORD_VALIDATION_ERROR);
+  }
 }
 
-function timingSafeStringEquals(left, right) {
-  const leftBuffer = Buffer.from(left || "");
-  const rightBuffer = Buffer.from(right || "");
-
-  return (
-    leftBuffer.length === rightBuffer.length &&
-    crypto.timingSafeEqual(leftBuffer, rightBuffer)
-  );
+async function hashPassword(password) {
+  return bcrypt.hash(password?.toString() || "", 10);
 }
 
-function verifyPassword(password, storedPasswordValue) {
+function verifyLegacyPassword(password, storedPasswordValue) {
   const normalizedPassword = password?.toString() || "";
   const storedValue = storedPasswordValue?.toString() || "";
 
@@ -90,10 +93,35 @@ function verifyPassword(password, storedPasswordValue) {
   return timingSafeStringEquals(normalizedPassword, storedValue);
 }
 
-function verifyUserPassword(password, userData = {}) {
+async function verifyPassword(password, storedPasswordValue) {
+  const normalizedPassword = password?.toString() || "";
+  const storedValue = storedPasswordValue?.toString() || "";
+
+  if (!normalizedPassword || !storedValue) {
+    return false;
+  }
+
+  if (/^\$2[aby]\$/.test(storedValue)) {
+    return bcrypt.compare(normalizedPassword, storedValue);
+  }
+
+  return verifyLegacyPassword(normalizedPassword, storedValue);
+}
+
+async function verifyUserPassword(password, userData = {}) {
   return (
-    verifyPassword(password, userData.password_hash) ||
-    verifyPassword(password, userData.password)
+    (await verifyPassword(password, userData.password_hash)) ||
+    (await verifyPassword(password, userData.password))
+  );
+}
+
+function timingSafeStringEquals(left, right) {
+  const leftBuffer = Buffer.from(left || "");
+  const rightBuffer = Buffer.from(right || "");
+
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    crypto.timingSafeEqual(leftBuffer, rightBuffer)
   );
 }
 
@@ -102,9 +130,11 @@ async function logUserAudit(entry) {
 }
 
 function buildUserResponse(userId, userData = {}) {
+  const fullName = userData.fullName || userData.name || "";
   return {
     id: userId,
-    name: userData.name || "",
+    fullName,
+    name: fullName,
     phone: userData.phone || "",
     email: userData.email || "",
     photo: userData.photo || "",
@@ -158,6 +188,21 @@ function tryFallbackAdminLogin(req, res, reason) {
 
   res.json(buildFallbackAdminLoginPayload(admin));
   return true;
+}
+
+async function findUserDocumentByEmail(email) {
+  const normalizedEmail = email?.toString().trim().toLowerCase() || "";
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const snap = await firestore
+    .collection("users")
+    .where("email", "==", normalizedEmail)
+    .limit(1)
+    .get();
+
+  return snap.empty ? null : snap.docs[0];
 }
 
 function normalizeTimestampValue(value, fallback = 0) {
@@ -235,102 +280,17 @@ exports.getFirebaseToken = async (req, res, next) => {
 // REGISTER
 exports.register = async (req, res) => {
   try {
-    const { name, phone, email, password } = req.body;
-
-    if (!name || !phone || !email || !password) {
-      return res.status(400).json({ error: "Name, phone, email, and password are required" });
-    }
-
-    // Check if email already exists
-    const existingUser = await firestore.collection("users")
-      .where("email", "==", email)
-      .get();
-
-    if (!existingUser.empty) {
-      await logUserAudit({
-        eventType: "user_created",
-        entityType: "user",
-        entityId: null,
-        title: "User registration failed",
-        description: `Registration failed for ${email}.`,
-        performedBy: {
-          email: email || null,
-          role: "user",
-          type: "user",
-        },
-        target: {
-          email: email || null,
-          name: name || null,
-        },
-        status: "failed",
-        result: "failed",
-        source: inferSource(req, "mobile_app"),
-        metadata: {
-          reason: "email_already_registered",
-        },
-      });
-      return res.status(400).json({ error: "Email already registered" });
-    }
-
-    const createdAt = Date.now();
-    const storedUser = {
-      name,
-      phone,
-      email,
-      password_hash: hashPassword(password),
-      role: "user",
-      status: "active",
-      created_at: createdAt,
+    const payload = {
+      ...(req.body || {}),
+      type: "signup",
+      fullName: req.body?.fullName ?? req.body?.name,
+      confirmPassword:
+        req.body?.confirmPassword ??
+        req.body?.confirm_password ??
+        req.body?.password,
     };
-
-    const user = await firestore.collection("users").add(storedUser);
-    const userResponse = buildUserResponse(user.id, storedUser);
-    const token = createAuthToken({
-      subjectId: user.id,
-      role: userResponse.role,
-      subjectType: "user",
-      email: userResponse.email,
-    });
-
-    await logUserAudit({
-      eventType: "user_created",
-      entityType: "user",
-      entityId: user.id,
-      title: "User registered",
-      description: `${name} registered a new account.`,
-      performedBy: {
-        id: user.id,
-        name: name || null,
-        email: email || null,
-        role: "user",
-        type: "user",
-      },
-      target: {
-        id: user.id,
-        name: name || null,
-        email: email || null,
-        role: "user",
-      },
-      status: "success",
-      result: "success",
-      source: inferSource(req, "mobile_app"),
-      metadata: {
-        newValues: {
-          name,
-          phone,
-          email,
-          role: "user",
-          status: "active",
-        },
-      },
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "User created successfully",
-      user: userResponse,
-      token,
-    });
+    const result = await otpService.sendOtp(payload);
+    res.status(200).json(result);
   } catch (e) {
     await logUserAudit({
       eventType: "user_created",
@@ -345,7 +305,7 @@ exports.register = async (req, res) => {
       },
       target: {
         email: req.body?.email || null,
-        name: req.body?.name || null,
+        name: req.body?.fullName || req.body?.name || null,
       },
       status: "failed",
       result: "failed",
@@ -354,28 +314,37 @@ exports.register = async (req, res) => {
         reason: e.message,
       },
     });
-    res.status(500).json({ error: e.message });
+    res.status(e.status || 500).json({ error: e.message, message: e.message });
   }
 };
 
 // LOGIN
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = normalizeEmail(req.body?.email);
+    const password = req.body?.password?.toString() || "";
 
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const snap = await firestore
-      .collection("users")
-      .where("email", "==", email)
-      .limit(2)
-      .get();
+    const isGmailAddress = emailRegex.test(email);
+    let matchingUserDoc = null;
 
-    const matchingUserDoc = snap.docs.find((doc) =>
-      verifyUserPassword(password, doc.data())
-    );
+    if (isGmailAddress) {
+      const snap = await firestore
+        .collection("users")
+        .where("email", "==", email)
+        .limit(2)
+        .get();
+
+      for (const doc of snap.docs) {
+        if (await verifyUserPassword(password, doc.data())) {
+          matchingUserDoc = doc;
+          break;
+        }
+      }
+    }
 
     if (matchingUserDoc) {
       const userData = matchingUserDoc.data();
@@ -383,6 +352,10 @@ exports.login = async (req, res) => {
 
       if (userData.status === "blocked") {
         return res.status(403).json({ error: "Account is blocked" });
+      }
+
+      if (userData.isVerified === false) {
+        return res.status(403).json({ error: "Please verify your email first" });
       }
 
       const userResponse = buildUserResponse(matchingUserDoc.id, userData);
@@ -393,13 +366,21 @@ exports.login = async (req, res) => {
         email: userData.email,
       });
 
-      if (!userData.password_hash || !userData.password_hash.startsWith(PASSWORD_HASH_PREFIX)) {
-        await matchingUserDoc.ref.update({
-          password_hash: hashPassword(password),
-          password: admin.firestore.FieldValue.delete(),
-          updated_at: Date.now(),
-        });
+      const loginUpdates = {
+        last_login_at: Date.now(),
+        updated_at: Date.now(),
+      };
+
+      if (!userData.password_hash || !/^\$2[aby]\$/.test(userData.password_hash)) {
+        loginUpdates.password_hash = await hashPassword(password);
+        loginUpdates.password = admin.firestore.FieldValue.delete();
       }
+
+      if (userData.isVerified !== true) {
+        loginUpdates.isVerified = true;
+      }
+
+      await matchingUserDoc.ref.update(loginUpdates);
 
       res.json({
         success: true,
@@ -446,6 +427,9 @@ exports.login = async (req, res) => {
       .get();
 
     if (adminSnap.empty) {
+      if (!isGmailAddress) {
+        return res.status(400).json({ error: GMAIL_VALIDATION_ERROR });
+      }
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -502,6 +486,24 @@ exports.login = async (req, res) => {
     console.error('LOGIN ERROR:', e);
     res.status(500).json({ error: e.message });
   }
+};
+
+// VERIFY SIGNUP OTP
+exports.verifyOtp = async (req, res) => {
+  try {
+    const result = await otpService.verifyOtp({
+      ...(req.body || {}),
+      type: req.body?.type || "signup",
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message, message: e.message });
+  }
+};
+
+// SOCIAL LOGIN
+exports.socialLogin = async (req, res) => {
+  return res.status(410).json({ error: "Social login has been disabled" });
 };
 
 // LOGOUT
@@ -576,74 +578,32 @@ exports.deleteUser = async (req, res) => {
 // REQUEST PASSWORD RESET (Generate OTP)
 exports.requestPasswordReset = async (req, res) => {
   try {
-    const { email } = req.body;
-
-    const snap = await firestore.collection("users")
-      .where("email", "==", email)
-      .get();
-
-    if (snap.empty) {
-      return res.status(404).json({ error: "Email not found" });
-    }
-
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-    await firestore.collection("password_resets").doc(email).set({
-      email,
-      otp,
-      otpExpiry,
-      created_at: Date.now()
+    const result = await otpService.sendOtp({
+      ...(req.body || {}),
+      type: "forgot",
     });
-
-    // In production, send OTP via SMS/email - not in response!
-    res.json({ message: "OTP sent successfully", otp: otp });
+    res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(e.status || 500).json({ error: e.message, message: e.message });
   }
 };
 
 // VERIFY OTP AND RESET PASSWORD
 exports.verifyOtpAndResetPassword = async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
-
-    const doc = await firestore.collection("password_resets").doc(email).get();
-
-    if (!doc.exists) {
-      return res.status(400).json({ error: "Invalid request" });
-    }
-
-    const data = doc.data();
-
-    if (Date.now() > data.otpExpiry) {
-      return res.status(400).json({ error: "OTP expired" });
-    }
-
-    if (data.otp !== otp) {
-      return res.status(400).json({ error: "Invalid OTP" });
-    }
-
-    const userSnap = await firestore.collection("users")
-      .where("email", "==", email)
-      .get();
-
-    if (userSnap.empty) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    await firestore.collection("users").doc(userSnap.docs[0].id).update({
-      password_hash: hashPassword(newPassword),
-      password: admin.firestore.FieldValue.delete(),
-      updated_at: Date.now(),
+    const result = await otpService.verifyOtp({
+      ...(req.body || {}),
+      type: "forgot",
     });
-
-    await firestore.collection("password_resets").doc(email).delete();
-
-    res.json({ message: "Password reset successfully" });
+    res.json({
+      ...result,
+      message:
+        req.body?.newPassword || req.body?.new_password
+          ? "Password reset successfully"
+          : result.message,
+    });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(e.status || 500).json({ error: e.message, message: e.message });
   }
 };
 
@@ -717,12 +677,7 @@ exports.changePassword = async (req, res) => {
       );
     }
 
-    if (newPassword.toString().length < 6) {
-      throw createHttpError(
-        400,
-        "New password must be at least 6 characters"
-      );
-    }
+    validateStrongPassword(newPassword);
 
     if (newPassword.toString() !== confirmPassword.toString()) {
       throw createHttpError(400, "Passwords do not match");
@@ -736,7 +691,7 @@ exports.changePassword = async (req, res) => {
     }
 
     const userData = userDoc.data();
-    if (!verifyUserPassword(currentPassword, userData)) {
+    if (!(await verifyUserPassword(currentPassword, userData))) {
       console.warn("[user.changePassword] current password rejected", {
         actorId: req.auth?.id || null,
         targetUserId: req.params.id,
@@ -745,8 +700,9 @@ exports.changePassword = async (req, res) => {
     }
 
     await userRef.update({
-      password_hash: hashPassword(newPassword),
+      password_hash: await hashPassword(newPassword),
       password: admin.firestore.FieldValue.delete(),
+      isVerified: userData.isVerified === false ? false : true,
       updated_at: Date.now(),
     });
 
@@ -773,10 +729,13 @@ exports.createTestUser = async (req, res) => {
     const testUser = {
       name: "Test User",
       phone: "+1234567890", 
-      email: "test@example.com",
-      password: "password123",
+      email: "test@gmail.com",
+      password_hash: await hashPassword("Test123!"),
+      role: "user",
+      isVerified: true,
       status: "active",
-      created_at: Date.now()
+      created_at: Date.now(),
+      updated_at: Date.now(),
     };
 
     // Check if exists
@@ -790,7 +749,11 @@ exports.createTestUser = async (req, res) => {
     const userRef = await firestore.collection("users").add(testUser);
     console.log("Test user created:", userRef.id);
     
-    res.json({ id: userRef.id, message: "Test user created successfully", user: testUser });
+    res.json({
+      id: userRef.id,
+      message: "Test user created successfully",
+      user: buildUserResponse(userRef.id, testUser),
+    });
   } catch (e) {
     console.error("Test user creation failed:", e);
     res.status(500).json({ error: e.message });
@@ -825,10 +788,7 @@ exports.updateProfile = async (req, res) => {
     }
 
     if (req.body.email !== undefined) {
-      const email = req.body.email.toString().trim();
-      if (!email) {
-        throw createHttpError(400, "email is required");
-      }
+      const email = validateGmailEmail(req.body.email);
 
       const existingUser = await firestore
         .collection("users")

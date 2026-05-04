@@ -106,6 +106,30 @@ function createSystemActor(name = "System") {
 
 function normalizeAuditLogRecord(id, data = {}) {
   const timestamp = data.timestamp || data.created_at || 0;
+  const metadata = sanitizeAuditValue(data.metadata) || {};
+  const childId =
+    data.childId ||
+    data.child_id ||
+    metadata.childId ||
+    metadata.child_id ||
+    data.target?.child_id ||
+    (data.entityType === "child" ? data.entityId : null) ||
+    null;
+  const userId =
+    data.userId ||
+    data.user_id ||
+    metadata.userId ||
+    metadata.user_id ||
+    metadata.parentUserId ||
+    metadata.parent_user_id ||
+    null;
+  const alertId =
+    data.alertId ||
+    data.alert_id ||
+    metadata.alertId ||
+    metadata.alert_id ||
+    (data.entityType === "alert" ? data.entityId : null) ||
+    null;
 
   return {
     id,
@@ -119,8 +143,12 @@ function normalizeAuditLogRecord(id, data = {}) {
     status: data.status || data.result || "success",
     result: data.result || data.status || "success",
     timestamp,
+    createdAt: data.createdAt || data.created_at || timestamp,
     source: data.source || "backend",
-    metadata: sanitizeAuditValue(data.metadata) || {},
+    userId,
+    childId,
+    alertId,
+    metadata,
   };
 }
 
@@ -156,8 +184,32 @@ async function writeAuditLog({
   result,
   source = "backend",
   metadata = {},
+  userId = null,
+  childId = null,
+  alertId = null,
 }) {
   const timestamp = Date.now();
+  const sanitizedMetadata = sanitizeAuditValue(metadata) || {};
+  const resolvedUserId =
+    userId ||
+    sanitizedMetadata.userId ||
+    sanitizedMetadata.user_id ||
+    sanitizedMetadata.parentUserId ||
+    sanitizedMetadata.parent_user_id ||
+    null;
+  const resolvedChildId =
+    childId ||
+    sanitizedMetadata.childId ||
+    sanitizedMetadata.child_id ||
+    target?.child_id ||
+    (entityType === "child" ? entityId : null) ||
+    null;
+  const resolvedAlertId =
+    alertId ||
+    sanitizedMetadata.alertId ||
+    sanitizedMetadata.alert_id ||
+    (entityType === "alert" ? entityId : null) ||
+    null;
   const payload = {
     eventType,
     entityType,
@@ -170,8 +222,12 @@ async function writeAuditLog({
     result: result || status,
     timestamp,
     created_at: timestamp,
+    createdAt: timestamp,
     source,
-    metadata: sanitizeAuditValue(metadata) || {},
+    userId: resolvedUserId,
+    childId: resolvedChildId,
+    alertId: resolvedAlertId,
+    metadata: sanitizedMetadata,
     serverTimestamp: admin.firestore.FieldValue.serverTimestamp(),
   };
 
@@ -189,6 +245,30 @@ async function writeAuditLogWithId(id, entry) {
   }
 
   const timestamp = Date.now();
+  const sanitizedMetadata = sanitizeAuditValue(entry.metadata) || {};
+  const resolvedUserId =
+    entry.userId ||
+    entry.user_id ||
+    sanitizedMetadata.userId ||
+    sanitizedMetadata.user_id ||
+    sanitizedMetadata.parentUserId ||
+    sanitizedMetadata.parent_user_id ||
+    null;
+  const resolvedChildId =
+    entry.childId ||
+    entry.child_id ||
+    sanitizedMetadata.childId ||
+    sanitizedMetadata.child_id ||
+    entry.target?.child_id ||
+    (entry.entityType === "child" ? entry.entityId : null) ||
+    null;
+  const resolvedAlertId =
+    entry.alertId ||
+    entry.alert_id ||
+    sanitizedMetadata.alertId ||
+    sanitizedMetadata.alert_id ||
+    (entry.entityType === "alert" ? entry.entityId : null) ||
+    null;
   const payload = {
     eventType: entry.eventType,
     entityType: entry.entityType,
@@ -201,8 +281,12 @@ async function writeAuditLogWithId(id, entry) {
     result: entry.result || entry.status || "success",
     timestamp,
     created_at: timestamp,
+    createdAt: timestamp,
     source: entry.source || "backend",
-    metadata: sanitizeAuditValue(entry.metadata) || {},
+    userId: resolvedUserId,
+    childId: resolvedChildId,
+    alertId: resolvedAlertId,
+    metadata: sanitizedMetadata,
     serverTimestamp: admin.firestore.FieldValue.serverTimestamp(),
   };
 

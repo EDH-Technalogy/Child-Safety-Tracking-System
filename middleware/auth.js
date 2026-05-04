@@ -67,6 +67,10 @@ async function resolveCurrentAuthState(payload) {
       throw createHttpError(403, "Account is blocked");
     }
 
+    if (userData.isVerified === false) {
+      throw createHttpError(403, "Please verify your email first");
+    }
+
     return {
       id: userDoc.id,
       email: userData.email || payload.email || "",

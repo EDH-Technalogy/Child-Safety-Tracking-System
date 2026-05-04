@@ -105,7 +105,12 @@ class QuickActionCard extends StatelessWidget {
                               duration: const Duration(milliseconds: 200),
                               curve: Curves.easeOutCubic,
                               transform: Matrix4.identity()
-                                ..translate(isHovered ? 3.0 : 0.0),
+                                ..translateByDouble(
+                                  isHovered ? 3.0 : 0.0,
+                                  0,
+                                  0,
+                                  1,
+                                ),
                               child: Icon(
                                 textDirection == TextDirection.rtl
                                     ? Icons.chevron_left_rounded

@@ -12,6 +12,8 @@ const {
 function mapActivityResponseItem(record = {}) {
   const createdAt = record.timestamp || record.created_at || 0;
   const targetChildId =
+    record.childId ||
+    record.child_id ||
     record.target?.child_id ||
     record.target?.id ||
     record.metadata?.childId ||
@@ -42,15 +44,26 @@ async function listLegacyActivityLogs(childId) {
 }
 
 async function listRelevantAuditLogs(childId) {
-  const snapshot = await firestore
-    .collection(AUDIT_LOG_COLLECTION)
-    .where("metadata.childId", "==", childId)
-    .get();
+  const [topLevelSnapshot, metadataSnapshot] = await Promise.all([
+    firestore
+      .collection(AUDIT_LOG_COLLECTION)
+      .where("childId", "==", childId)
+      .get(),
+    firestore
+      .collection(AUDIT_LOG_COLLECTION)
+      .where("metadata.childId", "==", childId)
+      .get(),
+  ]);
 
-  return snapshot.docs
+  const docsById = new Map();
+  topLevelSnapshot.docs.forEach((doc) => docsById.set(doc.id, doc));
+  metadataSnapshot.docs.forEach((doc) => docsById.set(doc.id, doc));
+
+  return Array.from(docsById.values())
     .map((doc) => normalizeAuditLogRecord(doc.id, doc.data() || {}))
     .filter((entry) =>
       [
+        "alert_received",
         "safe_zone_exit",
         "safe_zone_enter",
         "device_disconnected_auto",

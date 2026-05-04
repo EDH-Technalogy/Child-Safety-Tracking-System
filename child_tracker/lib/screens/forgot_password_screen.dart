@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/auth_validation.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 
@@ -147,13 +148,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return l10n.enterYourEmail;
-                        }
-                        if (!value.contains('@')) {
-                          return l10n.enterValidEmail;
-                        }
-                        return null;
+                        return validateGmailEmailInput(
+                          value,
+                          requiredMessage: l10n.enterYourEmail,
+                        );
                       },
                     ),
                     if (_otpSent) ...[
@@ -184,13 +182,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           prefixIcon: Icon(Icons.lock_outlined),
                         ),
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return l10n.enterNewPassword;
-                          }
-                          if (value.length < 6) {
-                            return l10n.passwordMinSix;
-                          }
-                          return null;
+                          return validateStrongPasswordInput(
+                            value,
+                            requiredMessage: l10n.enterNewPassword,
+                          );
                         },
                       ),
                       const SizedBox(height: 16),

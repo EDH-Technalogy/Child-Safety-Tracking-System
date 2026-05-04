@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
+import '../utils/auth_validation.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 
@@ -14,18 +15,35 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
+  bool get _isFormReady {
+    final fullName = _fullNameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    return fullName.isNotEmpty &&
+        gmailEmailRegex.hasMatch(email) &&
+        strongPasswordRegex.hasMatch(password) &&
+        confirmPassword.isNotEmpty &&
+        password == confirmPassword;
+  }
+
+  void _refreshFormState() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
+    _fullNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -38,23 +56,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final success = await authProvider.register(
-      name: _nameController.text.trim(),
-      phone: _phoneController.text.trim(),
+      fullName: _fullNameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
+      confirmPassword: _confirmPasswordController.text,
     );
 
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.registrationSuccessful),
+          content: Text(l10n.otpSentToEmail),
           backgroundColor: AppColors.successColor,
         ),
       );
-      Navigator.pushNamedAndRemoveUntil(
+      Navigator.pushNamed(
         context,
-        authProvider.isAdmin ? '/admin-dashboard' : '/home',
-        (route) => false,
+        '/verify-otp',
+        arguments: _emailController.text.trim(),
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -88,6 +106,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               padding: const EdgeInsets.all(24),
               child: Form(
                 key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -105,7 +124,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: const Icon(
                             Icons.safety_check,
                             size: 40,
-                            color: Colors.white,
+                            color: Color.fromARGB(255, 53, 51, 51),
                           ),
                         );
                       },
@@ -131,30 +150,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 32),
                     TextFormField(
-                      controller: _nameController,
+                      controller: _fullNameController,
                       textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        labelText: l10n.name,
-                        prefixIcon: const Icon(Icons.person_outlined),
+                      onChanged: (_) => _refreshFormState(),
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        prefixIcon: Icon(Icons.person_outlined),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return l10n.enterName;
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        labelText: l10n.phone,
-                        prefixIcon: const Icon(Icons.phone_outlined),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return l10n.enterPhone;
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Full name is required';
                         }
                         return null;
                       },
@@ -163,24 +168,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      onChanged: (_) => _refreshFormState(),
                       decoration: InputDecoration(
                         labelText: l10n.email,
                         prefixIcon: const Icon(Icons.email_outlined),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return l10n.emailRequired;
-                        }
-                        if (!value.contains('@')) {
-                          return l10n.enterValidEmail;
-                        }
-                        return null;
+                        return validateGmailEmailInput(
+                          value,
+                          requiredMessage: l10n.emailRequired,
+                        );
                       },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
+                      onChanged: (_) => _refreshFormState(),
                       decoration: InputDecoration(
                         labelText: l10n.password,
                         prefixIcon: const Icon(Icons.lock_outlined),
@@ -198,19 +202,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return l10n.passwordRequired;
-                        }
-                        if (value.length < 6) {
-                          return l10n.passwordMinSix;
-                        }
-                        return null;
+                        return validateStrongPasswordInput(
+                          value,
+                          requiredMessage: l10n.passwordRequired,
+                        );
                       },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirmPassword,
+                      onChanged: (_) => _refreshFormState(),
                       decoration: InputDecoration(
                         labelText: l10n.confirmPassword,
                         prefixIcon: const Icon(Icons.lock_outlined),
@@ -240,7 +242,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 32),
                     ElevatedButton(
-                      onPressed: authProvider.isLoading ? null : _register,
+                      onPressed: authProvider.isLoading || !_isFormReady
+                          ? null
+                          : _register,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),

@@ -984,7 +984,7 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          value: selectedValue,
+          initialValue: selectedValue,
           decoration: const InputDecoration(
             labelText: 'Saved locations',
             prefixIcon: Icon(Icons.history),

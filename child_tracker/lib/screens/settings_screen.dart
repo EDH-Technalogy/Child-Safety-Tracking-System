@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../providers/locale_provider.dart';
+import '../utils/auth_validation.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 import '../utils/photo_provider.dart';
@@ -737,12 +738,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return l10n.passwordRequired;
-                      }
-                      if (value.length < 6) {
-                        return l10n.passwordMinSix;
-                      }
+                      final passwordError = validateStrongPasswordInput(
+                        value,
+                        requiredMessage: l10n.passwordRequired,
+                      );
+                      if (passwordError != null) return passwordError;
                       if (value == currentPasswordController.text) {
                         return _newPasswordMustDifferLabel(context);
                       }
@@ -913,28 +913,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           return AlertDialog(
             title: Text(l10n.selectLanguage),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _languageOptionTile(
-                  value: 'en',
-                  title: l10n.english,
-                  groupValue: localeProvider.locale.languageCode,
-                  onSelected: () => selectLocale(const Locale('en')),
-                ),
-                _languageOptionTile(
-                  value: 'ps',
-                  title: l10n.pashto,
-                  groupValue: localeProvider.locale.languageCode,
-                  onSelected: () => selectLocale(const Locale('ps')),
-                ),
-                _languageOptionTile(
-                  value: 'fa',
-                  title: l10n.dari,
-                  groupValue: localeProvider.locale.languageCode,
-                  onSelected: () => selectLocale(const Locale('fa')),
-                ),
-              ],
+            content: RadioGroup<String>(
+              groupValue: localeProvider.locale.languageCode,
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                selectLocale(Locale(value));
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _languageOptionTile(
+                    value: 'en',
+                    title: l10n.english,
+                    onSelected: () => selectLocale(const Locale('en')),
+                  ),
+                  _languageOptionTile(
+                    value: 'ps',
+                    title: l10n.pashto,
+                    onSelected: () => selectLocale(const Locale('ps')),
+                  ),
+                  _languageOptionTile(
+                    value: 'fa',
+                    title: l10n.dari,
+                    onSelected: () => selectLocale(const Locale('fa')),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -951,15 +957,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _languageOptionTile({
     required String value,
     required String title,
-    required String groupValue,
     required VoidCallback onSelected,
   }) {
     return ListTile(
-      leading: Radio<String>(
-        value: value,
-        groupValue: groupValue,
-        onChanged: (_) => onSelected(),
-      ),
+      leading: Radio<String>(value: value),
       title: Text(title),
       onTap: onSelected,
     );

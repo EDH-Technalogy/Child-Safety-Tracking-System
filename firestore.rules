@@ -66,6 +66,10 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    match /otp_codes/{otpId} {
+      allow read, write: if false;
+    }
+
     match /settings/{settingId} {
       allow read, write: if isAdmin();
     }

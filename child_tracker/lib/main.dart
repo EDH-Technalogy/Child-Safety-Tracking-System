@@ -18,6 +18,7 @@ import 'l10n/cupertino_fallback_localizations.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/otp_verification_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/child_detail_screen.dart';
@@ -152,6 +153,11 @@ class MyApp extends StatelessWidget {
                 case '/register':
                   return MaterialPageRoute(
                       builder: (_) => const RegisterScreen());
+                case '/verify-otp':
+                  final email = settings.arguments as String;
+                  return MaterialPageRoute(
+                    builder: (_) => OtpVerificationScreen(email: email),
+                  );
                 case '/forgot-password':
                   return MaterialPageRoute(
                       builder: (_) => const ForgotPasswordScreen());
