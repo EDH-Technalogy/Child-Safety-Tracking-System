@@ -1,0 +1,33 @@
+group 'fr.g123k.flutterappbadge.flutterappbadger'
+version '1.0-SNAPSHOT'
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'fr.g123k.flutterappbadge.flutterappbadger'
+    compileSdkVersion 36
+
+    defaultConfig {
+        minSdkVersion 16
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lintOptions {
+        disable 'InvalidPackage'
+    }
+}
+
+dependencies {
+    //noinspection GradleDependency
+    implementation "me.leolin:ShortcutBadger:1.1.22@aar"
+}

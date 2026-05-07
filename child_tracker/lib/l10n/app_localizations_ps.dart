@@ -1559,4 +1559,170 @@ class AppLocalizationsPs extends AppLocalizations {
 
   @override
   String get geofenceBreachesToday => 'د نن جيوفنس سرغړونې';
+
+  @override
+  String get mapUnavailableTitle => 'نقشه شتون نه لري';
+
+  @override
+  String get mapUnavailableMessage =>
+      'Google Maps اوس په دې براوزر کې چمتو نه دی. د وېب نقشې سکرېپټ او API key امستنې وګورئ.';
+
+  @override
+  String get noLiveLocationAvailableForChild =>
+      'د دې ماشوم لپاره ژوندی موقعیت نشته';
+
+  @override
+  String get mapAppearsWhenGpsAvailable =>
+      'نقشه هغه وخت ښکاري کله چې تړلې وسیله سم GPS معلومات واستوي.';
+
+  @override
+  String get noLiveLocationOrSafeZoneAvailable =>
+      'ژوندی موقعیت یا خوندي سیمه نشته';
+
+  @override
+  String get addChildToStartTrackingAndSafeZones =>
+      'د ژوندۍ څارنې او خوندي سیمو د څار پیل لپاره یو ماشوم اضافه کړئ.';
+
+  @override
+  String get mapAppearsWhenLiveDataOrSafeZoneSaved =>
+      'نقشه هغه وخت ښکاري کله چې ماشوم ژوندی معلومات واستوي یا خوندي سیمه خوندي شي.';
+
+  @override
+  String get childMapTemporarilyUnavailable =>
+      'د ماشوم نقشه لنډمهاله شتون نه لري.';
+
+  @override
+  String get mapMode => 'د نقشې حالت';
+
+  @override
+  String get mapTypeNormal => 'عادي';
+
+  @override
+  String get mapTypeSatellite => 'سپوږمکۍ';
+
+  @override
+  String get mapTypeTerrain => 'ځمکنی';
+
+  @override
+  String get mapTypeDefault => 'اصلي';
+
+  @override
+  String get mapTypeThreeDimensionalLike => '۳ بعدي ته ورته';
+
+  @override
+  String insideSafeZoneNamed(Object name) {
+    return 'د $name دننه';
+  }
+
+  @override
+  String outsideByDistance(Object distance) {
+    return 'د $distance په اندازه بهر';
+  }
+
+  @override
+  String get outsideSafeZones => 'له خوندي سیمو بهر';
+
+  @override
+  String get noLiveData => 'ژوندی معلومات نشته';
+
+  @override
+  String get moving => 'په خوځښت کې';
+
+  @override
+  String get stationary => 'ولاړ';
+
+  @override
+  String get insideSafeZone => 'د خوندي سیمې دننه';
+
+  @override
+  String get outsideSafeZone => 'له خوندي سیمې بهر';
+
+  @override
+  String get changeMapStyle => 'د نقشې بڼه بدله کړئ';
+
+  @override
+  String get savedCenterHint =>
+      'خوندي شوی مرکز. په نقشه ټک وکړئ یا د ځای یو عمل وکاروئ، بیا یې د بدلولو لپاره خوندي کړئ.';
+
+  @override
+  String get previewCenterHint =>
+      'یوازې مخکتنه. د خوندي کولو مخکې په نقشه ټک وکړئ یا د مرکز ټاکلو لپاره د ځای یو عمل وکاروئ.';
+
+  @override
+  String get chooseNewCenterOrKeepSaved =>
+      'یو نوی مرکز وټاکئ او خوندي یې کړئ، یا اوسنی خوندي شوی مرکز همداسې پرېږدئ.';
+
+  @override
+  String get previousSavedLocation => 'مخکینی خوندي شوی موقعیت';
+
+  @override
+  String get currentLiveLocation => 'اوسنی ژوندی موقعیت';
+
+  @override
+  String get customLocationFromMap => 'له نقشې څخه ځانګړی موقعیت';
+
+  @override
+  String get previewingSavedLocationInstructions =>
+      'یو خوندي شوی موقعیت مخکتنه کېږي. په نقشه ټک وکړئ، نښه راکاږئ، یا د خوندي کولو مخکې د ځای عمل تایید کړئ.';
+
+  @override
+  String get previewingLiveLocationInstructions =>
+      'د ماشوم اوسنی ژوندی موقعیت مخکتنه کېږي. د نوي مرکز د ټاکلو لپاره د عمل تڼۍ یا پر نقشه ټک کاروئ.';
+
+  @override
+  String get pendingCenterChange =>
+      'بدلون انتظار باسي: د خوندي سیمې مرکز د نوي کولو لپاره خوندي یې کړئ.';
+
+  @override
+  String get savedCenterLoaded => 'خوندي شوی مرکز له ډیټابېس څخه پورته شو.';
+
+  @override
+  String get previewOnlyChooseLocation =>
+      'یوازې مخکتنه: دا ځای په څرګنده وټاکئ، بیا یې د ساتلو لپاره خوندي کړئ.';
+
+  @override
+  String get noCenterSelectedYet => 'لا تر اوسه کوم مرکز نه دی ټاکل شوی.';
+
+  @override
+  String get unknownTime => 'نامعلوم وخت';
+
+  @override
+  String get safeZoneCenterTitle => 'د خوندي سیمې مرکز';
+
+  @override
+  String get noPreviousSavedLocations =>
+      'لا تر اوسه د دې ماشوم لپاره کوم مخکینی خوندي شوی موقعیت نشته.';
+
+  @override
+  String get refreshSavedLocations => 'خوندي شوي موقعیتونه تازه کړئ';
+
+  @override
+  String get savedLocations => 'خوندي شوي موقعیتونه';
+
+  @override
+  String get useSelectedSavedLocation => 'ټاکل شوی خوندي شوی موقعیت وکاروئ';
+
+  @override
+  String get savedLocationPreviewHint =>
+      'له دې لست څخه ټاکل یوازې ځای مخکتنه کوي. مرکز هغه وخت بدلېږي چې پورته تڼۍ وکاروئ او بیا خوندي کړئ.';
+
+  @override
+  String get useCurrentLiveLocation => 'اوسنی ژوندی موقعیت وکاروئ';
+
+  @override
+  String latestLiveUpdateUseButton(Object time) {
+    return 'وروستی ژوندی تازه کول: $time. که غواړئ دا د مرکز په توګه وټاکئ، پورته تڼۍ وکاروئ.';
+  }
+
+  @override
+  String get liveLocationPreviewHint =>
+      'دا برخه د مخکتنې لپاره وروستی ژوندی موقعیت ښيي. دا یوازې هغه وخت د خوندي سیمې مرکز ګرځي چې یې وټاکئ او خوندي یې کړئ.';
+
+  @override
+  String get customLocationPanelHint =>
+      'د نقشې پر هر ځای ټک وکړئ یا نښه راکش کړئ تر څو د خوندي سیمې مرکز په دقیق ډول هغه ځای کې کېږدئ چې غواړئ. خوندي شوی مرکز تر هغه نه بدلېږي څو Save یا Update ونه ټکوئ.';
+
+  @override
+  String get chooseCenterToPreviewSafeZone =>
+      'یو ژوندی، خوندي شوی، یا ځانګړی مرکز وټاکئ تر څو په نقشه کې د خوندي سیمې مخکتنه ووینئ.';
 }

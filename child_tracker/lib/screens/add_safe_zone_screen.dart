@@ -594,8 +594,8 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
           snippet: hasManualSelection
               ? context.l10n.dragToAdjustLocation
               : isSavedCenterVisible
-                  ? 'Saved center. Tap the map or use a location action, then save to change it.'
-                  : 'Preview only. Tap the map or use a location action to set the center before saving.',
+                  ? context.l10n.savedCenterHint
+                  : context.l10n.previewCenterHint,
         ),
       ),
     };
@@ -663,7 +663,7 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
         SnackBar(
           content: Text(
             widget.isEditMode
-                ? 'Choose a new center and save, or keep the existing saved center.'
+                ? l10n.chooseNewCenterOrKeepSaved
                 : l10n.pleaseSelectLocation,
           ),
           backgroundColor: AppColors.errorColor,
@@ -793,22 +793,23 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
   }
 
   String _centerSourceLabel(_SafeZoneCenterSource source) {
+    final l10n = context.l10n;
     switch (source) {
       case _SafeZoneCenterSource.previousSavedLocation:
-        return 'Previous saved location';
+        return l10n.previousSavedLocation;
       case _SafeZoneCenterSource.currentLiveLocation:
-        return 'Current live location';
+        return l10n.currentLiveLocation;
       case _SafeZoneCenterSource.customMap:
-        return 'Custom location from map';
+        return l10n.customLocationFromMap;
     }
   }
 
   String _mapInstructionText() {
     switch (_centerSource) {
       case _SafeZoneCenterSource.previousSavedLocation:
-        return 'Previewing a saved location. Tap the map, drag the marker, or confirm a location action before saving a new center.';
+        return context.l10n.previewingSavedLocationInstructions;
       case _SafeZoneCenterSource.currentLiveLocation:
-        return 'Previewing the child\'s current live location. Use the action button or tap the map to set a new center before saving.';
+        return context.l10n.previewingLiveLocationInstructions;
       case _SafeZoneCenterSource.customMap:
         return context.l10n.tapOnMapToSelectLocation;
     }
@@ -816,18 +817,18 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
 
   String _centerPersistenceStatusText() {
     if (_selectedCenter != null) {
-      return 'Pending change: save to update the safe zone center.';
+      return context.l10n.pendingCenterChange;
     }
 
     if (_savedCenter != null) {
-      return 'Saved center loaded from the database.';
+      return context.l10n.savedCenterLoaded;
     }
 
     if (_previewCenter != null) {
-      return 'Preview only: choose this location explicitly, then save to keep it.';
+      return context.l10n.previewOnlyChooseLocation;
     }
 
-    return 'No center selected yet.';
+    return context.l10n.noCenterSelectedYet;
   }
 
   String _displayedCenterText(BuildContext context) {
@@ -854,15 +855,16 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
   }
 
   String _mapViewLabel(_SafeZoneMapViewMode mode) {
+    final l10n = context.l10n;
     switch (mode) {
       case _SafeZoneMapViewMode.defaultView:
-        return 'Default';
+        return l10n.mapTypeDefault;
       case _SafeZoneMapViewMode.satellite:
-        return 'Satellite';
+        return l10n.mapTypeSatellite;
       case _SafeZoneMapViewMode.terrain:
-        return 'Terrain';
+        return l10n.mapTypeTerrain;
       case _SafeZoneMapViewMode.threeDimensionalLike:
-        return '3D-like';
+        return l10n.mapTypeThreeDimensionalLike;
     }
   }
 
@@ -901,7 +903,7 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
   String _formatRecordedAt(int? value) {
     final date = TimestampUtils.toLocalDateTime(value);
     if (date == null) {
-      return 'Unknown time';
+      return context.l10n.unknownTime;
     }
 
     return DateFormat('MMM d, HH:mm').format(date);
@@ -914,8 +916,8 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Safe zone center',
+            Text(
+              context.l10n.safeZoneCenterTitle,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -961,14 +963,14 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
           Text(
             _savedLocationError?.isNotEmpty == true
                 ? _savedLocationError!
-                : 'No previous saved locations are available for this child yet.',
+                : context.l10n.noPreviousSavedLocations,
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: _loadSavedLocations,
             icon: const Icon(Icons.refresh),
-            label: const Text('Refresh saved locations'),
+            label: Text(context.l10n.refreshSavedLocations),
           ),
         ],
       );
@@ -985,8 +987,8 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
       children: [
         DropdownButtonFormField<String>(
           initialValue: selectedValue,
-          decoration: const InputDecoration(
-            labelText: 'Saved locations',
+          decoration: InputDecoration(
+            labelText: context.l10n.savedLocations,
             prefixIcon: Icon(Icons.history),
           ),
           items: _savedLocationOptions.map((option) {
@@ -1022,18 +1024,18 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
             _applySavedLocation(selectedOption);
           },
           icon: const Icon(Icons.place),
-          label: const Text('Use selected saved location'),
+          label: Text(context.l10n.useSelectedSavedLocation),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Picking from this list only previews the location. The center changes after you press the button above and then save.',
+        Text(
+          context.l10n.savedLocationPreviewHint,
           style: TextStyle(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 8),
         TextButton.icon(
           onPressed: _loadSavedLocations,
           icon: const Icon(Icons.refresh),
-          label: const Text('Refresh saved locations'),
+          label: Text(context.l10n.refreshSavedLocations),
         ),
       ],
     );
@@ -1048,15 +1050,17 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
               ? null
               : () => _useCurrentLiveLocation(showFeedback: true),
           icon: const Icon(Icons.gps_fixed),
-          label: const Text('Use current live location'),
+          label: Text(context.l10n.useCurrentLiveLocation),
         ),
         const SizedBox(height: 8),
         Text(
           _liveLocationError?.isNotEmpty == true
               ? _liveLocationError!
               : (_lastLiveLocationAt != null
-                  ? 'Latest live update: ${_formatRecordedAt(_lastLiveLocationAt)}. Use the button above if you want to set it as the center.'
-                  : 'This shows the latest live location for preview. It only becomes the safe zone center after you choose it and save.'),
+                  ? context.l10n.latestLiveUpdateUseButton(
+                      _formatRecordedAt(_lastLiveLocationAt),
+                    )
+                  : context.l10n.liveLocationPreviewHint),
           style: const TextStyle(color: AppColors.textSecondary),
         ),
       ],
@@ -1064,9 +1068,9 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
   }
 
   Widget _buildCustomLocationPanel() {
-    return const Text(
-      'Tap anywhere on the map or drag the marker to place the safe zone center exactly where you want it. The saved center stays unchanged until you press Save or Update.',
-      style: TextStyle(color: AppColors.textSecondary),
+    return Text(
+      context.l10n.customLocationPanelHint,
+      style: const TextStyle(color: AppColors.textSecondary),
     );
   }
 
@@ -1082,7 +1086,7 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
             onPressed: _isLoadingLocation
                 ? null
                 : () => _useCurrentLiveLocation(showFeedback: true),
-            tooltip: 'Use current live location',
+            tooltip: l10n.useCurrentLiveLocation,
           ),
         ],
       ),
@@ -1122,10 +1126,9 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
                           rotateGesturesEnabled: true,
                           tiltGesturesEnabled: true,
                         ),
-                        fallbackBuilder: (_) => const GoogleMapUnavailableState(
-                          title: 'Map unavailable',
-                          message:
-                              'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+                        fallbackBuilder: (_) => GoogleMapUnavailableState(
+                          title: l10n.mapUnavailableTitle,
+                          message: l10n.mapUnavailableMessage,
                         ),
                       )
                     else
@@ -1152,7 +1155,7 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Choose a live, saved, or custom center to preview the safe zone on the map.',
+                              l10n.chooseCenterToPreviewSafeZone,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 color: AppColors.textSecondary,

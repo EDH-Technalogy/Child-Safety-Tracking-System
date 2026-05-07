@@ -1551,4 +1551,170 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get geofenceBreachesToday => 'Geofence Breaches Today';
+
+  @override
+  String get mapUnavailableTitle => 'Map unavailable';
+
+  @override
+  String get mapUnavailableMessage =>
+      'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.';
+
+  @override
+  String get noLiveLocationAvailableForChild =>
+      'No live location available for this child';
+
+  @override
+  String get mapAppearsWhenGpsAvailable =>
+      'The map will appear when the linked device sends valid GPS data.';
+
+  @override
+  String get noLiveLocationOrSafeZoneAvailable =>
+      'No live location or safe zone available';
+
+  @override
+  String get addChildToStartTrackingAndSafeZones =>
+      'Add a child to start live tracking and safe zone monitoring.';
+
+  @override
+  String get mapAppearsWhenLiveDataOrSafeZoneSaved =>
+      'The map will appear once the child sends live data or a safe zone is saved.';
+
+  @override
+  String get childMapTemporarilyUnavailable =>
+      'The child map is temporarily unavailable.';
+
+  @override
+  String get mapMode => 'Map mode';
+
+  @override
+  String get mapTypeNormal => 'Normal';
+
+  @override
+  String get mapTypeSatellite => 'Satellite';
+
+  @override
+  String get mapTypeTerrain => 'Terrain';
+
+  @override
+  String get mapTypeDefault => 'Default';
+
+  @override
+  String get mapTypeThreeDimensionalLike => '3D-like';
+
+  @override
+  String insideSafeZoneNamed(Object name) {
+    return 'Inside $name';
+  }
+
+  @override
+  String outsideByDistance(Object distance) {
+    return 'Outside by $distance';
+  }
+
+  @override
+  String get outsideSafeZones => 'Outside safe zones';
+
+  @override
+  String get noLiveData => 'No live data';
+
+  @override
+  String get moving => 'Moving';
+
+  @override
+  String get stationary => 'Stationary';
+
+  @override
+  String get insideSafeZone => 'Inside safe zone';
+
+  @override
+  String get outsideSafeZone => 'Outside safe zone';
+
+  @override
+  String get changeMapStyle => 'Change map style';
+
+  @override
+  String get savedCenterHint =>
+      'Saved center. Tap the map or use a location action, then save to change it.';
+
+  @override
+  String get previewCenterHint =>
+      'Preview only. Tap the map or use a location action to set the center before saving.';
+
+  @override
+  String get chooseNewCenterOrKeepSaved =>
+      'Choose a new center and save, or keep the existing saved center.';
+
+  @override
+  String get previousSavedLocation => 'Previous saved location';
+
+  @override
+  String get currentLiveLocation => 'Current live location';
+
+  @override
+  String get customLocationFromMap => 'Custom location from map';
+
+  @override
+  String get previewingSavedLocationInstructions =>
+      'Previewing a saved location. Tap the map, drag the marker, or confirm a location action before saving a new center.';
+
+  @override
+  String get previewingLiveLocationInstructions =>
+      'Previewing the child\'s current live location. Use the action button or tap the map to set a new center before saving.';
+
+  @override
+  String get pendingCenterChange =>
+      'Pending change: save to update the safe zone center.';
+
+  @override
+  String get savedCenterLoaded => 'Saved center loaded from the database.';
+
+  @override
+  String get previewOnlyChooseLocation =>
+      'Preview only: choose this location explicitly, then save to keep it.';
+
+  @override
+  String get noCenterSelectedYet => 'No center selected yet.';
+
+  @override
+  String get unknownTime => 'Unknown time';
+
+  @override
+  String get safeZoneCenterTitle => 'Safe zone center';
+
+  @override
+  String get noPreviousSavedLocations =>
+      'No previous saved locations are available for this child yet.';
+
+  @override
+  String get refreshSavedLocations => 'Refresh saved locations';
+
+  @override
+  String get savedLocations => 'Saved locations';
+
+  @override
+  String get useSelectedSavedLocation => 'Use selected saved location';
+
+  @override
+  String get savedLocationPreviewHint =>
+      'Picking from this list only previews the location. The center changes after you press the button above and then save.';
+
+  @override
+  String get useCurrentLiveLocation => 'Use current live location';
+
+  @override
+  String latestLiveUpdateUseButton(Object time) {
+    return 'Latest live update: $time. Use the button above if you want to set it as the center.';
+  }
+
+  @override
+  String get liveLocationPreviewHint =>
+      'This shows the latest live location for preview. It only becomes the safe zone center after you choose it and save.';
+
+  @override
+  String get customLocationPanelHint =>
+      'Tap anywhere on the map or drag the marker to place the safe zone center exactly where you want it. The saved center stays unchanged until you press Save or Update.';
+
+  @override
+  String get chooseCenterToPreviewSafeZone =>
+      'Choose a live, saved, or custom center to preview the safe zone on the map.';
 }

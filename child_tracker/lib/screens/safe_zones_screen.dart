@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/geofence_provider.dart';
 import '../providers/location_provider.dart';
 import '../utils/constants.dart';
+import '../utils/localization_helpers.dart';
 import '../utils/timestamp_utils.dart';
 import '../models/geofence_model.dart';
 import '../models/location_model.dart';
@@ -201,10 +202,14 @@ class _SafeZonesScreenState extends State<SafeZonesScreen> {
     final statusText = zoneCheck == null
         ? l10n.loading
         : zoneCheck.inZone
-            ? 'Inside ${zoneCheck.currentZone?.name ?? l10n.safeZones}'
+            ? l10n.insideSafeZoneNamed(
+                zoneCheck.currentZone?.name ?? l10n.safeZones,
+              )
             : nearestZone != null
-                ? 'Outside by ${nearestZone.distance} ${l10n.metersShort}'
-                : 'Outside safe zones';
+                ? l10n.outsideByDistance(
+                    '${nearestZone.distance} ${l10n.metersShort}',
+                  )
+                : l10n.outsideSafeZones;
     final markers = <Marker>{
       Marker(
         markerId: const MarkerId('device_live_location'),
@@ -287,10 +292,9 @@ class _SafeZonesScreenState extends State<SafeZonesScreen> {
                 zoomControlsEnabled: false,
                 myLocationButtonEnabled: false,
               ),
-              fallbackBuilder: (_) => const GoogleMapUnavailableState(
-                title: 'Map unavailable',
-                message:
-                    'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+              fallbackBuilder: (_) => GoogleMapUnavailableState(
+                title: l10n.mapUnavailableTitle,
+                message: l10n.mapUnavailableMessage,
               ),
             ),
           ),

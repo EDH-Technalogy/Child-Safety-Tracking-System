@@ -223,6 +223,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   }
 
   Widget _buildUnavailableMapState() {
+    final l10n = context.l10n;
     return Container(
       color: Colors.grey[100],
       alignment: Alignment.center,
@@ -237,7 +238,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'No live location available for this child',
+            l10n.noLiveLocationAvailableForChild,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 16,
@@ -246,7 +247,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'The map will appear when the linked device sends valid GPS data.',
+            l10n.mapAppearsWhenGpsAvailable,
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.textSecondary,
@@ -258,10 +259,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   }
 
   Widget _buildWebMapUnavailableState() {
-    return const GoogleMapUnavailableState(
-      title: 'Map unavailable',
-      message:
-          'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+    final l10n = context.l10n;
+    return GoogleMapUnavailableState(
+      title: l10n.mapUnavailableTitle,
+      message: l10n.mapUnavailableMessage,
     );
   }
 

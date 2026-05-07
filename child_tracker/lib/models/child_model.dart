@@ -143,7 +143,7 @@ class DeviceModel {
 
   factory DeviceModel.fromJson(Map<String, dynamic> json) {
     final resolvedStatus =
-        (json['status'] ?? json['latest_live_status'] ?? 'offline').toString();
+        (json['latest_live_status'] ?? json['status'] ?? 'offline').toString();
 
     return DeviceModel(
       id: (json['id'] ?? '').toString(),

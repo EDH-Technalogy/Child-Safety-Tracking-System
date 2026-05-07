@@ -116,6 +116,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               padding: const EdgeInsets.all(24),
               child: Form(
                 key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -151,6 +152,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         return validateGmailEmailInput(
                           value,
                           requiredMessage: l10n.enterYourEmail,
+                          invalidMessage: l10n.enterValidEmail,
                         );
                       },
                     ),
@@ -164,13 +166,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           prefixIcon: Icon(Icons.pin_outlined),
                         ),
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return l10n.enterOtp;
-                          }
-                          if (value.length != 6) {
-                            return l10n.otpMustBeSixDigits;
-                          }
-                          return null;
+                          return validateOtpInput(
+                            value,
+                            requiredMessage: l10n.enterOtp,
+                            invalidMessage: l10n.otpMustBeSixDigits,
+                          );
                         },
                       ),
                       const SizedBox(height: 16),

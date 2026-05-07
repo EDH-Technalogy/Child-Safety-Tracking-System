@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../services/admin_api_service.dart';
+import '../utils/auth_validation.dart';
 import '../utils/constants.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -108,6 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       builder: (context, authProvider, child) {
                         return Form(
                           key: _formKey,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -158,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'Connect with your children safely',
+                                l10n.connectWithYourChildrenSafely,
                                 style: TextStyle(
                                   fontSize: 16,
                                   color: AppColors.textSecondary.withValues(
@@ -203,13 +205,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Email is required';
-                                  }
-                                  if (!value.contains('@')) {
-                                    return 'Please enter a valid email';
-                                  }
-                                  return null;
+                                  return validateGmailEmailInput(
+                                    value,
+                                    requiredMessage: l10n.emailRequired,
+                                    invalidMessage: l10n.enterValidEmail,
+                                  );
                                 },
                               ),
                               const SizedBox(height: 28),
@@ -259,10 +259,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Password is required';
-                                  }
-                                  return null;
+                                  return validateStrongPasswordInput(
+                                    value,
+                                    requiredMessage: l10n.passwordRequired,
+                                  );
                                 },
                               ),
                               const SizedBox(height: 28),
@@ -275,7 +275,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         context, '/forgot-password');
                                   },
                                   child: Text(
-                                    'Forgot Password?',
+                                    l10n.forgotPassword,
                                     style: TextStyle(
                                       color: AppColors.primaryColor,
                                       fontWeight: FontWeight.w600,
@@ -312,8 +312,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                             ),
                                           ),
                                         )
-                                      : const Text(
-                                          'Sign In',
+                                      : Text(
+                                          l10n.signIn,
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,

@@ -12,6 +12,7 @@ import '../providers/alert_provider.dart';
 import '../providers/child_provider.dart';
 import '../providers/geofence_provider.dart';
 import '../providers/location_provider.dart';
+import '../providers/settings_provider.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 import '../utils/timestamp_utils.dart';
@@ -106,10 +107,17 @@ class _MapScreenState extends State<MapScreen> {
         Provider.of<LocationProvider>(context, listen: false);
     final geofenceProvider =
         Provider.of<GeofenceProvider>(context, listen: false);
+    final settingsProvider =
+        Provider.of<SettingsProvider>(context, listen: false);
 
     await childProvider.getChildWithDevice(childId);
     await locationProvider.getLiveLocation(childId);
     await geofenceProvider.loadSafeZones(childId);
+    await settingsProvider.loadSettings();
+
+    if (settingsProvider.locationTrackingEnabled) {
+      await locationProvider.startLocalTracking(childId);
+    }
 
     final nextOwnerId = 'map_screen:$childId';
     if (_alertMonitorOwnerId != null && _alertMonitorOwnerId != nextOwnerId) {
@@ -339,14 +347,15 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   String _mapTypeLabel(MapType mapType) {
+    final l10n = context.l10n;
     switch (mapType) {
       case MapType.satellite:
-        return 'Satellite';
+        return l10n.mapTypeSatellite;
       case MapType.terrain:
-        return 'Terrain';
+        return l10n.mapTypeTerrain;
       case MapType.normal:
       default:
-        return 'Normal';
+        return l10n.mapTypeNormal;
     }
   }
 
@@ -391,7 +400,7 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Map mode',
+                  l10n.mapMode,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -803,14 +812,14 @@ class _MapScreenState extends State<MapScreen> {
                     ? l10n.noData
                     : activeLocation == null &&
                             geofenceProvider.safeZones.isEmpty
-                        ? 'No live location or safe zone available'
-                        : 'Map unavailable';
+                        ? l10n.noLiveLocationOrSafeZoneAvailable
+                        : l10n.mapUnavailableTitle;
                 final unavailableMessage = noChildSelected
-                    ? 'Add a child to start live tracking and safe zone monitoring.'
+                    ? l10n.addChildToStartTrackingAndSafeZones
                     : activeLocation == null &&
                             geofenceProvider.safeZones.isEmpty
-                        ? 'The map will appear once the child sends live data or a safe zone is saved.'
-                        : 'The child map is temporarily unavailable.';
+                        ? l10n.mapAppearsWhenLiveDataOrSafeZoneSaved
+                        : l10n.childMapTemporarilyUnavailable;
 
                 return Column(
                   children: [
@@ -839,9 +848,8 @@ class _MapScreenState extends State<MapScreen> {
                                 buildingsEnabled: true,
                               ),
                               fallbackBuilder: (_) => _buildUnavailableMapState(
-                                title: 'Map unavailable',
-                                message:
-                                    'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+                                title: l10n.mapUnavailableTitle,
+                                message: l10n.mapUnavailableMessage,
                               ),
                             )
                           else

@@ -21,10 +21,14 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkLoginStatus() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    await Future.wait([
-      Future.delayed(const Duration(seconds: 2)),
-      authProvider.initializeSession(),
-    ]);
+    try {
+      await Future.wait([
+        Future.delayed(const Duration(seconds: 2)),
+        authProvider.initializeSession().timeout(const Duration(seconds: 12)),
+      ]);
+    } catch (error) {
+      debugPrint('[SplashScreen] startup failed, continuing to login: $error');
+    }
 
     if (!mounted) return;
 
@@ -40,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: AppColors.primaryColor,
@@ -63,7 +67,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              l10n.appTitle,
+              l10n?.appTitle ?? 'Child Tracker',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -72,7 +76,8 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.connectWithYourChildrenSafely,
+              l10n?.connectWithYourChildrenSafely ??
+                  'Connect with your children safely',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.white70,

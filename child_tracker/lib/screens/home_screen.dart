@@ -7,6 +7,8 @@ import '../l10n/app_localizations.dart';
 import '../providers/alert_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/child_provider.dart';
+import '../providers/location_provider.dart';
+import '../providers/settings_provider.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 import '../utils/photo_provider.dart';
@@ -52,6 +54,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final alertProvider = Provider.of<AlertProvider>(context, listen: false);
     final childProvider = Provider.of<ChildProvider>(context, listen: false);
+    final locationProvider =
+        Provider.of<LocationProvider>(context, listen: false);
+    final settingsProvider =
+        Provider.of<SettingsProvider>(context, listen: false);
 
     if (authProvider.user != null) {
       if (!showLoading && childProvider.isLoading) {
@@ -74,6 +80,16 @@ class _HomeScreenState extends State<HomeScreen> {
         ownerId: _backgroundAlertMonitorOwnerId,
         childIds: childProvider.children.map((child) => child.id),
       );
+
+      await settingsProvider.loadSettings();
+      if (settingsProvider.locationTrackingEnabled &&
+          childProvider.children.isNotEmpty) {
+        final trackedChildId = childProvider.selectedChild?.id.trim().isNotEmpty ==
+                true
+            ? childProvider.selectedChild!.id.trim()
+            : childProvider.children.first.id.trim();
+        await locationProvider.startLocalTracking(trackedChildId);
+      }
     }
   }
 
@@ -166,10 +182,17 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAddChild,
-        backgroundColor: AppColors.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'home_add_child',
+            onPressed: _openAddChild,
+            backgroundColor: AppColors.primaryColor,
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        ],
       ),
     );
   }

@@ -521,10 +521,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return l10n.enterName;
-                      }
-                      return null;
+                      return validateFullNameInput(
+                        value,
+                        requiredMessage: l10n.enterName,
+                        invalidMessage: l10n.enterName,
+                      );
                     },
                   ),
                   const SizedBox(height: 16),
@@ -559,14 +560,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     validator: (value) {
-                      final email = value?.trim() ?? '';
-                      if (email.isEmpty) {
-                        return l10n.emailRequired;
-                      }
-                      if (!email.contains('@') || !email.contains('.')) {
-                        return l10n.enterValidEmail;
-                      }
-                      return null;
+                      return validateGmailEmailInput(
+                        value,
+                        requiredMessage: l10n.emailRequired,
+                        invalidMessage: l10n.enterValidEmail,
+                      );
                     },
                   ),
                 ],

@@ -35,7 +35,9 @@ class ApiService {
         const Duration(milliseconds: ApiConfig.connectionTimeout),
       );
     } on TimeoutException {
-      throw Exception('Request timed out while trying to $action');
+      throw Exception(
+        'Request timed out while trying to $action. Backend URL: $baseUrl. ${ApiConfig.backendSetupHint}',
+      );
     } catch (e) {
       final message = e.toString();
       if (e is http.ClientException ||
@@ -44,7 +46,7 @@ class ApiService {
           message.contains('SocketException') ||
           message.contains('Connection refused')) {
         throw Exception(
-          'Unable to reach backend server. Check API URL, backend server, and CORS settings.',
+          'Unable to reach backend server at $baseUrl. ${ApiConfig.backendSetupHint}',
         );
       }
       throw Exception('Failed to $action: $message');
@@ -599,6 +601,46 @@ class ApiService {
 
   // ==================== LOCATION API ====================
 
+  // Send Live Location Update
+  Future<Map<String, dynamic>> updateLocation({
+    required String childId,
+    required double latitude,
+    required double longitude,
+    double? speed,
+    int? battery,
+    String? locationText,
+    String? source,
+    int? recordedAt,
+  }) async {
+    try {
+      final response = await _sendRequest(
+        http.post(
+          Uri.parse('$baseUrl${ApiConfig.locations}/update'),
+          headers: await _buildAuthHeaders(),
+          body: jsonEncode({
+            'child_id': childId,
+            'latitude': latitude,
+            'longitude': longitude,
+            if (speed != null) 'speed': speed,
+            if (battery != null) 'battery': battery,
+            if (locationText != null && locationText.isNotEmpty)
+              'location_text': locationText,
+            if (source != null && source.isNotEmpty) 'source': source,
+            if (recordedAt != null) 'recorded_at': recordedAt,
+            if (recordedAt != null) 'timestamp': recordedAt,
+          }),
+        ),
+        'send live location update',
+      );
+
+      return Map<String, dynamic>.from(
+        _decodeResponse(response, 'send live location update'),
+      );
+    } catch (e) {
+      throw Exception('Failed to send live location update: $e');
+    }
+  }
+
   // Get Live Location
   Future<Map<String, dynamic>> getLiveLocation(String childId) async {
     try {
@@ -710,6 +752,39 @@ class ApiService {
   }
 
   // ==================== ALERT API ====================
+
+  // Send SOS Alert
+  Future<Map<String, dynamic>> sendSosAlert({
+    required String childId,
+    double? latitude,
+    double? longitude,
+    String? locationText,
+    String? message,
+  }) async {
+    try {
+      final response = await _sendRequest(
+        http.post(
+          Uri.parse('$baseUrl${ApiConfig.alerts}/sos'),
+          headers: await _buildAuthHeaders(),
+          body: jsonEncode({
+            'child_id': childId,
+            if (latitude != null) 'latitude': latitude,
+            if (longitude != null) 'longitude': longitude,
+            if (locationText != null && locationText.isNotEmpty)
+              'location_text': locationText,
+            if (message != null && message.isNotEmpty) 'message': message,
+          }),
+        ),
+        'send SOS alert',
+      );
+
+      return Map<String, dynamic>.from(
+        _decodeResponse(response, 'send SOS alert'),
+      );
+    } catch (e) {
+      throw Exception('Failed to send SOS alert: $e');
+    }
+  }
 
   // Get Alerts
   Future<List<dynamic>> getAlerts(String childId) async {

@@ -38,6 +38,17 @@ function buildLocationText({
   return formatCoordinates(latitude, longitude);
 }
 
+function formatAlertTimestamp(timestamp = Date.now()) {
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
 function buildAlertMessage({
   type,
   locationText,
@@ -47,6 +58,7 @@ function buildAlertMessage({
 }) {
   const normalizedType = type?.toString().trim().toUpperCase();
   const safeLocationText = locationText || "an unknown location";
+  const timestampText = formatAlertTimestamp();
 
   if (customMessage?.toString().trim()) {
     return customMessage.toString().trim();
@@ -58,11 +70,11 @@ function buildAlertMessage({
     case "OUT_ZONE":
     case "SAFE_ZONE_EXIT":
     case "ZONE_EXIT":
-      return `Child out of Safe Zone. Current location: ${safeLocationText}.`;
+      return `Child out of Safe Zone at ${timestampText}. Current location: ${safeLocationText}.`;
     case "IN_ZONE":
     case "SAFE_ZONE_ENTER":
     case "ZONE_ENTER":
-      return `Your child has returned to the configured safe zone and is currently located in ${safeLocationText}.`;
+      return `Your child returned to the safe zone at ${timestampText}. Current location: ${safeLocationText}.`;
     case "LOW_BATTERY":
       return `Low battery alert! Battery level: ${batteryLevel ?? "Unknown"}%`;
     case "DEVICE_OFF":
@@ -107,6 +119,23 @@ async function createAlertRecord({
     initialStatus?.toString().trim().toLowerCase() === "read"
       ? "read"
       : "unread";
+  const dedupeState = await resolveRecentAlertDuplicate({
+    childId,
+    type: normalizedType,
+    zoneName,
+    message,
+    extraFields,
+    createdAt: time,
+  });
+  if (dedupeState.shouldReuse) {
+    return {
+      alertId: dedupeState.alertId,
+      time: dedupeState.createdAt,
+      alertData: dedupeState.alertData,
+      childData,
+      alreadyExists: true,
+    };
+  }
 
   const alertPayload = {
     child_id: childId,
@@ -160,6 +189,7 @@ async function createAlertRecord({
   const realtimeUpdates = {
     [`alerts_by_child/${childId}/${resolvedAlertId}`]: livePayload,
     [`alerts_live/${childId}/${resolvedAlertId}`]: livePayload,
+    [`alerts_live/${resolvedAlertId}`]: livePayload,
     [`admin_alerts/${resolvedAlertId}`]: adminLivePayload,
   };
 
@@ -172,6 +202,15 @@ async function createAlertRecord({
     await alertDoc.set(alertPayload);
   }
   await realtimeDB.ref().update(realtimeUpdates);
+  await persistAlertDedupeState({
+    childId,
+    type: normalizedType,
+    zoneName,
+    message,
+    extraFields,
+    alertId: resolvedAlertId,
+    createdAt: time,
+  });
 
   if (!alreadyExists) {
     const trackingContext = await getTrackingContextForChild(childId);
@@ -257,6 +296,110 @@ async function createAlertRecord({
     childData,
     alreadyExists,
   };
+}
+
+function normalizeDedupeValue(value) {
+  return value?.toString().trim().toLowerCase() || "";
+}
+
+function buildAlertDedupeKey({ type, zoneName, extraFields = {} }) {
+  const normalizedType = normalizeDedupeValue(type).toUpperCase();
+  const eventKey = normalizeDedupeValue(
+    extraFields.event_key || extraFields.eventKey
+  );
+  const safeZoneId = normalizeDedupeValue(
+    extraFields.safe_zone_id || extraFields.safeZoneId
+  );
+  const normalizedZoneName = normalizeDedupeValue(zoneName);
+
+  if (normalizedType === "SOS") {
+    return "sos";
+  }
+
+  if (
+    normalizedType === "IN_ZONE" ||
+    normalizedType === "OUT_ZONE" ||
+    normalizedType === "ZONE_ENTER" ||
+    normalizedType === "ZONE_EXIT" ||
+    normalizedType === "SAFE_ZONE_ENTER" ||
+    normalizedType === "SAFE_ZONE_EXIT"
+  ) {
+    return [
+      eventKey || normalizedType,
+      safeZoneId || normalizedZoneName || "unknown_zone",
+    ].join("|");
+  }
+
+  return "";
+}
+
+async function resolveRecentAlertDuplicate({
+  childId,
+  type,
+  zoneName,
+  message,
+  extraFields = {},
+  createdAt,
+}) {
+  const dedupeKey = buildAlertDedupeKey({ type, zoneName, extraFields });
+  if (!dedupeKey) {
+    return { shouldReuse: false };
+  }
+
+  const dedupeWindowMs = type === "SOS" ? 60000 : 90000;
+  const ref = realtimeDB.ref(`alert_dedupe/${childId}/${dedupeKey}`);
+  const snapshot = await ref.once("value");
+  const state = snapshot.val() || {};
+  const lastCreatedAt = Number(state.created_at || 0);
+  const sameMessage =
+    normalizeDedupeValue(state.message) === normalizeDedupeValue(message);
+  const shouldRequireSameMessage = type === "SOS";
+
+  if (
+    state.alert_id &&
+    lastCreatedAt > 0 &&
+    createdAt - lastCreatedAt < dedupeWindowMs &&
+    (!shouldRequireSameMessage || sameMessage)
+  ) {
+    return {
+      shouldReuse: true,
+      alertId: state.alert_id.toString(),
+      createdAt: lastCreatedAt,
+      alertData: {
+        child_id: childId,
+        type,
+        zone_name: zoneName,
+        message,
+        created_at: lastCreatedAt,
+      },
+    };
+  }
+
+  return { shouldReuse: false };
+}
+
+async function persistAlertDedupeState({
+  childId,
+  type,
+  zoneName,
+  message,
+  extraFields = {},
+  alertId,
+  createdAt,
+}) {
+  const dedupeKey = buildAlertDedupeKey({ type, zoneName, extraFields });
+  if (!dedupeKey) {
+    return;
+  }
+
+  await realtimeDB.ref(`alert_dedupe/${childId}/${dedupeKey}`).set({
+    alert_id: alertId,
+    type,
+    zone_name: zoneName || null,
+    message,
+    created_at: createdAt,
+    updated_at: Date.now(),
+  });
 }
 
 module.exports = {

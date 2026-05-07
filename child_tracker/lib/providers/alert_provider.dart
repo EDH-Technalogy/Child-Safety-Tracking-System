@@ -38,6 +38,7 @@ class AlertProvider with ChangeNotifier {
   final Set<String> _handledAlertIds = <String>{};
   final Set<String> _rootSosAlertIds = <String>{};
   final Map<String, int> _unreadCountsByChild = <String, int>{};
+  Timer? _backgroundAlertPollTimer;
 
   List<AlertModel> _alerts = [];
   int _unreadCount = 0;
@@ -56,6 +57,7 @@ class AlertProvider with ChangeNotifier {
   String? _backgroundLiveAlertPath;
   String? _sosRootListeningChildId;
   int _sosRootListenerStartedAt = 0;
+  int _lastForegroundMonitoringStartedAt = 0;
 
   List<AlertModel> get alerts => _alerts;
   int get unreadCount => _unreadCount;
@@ -111,7 +113,7 @@ class AlertProvider with ChangeNotifier {
 
       for (final entry in data.entries) {
         final alertData = _asMap(entry.value);
-        if (!_looksLikeSingleAlertPayload(alertData)) {
+        if (!_isRootIngressSosPayload(entry.key, alertData)) {
           continue;
         }
 
@@ -146,11 +148,54 @@ class AlertProvider with ChangeNotifier {
 
   List<AlertModel> _mergeAndSortAlerts(Iterable<AlertModel> alerts) {
     final alertsById = <String, AlertModel>{};
+    final safeZoneDedupedAlerts = <AlertModel>[];
+    final recentSafeZoneKeys = <String, AlertModel>{};
+
+    bool isSafeZoneType(String type) {
+      switch (type.trim().toUpperCase()) {
+        case 'OUT_ZONE':
+        case 'SAFE_ZONE_EXIT':
+        case 'ZONE_EXIT':
+        case 'IN_ZONE':
+        case 'SAFE_ZONE_ENTER':
+        case 'ZONE_ENTER':
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    String buildSafeZoneKey(AlertModel alert) {
+      final bucket = alert.createdAt ~/ 120000;
+      return [
+        alert.childId.trim(),
+        alert.type.trim().toUpperCase(),
+        (alert.zoneName ?? '').trim().toLowerCase(),
+        (((alert.latitude ?? 0) * 1000).round()).toString(),
+        (((alert.longitude ?? 0) * 1000).round()).toString(),
+        bucket.toString(),
+      ].join('|');
+    }
+
     for (final alert in alerts) {
       if (alert.id.trim().isEmpty) {
         continue;
       }
 
+      if (isSafeZoneType(alert.type)) {
+        final dedupeKey = buildSafeZoneKey(alert);
+        final existing = recentSafeZoneKeys[dedupeKey];
+        if (existing == null || alert.createdAt > existing.createdAt) {
+          recentSafeZoneKeys[dedupeKey] = alert;
+        }
+        continue;
+      }
+
+      alertsById[alert.id] = alert;
+    }
+
+    safeZoneDedupedAlerts.addAll(recentSafeZoneKeys.values);
+    for (final alert in safeZoneDedupedAlerts) {
       alertsById[alert.id] = alert;
     }
 
@@ -173,6 +218,7 @@ class AlertProvider with ChangeNotifier {
       0,
       (sum, value) => sum + value,
     );
+    unawaited(_notificationService.updateAppIconBadge(_totalUnreadCount));
   }
 
   void _applyAlerts(List<AlertModel> alerts, {String? childId}) {
@@ -187,6 +233,7 @@ class AlertProvider with ChangeNotifier {
     } else {
       _unreadCount = alerts.where((alert) => !alert.isRead).length;
       _totalUnreadCount = _unreadCount;
+      unawaited(_notificationService.updateAppIconBadge(_totalUnreadCount));
     }
   }
 
@@ -209,6 +256,7 @@ class AlertProvider with ChangeNotifier {
     final childId = _monitoredChildId;
     _unreadCount =
         childId == null ? _totalUnreadCount : unreadCountForChild(childId);
+    unawaited(_notificationService.updateAppIconBadge(_totalUnreadCount));
   }
 
   Future<bool> loadAlerts(
@@ -287,6 +335,7 @@ class AlertProvider with ChangeNotifier {
     _monitorOwners[ownerId] = normalizedChildId;
     _monitoredChildId =
         _monitorOwners.values.isEmpty ? null : _monitorOwners.values.last;
+    _lastForegroundMonitoringStartedAt = DateTime.now().millisecondsSinceEpoch;
 
     await _notificationService.init();
     debugPrint(
@@ -341,6 +390,7 @@ class AlertProvider with ChangeNotifier {
 
     final activeChildIds =
         _backgroundMonitorOwners.values.expand((childSet) => childSet).toSet();
+    _startBackgroundAlertPolling();
     debugPrint(
       '[AlertProvider.background] sync owner=$ownerId childIds=${activeChildIds.join(",")} listeners=${_backgroundLiveAlertSubscription == null ? 0 : 1}',
     );
@@ -356,10 +406,12 @@ class AlertProvider with ChangeNotifier {
     _backgroundLiveAlertSubscription = null;
     _backgroundLiveAlertPath = null;
     _backgroundKnownAlertIds.clear();
+    _stopBackgroundAlertPolling();
     if (_monitoredChildId == null) {
       _unreadCountsByChild.clear();
       _totalUnreadCount = 0;
       _unreadCount = 0;
+      unawaited(_notificationService.updateAppIconBadge(0));
       notifyListeners();
     }
 
@@ -447,6 +499,7 @@ class AlertProvider with ChangeNotifier {
               .where((alert) => alert.childId == childId)
               .map((alert) => alert.id),
         );
+      final listenerStartedAt = DateTime.now().millisecondsSinceEpoch;
 
       debugPrint(
         '[AlertProvider.live] listening to alerts_live for childId=$childId',
@@ -470,6 +523,14 @@ class AlertProvider with ChangeNotifier {
 
           if (_knownAlertIds.contains(alert.id)) {
             debugPrint('[AlertProvider.live] alert ignored - duplicate');
+            return;
+          }
+
+          if (alert.createdAt < listenerStartedAt - 5000) {
+            debugPrint(
+              '[AlertProvider.live] alert ignored - existed before listener start',
+            );
+            _knownAlertIds.add(alert.id);
             return;
           }
 
@@ -555,6 +616,11 @@ class AlertProvider with ChangeNotifier {
       final ref = database.ref('alerts_live');
       _sosRootListeningChildId = normalizedChildId;
       _sosRootListenerStartedAt = DateTime.now().millisecondsSinceEpoch;
+      final existingRootAlerts = await _fetchRootSosAlertsForChild(
+        database,
+        normalizedChildId,
+      );
+      _knownAlertIds.addAll(existingRootAlerts.map((alert) => alert.id));
 
       debugPrint('[AlertProvider.sos] Listening to SOS alerts...');
 
@@ -608,7 +674,7 @@ class AlertProvider with ChangeNotifier {
     required bool isNewEvent,
   }) {
     final data = _asMap(event.snapshot.value);
-    if (!_looksLikeSingleAlertPayload(data)) {
+    if (!_isRootIngressSosPayload(event.snapshot.key, data)) {
       return;
     }
 
@@ -662,6 +728,82 @@ class AlertProvider with ChangeNotifier {
         data.containsKey('created_at') ||
         data.containsKey('isRead') ||
         data.containsKey('is_read');
+  }
+
+  bool _isMirroredRootAlertPayload(String? rawKey, Map<String, dynamic> data) {
+    final key = (rawKey ?? '').trim();
+    final alertId = (data['alert_id'] ?? '').toString().trim();
+    final childId = (data['child_id'] ?? data['childId'] ?? '').toString().trim();
+    final hasMirrorFields = (data['user_id'] ?? data['parent_user_id'] ?? '')
+            .toString()
+            .trim()
+            .isNotEmpty &&
+        ((data['status'] ?? '').toString().trim().isNotEmpty ||
+            data['isRead'] == true ||
+            data['is_read'] == true);
+
+    return key.isNotEmpty &&
+        alertId == key &&
+        childId.isNotEmpty &&
+        hasMirrorFields;
+  }
+
+  bool _isRootIngressSosPayload(String? rawKey, Map<String, dynamic> data) {
+    if (!_looksLikeSingleAlertPayload(data)) {
+      return false;
+    }
+
+    if (_isMirroredRootAlertPayload(rawKey, data)) {
+      return false;
+    }
+
+    return _inferAlertType(data) == 'SOS';
+  }
+
+  String _inferAlertType(Map<String, dynamic> data) {
+    final rawType = (data['type'] ??
+            data['alert_type'] ??
+            data['alertType'] ??
+            data['event_type'] ??
+            data['eventType'] ??
+            '')
+        .toString()
+        .trim()
+        .toUpperCase();
+
+    switch (rawType) {
+      case 'SOS':
+      case 'SOS_ALERT':
+      case 'EMERGENCY':
+        return 'SOS';
+      case 'OUT_ZONE':
+      case 'SAFE_ZONE_EXIT':
+      case 'ZONE_EXIT':
+      case 'SAFE_ZONE_BREACH':
+        return 'OUT_ZONE';
+      case 'IN_ZONE':
+      case 'SAFE_ZONE_ENTER':
+      case 'ZONE_ENTER':
+      case 'ZONE_ENTRY':
+      case 'SAFE_ZONE_RETURN':
+        return 'IN_ZONE';
+    }
+
+    final message = (data['message'] ?? '').toString().trim().toLowerCase();
+    if (message.contains('sos') || message.contains('emergency alert')) {
+      return 'SOS';
+    }
+    if (message.contains('back in safe zone') ||
+        message.contains('returned to the configured safe zone')) {
+      return 'IN_ZONE';
+    }
+    if (message.contains('out of safe zone') ||
+        message.contains('safe zone') ||
+        message.contains('geofence')) {
+      return 'OUT_ZONE';
+    }
+
+    return '';
   }
 
   Future<void> _ensureBackgroundLiveAlertListener() async {
@@ -774,9 +916,11 @@ class AlertProvider with ChangeNotifier {
     final createdAt = _parseInt(data['created_at']) > 0
         ? _parseInt(data['created_at'])
         : _parseInt(data['timestamp']);
-    final rawType = (data['type'] ?? '').toString().trim();
-    final type = rawType.isNotEmpty ? rawType : 'SOS';
+    final type = _inferAlertType(data);
     if (createdAt <= 0) {
+      return null;
+    }
+    if (type.isEmpty) {
       return null;
     }
 
@@ -1055,6 +1199,23 @@ class AlertProvider with ChangeNotifier {
 
   Future<bool> markAllAsRead(String childId) async {
     try {
+      final normalizedChildId = childId.trim();
+      final alertScreenActive = _monitorOwners.keys.any(
+        (ownerId) => ownerId == 'alerts_screen:$normalizedChildId',
+      );
+      final withinImplicitOpenWindow =
+          DateTime.now().millisecondsSinceEpoch -
+                  _lastForegroundMonitoringStartedAt <
+              2000;
+      if (alertScreenActive &&
+          normalizedChildId == _monitoredChildId &&
+          withinImplicitOpenWindow) {
+        debugPrint(
+          '[AlertProvider.markAllAsRead] skipped implicit call childId=$normalizedChildId',
+        );
+        return true;
+      }
+
       final hasNonRootAlerts = _alerts.any(
         (alert) => !_rootSosAlertIds.contains(alert.id),
       );
@@ -1134,7 +1295,69 @@ class AlertProvider with ChangeNotifier {
     final childId = _monitoredChildId;
     _unreadCount =
         childId == null ? _totalUnreadCount : unreadCountForChild(childId);
+    if (childId == null) {
+      unawaited(_notificationService.updateAppIconBadge(_totalUnreadCount));
+    }
     notifyListeners();
+  }
+
+  void _startBackgroundAlertPolling() {
+    if (_backgroundAlertPollTimer != null) {
+      return;
+    }
+
+    _backgroundAlertPollTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => unawaited(_pollBackgroundAlerts()),
+    );
+  }
+
+  void _stopBackgroundAlertPolling() {
+    _backgroundAlertPollTimer?.cancel();
+    _backgroundAlertPollTimer = null;
+  }
+
+  Future<void> _pollBackgroundAlerts() async {
+    final scope = await _resolveLiveAlertScope();
+    if (scope == null) {
+      return;
+    }
+
+    final activeChildIds =
+        _backgroundMonitorOwners.values.expand((childSet) => childSet).toSet();
+    if (activeChildIds.isEmpty) {
+      return;
+    }
+
+    try {
+      final previousIds = Set<String>.from(_backgroundKnownAlertIds);
+      final mergedAlerts = <AlertModel>[];
+
+      for (final childId in activeChildIds) {
+        final alerts = await _fetchAlerts(childId);
+        mergedAlerts.addAll(alerts);
+      }
+
+      final dedupedAlerts = _mergeAndSortAlerts(mergedAlerts);
+      final newAlerts = dedupedAlerts.where((alert) {
+        if (alert.isRead) {
+          return false;
+        }
+        return !previousIds.contains(alert.id);
+      }).toList();
+
+      _backgroundKnownAlertIds
+        ..clear()
+        ..addAll(dedupedAlerts.map((alert) => alert.id));
+      _applyAggregateAlerts(dedupedAlerts);
+      notifyListeners();
+
+      for (final alert in newAlerts) {
+        unawaited(_handleRealtimeAlert(alert, playSound: !scope.isAdmin));
+      }
+    } catch (error) {
+      debugPrint('[AlertProvider.background] poll failed: $error');
+    }
   }
 
   void clearError() {
@@ -1146,6 +1369,7 @@ class AlertProvider with ChangeNotifier {
   void dispose() {
     _stopLiveAlertListener();
     _backgroundLiveAlertSubscription?.cancel();
+    _stopBackgroundAlertPolling();
     super.dispose();
   }
 }

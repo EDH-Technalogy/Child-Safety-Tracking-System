@@ -1556,4 +1556,171 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get geofenceBreachesToday => 'نقض‌های ژئوفنس امروز';
+
+  @override
+  String get mapUnavailableTitle => 'نقشه در دسترس نیست';
+
+  @override
+  String get mapUnavailableMessage =>
+      'Google Maps در این مرورگر در حال حاضر آماده نیست. تنظیمات اسکریپت و API key نقشه وب را بررسی کنید.';
+
+  @override
+  String get noLiveLocationAvailableForChild =>
+      'برای این کودک موقعیت زنده موجود نیست';
+
+  @override
+  String get mapAppearsWhenGpsAvailable =>
+      'نقشه وقتی نمایش داده می‌شود که دستگاه متصل داده GPS معتبر ارسال کند.';
+
+  @override
+  String get noLiveLocationOrSafeZoneAvailable =>
+      'هیچ موقعیت زنده یا منطقه امنی موجود نیست';
+
+  @override
+  String get addChildToStartTrackingAndSafeZones =>
+      'برای شروع ردیابی زنده و پایش مناطق امن یک کودک اضافه کنید.';
+
+  @override
+  String get mapAppearsWhenLiveDataOrSafeZoneSaved =>
+      'نقشه زمانی نمایش داده می‌شود که کودک داده زنده ارسال کند یا یک منطقه امنی ذخیره شود.';
+
+  @override
+  String get childMapTemporarilyUnavailable =>
+      'نقشه کودک موقتاً در دسترس نیست.';
+
+  @override
+  String get mapMode => 'حالت نقشه';
+
+  @override
+  String get mapTypeNormal => 'عادی';
+
+  @override
+  String get mapTypeSatellite => 'ماهواره‌ای';
+
+  @override
+  String get mapTypeTerrain => 'عوارض';
+
+  @override
+  String get mapTypeDefault => 'پیش‌فرض';
+
+  @override
+  String get mapTypeThreeDimensionalLike => 'شبیه ۳ بعدی';
+
+  @override
+  String insideSafeZoneNamed(Object name) {
+    return 'داخل $name';
+  }
+
+  @override
+  String outsideByDistance(Object distance) {
+    return 'به اندازه $distance بیرون';
+  }
+
+  @override
+  String get outsideSafeZones => 'بیرون از مناطق امن';
+
+  @override
+  String get noLiveData => 'داده زنده‌ای موجود نیست';
+
+  @override
+  String get moving => 'در حال حرکت';
+
+  @override
+  String get stationary => 'ثابت';
+
+  @override
+  String get insideSafeZone => 'داخل منطقه امن';
+
+  @override
+  String get outsideSafeZone => 'بیرون منطقه امن';
+
+  @override
+  String get changeMapStyle => 'تغییر سبک نقشه';
+
+  @override
+  String get savedCenterHint =>
+      'مرکز ذخیره‌شده. روی نقشه ضربه بزنید یا از یک اقدام مکان استفاده کنید، سپس برای تغییر آن ذخیره کنید.';
+
+  @override
+  String get previewCenterHint =>
+      'فقط پیش‌نمایش. پیش از ذخیره روی نقشه ضربه بزنید یا از یک اقدام مکان برای تنظیم مرکز استفاده کنید.';
+
+  @override
+  String get chooseNewCenterOrKeepSaved =>
+      'یک مرکز جدید انتخاب و ذخیره کنید، یا مرکز ذخیره‌شده فعلی را نگه دارید.';
+
+  @override
+  String get previousSavedLocation => 'موقعیت ذخیره‌شده قبلی';
+
+  @override
+  String get currentLiveLocation => 'موقعیت زنده کنونی';
+
+  @override
+  String get customLocationFromMap => 'موقعیت سفارشی از نقشه';
+
+  @override
+  String get previewingSavedLocationInstructions =>
+      'در حال پیش‌نمایش یک موقعیت ذخیره‌شده. روی نقشه ضربه بزنید، نشانگر را بکشید، یا پیش از ذخیره کردن یک اقدام مکان را تایید کنید.';
+
+  @override
+  String get previewingLiveLocationInstructions =>
+      'در حال پیش‌نمایش موقعیت زنده کنونی کودک. برای تنظیم یک مرکز جدید پیش از ذخیره از دکمه اقدام یا ضربه روی نقشه استفاده کنید.';
+
+  @override
+  String get pendingCenterChange =>
+      'تغییر در انتظار: برای به‌روزرسانی مرکز منطقه امن ذخیره کنید.';
+
+  @override
+  String get savedCenterLoaded => 'مرکز ذخیره‌شده از پایگاه داده بارگیری شد.';
+
+  @override
+  String get previewOnlyChooseLocation =>
+      'فقط پیش‌نمایش: این مکان را به‌صورت صریح انتخاب کنید، سپس برای نگه داشتن آن ذخیره کنید.';
+
+  @override
+  String get noCenterSelectedYet => 'هنوز هیچ مرکزی انتخاب نشده است.';
+
+  @override
+  String get unknownTime => 'زمان نامشخص';
+
+  @override
+  String get safeZoneCenterTitle => 'مرکز منطقه امن';
+
+  @override
+  String get noPreviousSavedLocations =>
+      'هنوز هیچ موقعیت ذخیره‌شده قبلی برای این کودک موجود نیست.';
+
+  @override
+  String get refreshSavedLocations => 'بازنگری موقعیت‌های ذخیره‌شده';
+
+  @override
+  String get savedLocations => 'موقعیت‌های ذخیره‌شده';
+
+  @override
+  String get useSelectedSavedLocation =>
+      'از موقعیت ذخیره‌شده انتخاب‌شده استفاده کنید';
+
+  @override
+  String get savedLocationPreviewHint =>
+      'انتخاب از این فهرست فقط مکان را پیش‌نمایش می‌کند. مرکز پس از فشردن دکمه بالا و سپس ذخیره تغییر می‌کند.';
+
+  @override
+  String get useCurrentLiveLocation => 'از موقعیت زنده کنونی استفاده کنید';
+
+  @override
+  String latestLiveUpdateUseButton(Object time) {
+    return 'آخرین به‌روزرسانی زنده: $time. اگر می‌خواهید آن را به‌عنوان مرکز تنظیم کنید از دکمه بالا استفاده کنید.';
+  }
+
+  @override
+  String get liveLocationPreviewHint =>
+      'این بخش آخرین موقعیت زنده را برای پیش‌نمایش نشان می‌دهد. تنها پس از انتخاب آن و ذخیره کردن، به مرکز منطقه امن تبدیل می‌شود.';
+
+  @override
+  String get customLocationPanelHint =>
+      'در هر جای نقشه ضربه بزنید یا نشانگر را بکشید تا مرکز منطقه امن را دقیقاً همان جایی که می‌خواهید قرار دهید. مرکز ذخیره‌شده تا زمانی که ذخیره یا به‌روزرسانی را فشار ندهید تغییر نمی‌کند.';
+
+  @override
+  String get chooseCenterToPreviewSafeZone =>
+      'یک مرکز زنده، ذخیره‌شده یا سفارشی انتخاب کنید تا پیش‌نمایش منطقه امن را روی نقشه ببینید.';
 }

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/child_model.dart';
 import '../models/live_tracking_model.dart';
 import 'api_service.dart';
+import 'realtime_database_auth_service.dart';
 import '../utils/constants.dart';
 import '../utils/firebase_bootstrap.dart';
 
@@ -155,8 +156,6 @@ class DeviceLiveTrackingService {
     required String childId,
     required DeviceModel device,
   }) async {
-    await FirebaseBootstrap.ensureInitialized();
-
     try {
       final trackingKey = resolveRealtimeTrackingKey(device);
       final rtdbPath = 'live_tracking/$trackingKey/location';
@@ -165,18 +164,37 @@ class DeviceLiveTrackingService {
           '[DeviceLiveTrackingService.get] childId=$childId trackingKey=$trackingKey rtdbPath=/$rtdbPath',
         );
       }
-      final database = FirebaseDatabase.instanceFor(
-        app: Firebase.app(),
-        databaseURL: AppConstants.firebaseDatabaseUrl,
-      );
+      final database = await _database();
       final snapshot = await database.ref(rtdbPath).get();
 
       return _buildLiveTracking(
         childId: childId,
         rawLocation: snapshot.value,
       );
-    } on FirebaseException catch (error) {
-      throw StateError(_formatFirebaseError(error));
+    } catch (error) {
+      if (error is FirebaseException) {
+        if (_shouldFallbackToBackend(error)) {
+          if (kDebugMode) {
+            debugPrint(
+              '[DeviceLiveTrackingService.get] RTDB failed, falling back to API for childId=$childId error=$error',
+            );
+          }
+          return _getLiveTrackingFromBackend(childId);
+        }
+
+        throw StateError(_formatFirebaseError(error));
+      }
+
+      if (_shouldFallbackToBackend(error)) {
+        if (kDebugMode) {
+          debugPrint(
+            '[DeviceLiveTrackingService.get] RTDB failed, falling back to API for childId=$childId error=$error',
+          );
+        }
+        return _getLiveTrackingFromBackend(childId);
+      }
+
+      rethrow;
     }
   }
 
@@ -189,7 +207,6 @@ class DeviceLiveTrackingService {
 
     () async {
       try {
-        await FirebaseBootstrap.ensureInitialized();
         final trackingKey = resolveRealtimeTrackingKey(device);
         final rtdbPath = 'live_tracking/$trackingKey/location';
         if (kDebugMode) {
@@ -197,10 +214,7 @@ class DeviceLiveTrackingService {
             '[DeviceLiveTrackingService.watch] connected childId=$childId trackingKey=$trackingKey rtdbPath=/$rtdbPath',
           );
         }
-        final database = FirebaseDatabase.instanceFor(
-          app: Firebase.app(),
-          databaseURL: AppConstants.firebaseDatabaseUrl,
-        );
+        final database = await _database();
 
         final subscription = database.ref(rtdbPath).onValue.listen(
           (event) {
@@ -235,6 +249,19 @@ class DeviceLiveTrackingService {
           await subscription.cancel();
         };
       } catch (error) {
+        if (_shouldFallbackToBackend(error)) {
+          if (kDebugMode) {
+            debugPrint(
+              '[DeviceLiveTrackingService.watch] RTDB failed, using API polling for childId=$childId error=$error',
+            );
+          }
+          await _startBackendPolling(
+            childId: childId,
+            controller: controller,
+          );
+          return;
+        }
+
         controller.addError(error);
         await controller.close();
       }
@@ -354,6 +381,70 @@ class DeviceLiveTrackingService {
             ? error.message!.trim()
             : 'Failed to load live tracking data from Firebase.';
     }
+  }
+
+  Future<FirebaseDatabase> _database() async {
+    await FirebaseBootstrap.ensureInitialized();
+    await RealtimeDatabaseAuthService.ensureSignedIn();
+    return FirebaseDatabase.instanceFor(
+      app: Firebase.app(),
+      databaseURL: AppConstants.firebaseDatabaseUrl,
+    );
+  }
+
+  Future<LiveTrackingModel> _getLiveTrackingFromBackend(String childId) async {
+    final response = await _apiService.getLiveLocation(childId);
+    return LiveTrackingModel.fromRealtimeDatabase(
+      childId,
+      {
+        'location': response,
+      },
+    );
+  }
+
+  Future<void> _startBackendPolling({
+    required String childId,
+    required StreamController<LiveTrackingModel> controller,
+  }) async {
+    Timer? pollTimer;
+
+    Future<void> emitLatest() async {
+      try {
+        final tracking = await _getLiveTrackingFromBackend(childId);
+        if (!controller.isClosed) {
+          controller.add(tracking);
+        }
+      } catch (error) {
+        if (!controller.isClosed) {
+          controller.addError(error);
+        }
+      }
+    }
+
+    await emitLatest();
+    pollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(emitLatest());
+    });
+
+    controller.onCancel = () async {
+      pollTimer?.cancel();
+    };
+  }
+
+  bool _shouldFallbackToBackend(Object error) {
+    if (error is FirebaseException) {
+      return error.code == 'permission-denied' ||
+          error.code == 'unavailable' ||
+          error.code == 'network-error';
+    }
+
+    final message = error.toString().toLowerCase();
+    return message.contains('permission-denied') ||
+        message.contains('failed to authenticate realtime alerts') ||
+        message.contains('realtime alert token was empty') ||
+        message.contains('socketexception') ||
+        message.contains('unable to resolve host') ||
+        message.contains('network request failed');
   }
 
   Future<DocumentSnapshot<Map<String, dynamic>>?> _resolveDeviceSnapshot(

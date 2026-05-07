@@ -13,6 +13,7 @@ import '../providers/alert_provider.dart';
 import '../providers/geofence_provider.dart';
 import '../providers/location_provider.dart';
 import '../utils/constants.dart';
+import '../utils/localization_helpers.dart';
 import '../utils/timestamp_utils.dart';
 import '../widgets/google_map_guard.dart';
 
@@ -199,15 +200,16 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
   }
 
   String _mapViewLabel(_MapViewMode mode) {
+    final l10n = context.l10n;
     switch (mode) {
       case _MapViewMode.defaultView:
-        return 'Default';
+        return l10n.mapTypeDefault;
       case _MapViewMode.satellite:
-        return 'Satellite';
+        return l10n.mapTypeSatellite;
       case _MapViewMode.terrain:
-        return 'Terrain';
+        return l10n.mapTypeTerrain;
       case _MapViewMode.threeDimensionalLike:
-        return '3D-like';
+        return l10n.mapTypeThreeDimensionalLike;
     }
   }
 
@@ -380,15 +382,17 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
   }
 
   String _movementLabel(LocationModel? liveLocation) {
+    final l10n = context.l10n;
     if (liveLocation == null) {
-      return 'No live data';
+      return l10n.noLiveData;
     }
 
-    return liveLocation.speed > 0.5 ? 'Moving' : 'Stationary';
+    return liveLocation.speed > 0.5 ? l10n.moving : l10n.stationary;
   }
 
   String _zoneRelationLabel(bool isInsideZone) {
-    return isInsideZone ? 'Inside safe zone' : 'Outside safe zone';
+    final l10n = context.l10n;
+    return isInsideZone ? l10n.insideSafeZone : l10n.outsideSafeZone;
   }
 
   String _statusLabel({
@@ -396,7 +400,7 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
     required bool isInsideZone,
   }) {
     if (liveLocation == null) {
-      return 'No live data';
+      return context.l10n.noLiveData;
     }
 
     return _zoneRelationLabel(isInsideZone);
@@ -506,10 +510,9 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
                   rotateGesturesEnabled: true,
                   tiltGesturesEnabled: true,
                 ),
-                fallbackBuilder: (_) => const GoogleMapUnavailableState(
-                  title: 'Map unavailable',
-                  message:
-                      'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+                fallbackBuilder: (_) => GoogleMapUnavailableState(
+                  title: l10n.mapUnavailableTitle,
+                  message: l10n.mapUnavailableMessage,
                 ),
               ),
               Positioned(
@@ -552,7 +555,7 @@ class _SafeZoneDetailScreenState extends State<SafeZoneDetailScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: PopupMenuButton<_MapViewMode>(
-                    tooltip: 'Change map style',
+                    tooltip: l10n.changeMapStyle,
                     initialValue: _mapViewMode,
                     onSelected: (mode) => _setMapViewMode(mode, liveLocation),
                     itemBuilder: (context) => _MapViewMode.values

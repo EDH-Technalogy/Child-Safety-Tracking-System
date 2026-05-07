@@ -158,10 +158,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         prefixIcon: Icon(Icons.person_outlined),
                       ),
                       validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Full name is required';
-                        }
-                        return null;
+                        return validateFullNameInput(
+                          value,
+                          requiredMessage: l10n.enterName,
+                        );
                       },
                     ),
                     const SizedBox(height: 16),
@@ -177,6 +177,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return validateGmailEmailInput(
                           value,
                           requiredMessage: l10n.emailRequired,
+                          invalidMessage: l10n.enterValidEmail,
                         );
                       },
                     ),

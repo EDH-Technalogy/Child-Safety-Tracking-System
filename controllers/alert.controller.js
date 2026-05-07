@@ -23,6 +23,8 @@ const {
   normalizeAlert,
 } = require("../utils/alert-normalizer");
 
+const SOS_ALERT_COOLDOWN_MS = 60000;
+
 function buildAlertTarget(alertId, alertData = {}) {
   return {
     id: alertId || null,
@@ -55,8 +57,53 @@ function normalizeId(value) {
   return value?.toString().trim() || "";
 }
 
+function parseAlertTimestamp(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+}
+
 function requestChildId(req) {
   return normalizeId(req.query?.child_id || req.body?.child_id);
+}
+
+async function skipDuplicateSosIfRecent({
+  childId,
+  locationText = "",
+  latitude = null,
+  longitude = null,
+}) {
+  const sosStateRef = realtimeDB.ref(`live_tracking/${childId}/sos_state`);
+  const sosStateSnapshot = await sosStateRef.once("value");
+  const sosState = sosStateSnapshot.val() || {};
+  const now = Date.now();
+  const lastAlertAt = parseAlertTimestamp(sosState.last_alert_at);
+
+  if (lastAlertAt > 0 && now - lastAlertAt < SOS_ALERT_COOLDOWN_MS) {
+    await sosStateRef.update({
+      updated_at: now,
+      last_location_text: locationText,
+      latitude,
+      longitude,
+    });
+
+    return {
+      skipped: true,
+      lastAlertAt,
+    };
+  }
+
+  await sosStateRef.set({
+    last_alert_at: now,
+    last_location_text: locationText,
+    latitude,
+    longitude,
+    updated_at: now,
+  });
+
+  return {
+    skipped: false,
+    lastAlertAt: now,
+  };
 }
 
 function realtimeAlertMirrorUpdates(alertId, alertData = {}, childData = {}, value) {
@@ -234,6 +281,18 @@ function isAlertForChild(alert, childId) {
   return normalizeId(alert.child_id || alert.childId) === childId;
 }
 
+function isMirroredFlatRootAlert(alert = {}) {
+  const alertId = normalizeId(alert.alert_id || alert.id);
+  const childId = normalizeId(alert.child_id || alert.childId);
+  const hasMirrorFields =
+    normalizeId(alert.user_id || alert.parent_user_id) !== "" &&
+    (normalizeId(alert.status) !== "" ||
+      alert.is_read === true ||
+      alert.isRead === true);
+
+  return alertId !== "" && childId !== "" && hasMirrorFields;
+}
+
 async function listFirestoreAlertsForChild(childId) {
   const snap = await firestore
     .collection("alerts")
@@ -255,12 +314,25 @@ async function listRealtimeSosAlertsForChild(childId) {
       .once("value"),
   ]);
 
-  return [
-    ...collectAlertsFromRealtimeValue(childLiveSnapshot.val(), "alerts_live", {
+  const childScopedAlerts = collectAlertsFromRealtimeValue(
+    childLiveSnapshot.val(),
+    "alerts_live",
+    {
       childIdFallback: childId,
-    }),
-    ...collectAlertsFromRealtimeValue(flatLiveSnapshot.val(), "alerts_live"),
-  ].filter((alert) => isAlertForChild(alert, childId));
+    }
+  ).filter((alert) => isAlertForChild(alert, childId));
+
+  const flatRootAlerts = collectAlertsFromRealtimeValue(
+    flatLiveSnapshot.val(),
+    "alerts_live"
+  ).filter(
+    (alert) =>
+      isAlertForChild(alert, childId) &&
+      !isMirroredFlatRootAlert(alert) &&
+      isSosAlert(alert)
+  );
+
+  return [...childScopedAlerts, ...flatRootAlerts];
 }
 
 async function listRealtimeSafeZoneAlertsForChild(childId) {
@@ -424,6 +496,22 @@ exports.sendAlert = async (req, res) => {
       longitude: req.body.longitude,
     });
 
+    if (type === "SOS") {
+      const sosCheck = await skipDuplicateSosIfRecent({
+        childId,
+        locationText,
+        latitude: req.body.latitude,
+        longitude: req.body.longitude,
+      });
+      if (sosCheck.skipped) {
+        return res.json({
+          alert_id: null,
+          message: "Duplicate SOS ignored",
+          skipped: true,
+        });
+      }
+    }
+
     const result = await createAndLogAlert(req, {
       childId,
       type,
@@ -474,6 +562,20 @@ exports.sosAlert = async (req, res) => {
       latitude: req.body.latitude,
       longitude: req.body.longitude,
     });
+
+    const sosCheck = await skipDuplicateSosIfRecent({
+      childId,
+      locationText,
+      latitude: req.body.latitude,
+      longitude: req.body.longitude,
+    });
+    if (sosCheck.skipped) {
+      return res.json({
+        alert_id: null,
+        message: "Duplicate SOS ignored",
+        skipped: true,
+      });
+    }
 
     const result = await createAndLogAlert(req, {
       childId,

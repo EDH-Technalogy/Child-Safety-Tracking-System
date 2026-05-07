@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/admin_api_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/auth_validation.dart';
 import '../../utils/constants.dart';
 import '../../utils/localization_helpers.dart';
 import 'admin_dashboard_screen.dart';
@@ -132,6 +133,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                   padding: const EdgeInsets.all(32.0),
                   child: Form(
                     key: _formKey,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -209,13 +211,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             fillColor: Colors.grey.shade50,
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return l10n.emailRequired;
-                            }
-                            if (!value.contains('@')) {
-                              return l10n.validEmailRequired;
-                            }
-                            return null;
+                            return validateGmailEmailInput(
+                              value,
+                              requiredMessage: l10n.emailRequired,
+                              invalidMessage: l10n.enterValidEmail,
+                            );
                           },
                         ),
                         const SizedBox(height: 20),
@@ -261,10 +261,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             fillColor: Colors.grey.shade50,
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return l10n.passwordRequired;
-                            }
-                            return null;
+                            return validateStrongPasswordInput(
+                              value,
+                              requiredMessage: l10n.passwordRequired,
+                            );
                           },
                         ),
                         const SizedBox(height: 32),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
+import '../providers/child_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/settings_provider.dart';
@@ -33,9 +34,25 @@ class _PrivacySecurityPageState extends State<PrivacySecurityPage> {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
     final location = context.read<LocationProvider>();
-    final authProvider = context.read<AuthProvider>();
+    final childProvider = context.read<ChildProvider>();
+    final selectedChildId = childProvider.selectedChild?.id.trim() ??
+        (childProvider.children.isNotEmpty
+            ? childProvider.children.first.id.trim()
+            : '');
 
     if (value) {
+      if (selectedChildId.isEmpty) {
+        await settings.setLocationTrackingEnabled(false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.addChildToStartTrackingAndSafeZones),
+            backgroundColor: AppColors.errorColor,
+          ),
+        );
+        return;
+      }
+
       final hasPermission = await _locationService.requestLocationPermission();
       if (!hasPermission) {
         await settings.setLocationTrackingEnabled(false);
@@ -50,7 +67,7 @@ class _PrivacySecurityPageState extends State<PrivacySecurityPage> {
       }
 
       await settings.setLocationTrackingEnabled(true);
-      await location.startLocalTracking(authProvider.user?.id ?? 'device');
+      await location.startLocalTracking(selectedChildId);
     } else {
       await settings.setLocationTrackingEnabled(false);
       await location.stopLocalTracking();

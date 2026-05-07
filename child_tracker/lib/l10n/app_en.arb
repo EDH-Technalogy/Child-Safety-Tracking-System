@@ -500,5 +500,67 @@
   "allAccessibleSafeZones": "All accessible safe zones",
   "todayLocationUpdates": "Today's Location Updates",
   "last7Days": "Last 7 Days",
-  "geofenceBreachesToday": "Geofence Breaches Today"
+  "geofenceBreachesToday": "Geofence Breaches Today",
+  "mapUnavailableTitle": "Map unavailable",
+  "mapUnavailableMessage": "Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.",
+  "noLiveLocationAvailableForChild": "No live location available for this child",
+  "mapAppearsWhenGpsAvailable": "The map will appear when the linked device sends valid GPS data.",
+  "noLiveLocationOrSafeZoneAvailable": "No live location or safe zone available",
+  "addChildToStartTrackingAndSafeZones": "Add a child to start live tracking and safe zone monitoring.",
+  "mapAppearsWhenLiveDataOrSafeZoneSaved": "The map will appear once the child sends live data or a safe zone is saved.",
+  "childMapTemporarilyUnavailable": "The child map is temporarily unavailable.",
+  "mapMode": "Map mode",
+  "mapTypeNormal": "Normal",
+  "mapTypeSatellite": "Satellite",
+  "mapTypeTerrain": "Terrain",
+  "mapTypeDefault": "Default",
+  "mapTypeThreeDimensionalLike": "3D-like",
+  "insideSafeZoneNamed": "Inside {name}",
+  "@insideSafeZoneNamed": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "outsideByDistance": "Outside by {distance}",
+  "@outsideByDistance": {
+    "placeholders": {
+      "distance": {}
+    }
+  },
+  "outsideSafeZones": "Outside safe zones",
+  "noLiveData": "No live data",
+  "moving": "Moving",
+  "stationary": "Stationary",
+  "insideSafeZone": "Inside safe zone",
+  "outsideSafeZone": "Outside safe zone",
+  "changeMapStyle": "Change map style",
+  "savedCenterHint": "Saved center. Tap the map or use a location action, then save to change it.",
+  "previewCenterHint": "Preview only. Tap the map or use a location action to set the center before saving.",
+  "chooseNewCenterOrKeepSaved": "Choose a new center and save, or keep the existing saved center.",
+  "previousSavedLocation": "Previous saved location",
+  "currentLiveLocation": "Current live location",
+  "customLocationFromMap": "Custom location from map",
+  "previewingSavedLocationInstructions": "Previewing a saved location. Tap the map, drag the marker, or confirm a location action before saving a new center.",
+  "previewingLiveLocationInstructions": "Previewing the child's current live location. Use the action button or tap the map to set a new center before saving.",
+  "pendingCenterChange": "Pending change: save to update the safe zone center.",
+  "savedCenterLoaded": "Saved center loaded from the database.",
+  "previewOnlyChooseLocation": "Preview only: choose this location explicitly, then save to keep it.",
+  "noCenterSelectedYet": "No center selected yet.",
+  "unknownTime": "Unknown time",
+  "safeZoneCenterTitle": "Safe zone center",
+  "noPreviousSavedLocations": "No previous saved locations are available for this child yet.",
+  "refreshSavedLocations": "Refresh saved locations",
+  "savedLocations": "Saved locations",
+  "useSelectedSavedLocation": "Use selected saved location",
+  "savedLocationPreviewHint": "Picking from this list only previews the location. The center changes after you press the button above and then save.",
+  "useCurrentLiveLocation": "Use current live location",
+  "latestLiveUpdateUseButton": "Latest live update: {time}. Use the button above if you want to set it as the center.",
+  "@latestLiveUpdateUseButton": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "liveLocationPreviewHint": "This shows the latest live location for preview. It only becomes the safe zone center after you choose it and save.",
+  "customLocationPanelHint": "Tap anywhere on the map or drag the marker to place the safe zone center exactly where you want it. The saved center stays unchanged until you press Save or Update.",
+  "chooseCenterToPreviewSafeZone": "Choose a live, saved, or custom center to preview the safe zone on the map."
 }

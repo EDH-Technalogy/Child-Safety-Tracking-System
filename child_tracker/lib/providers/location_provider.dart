@@ -28,6 +28,7 @@ class LocationProvider with ChangeNotifier {
   bool _isTracking = false;
   bool _isAnimatingLiveLocation = false;
   String? _trackingChildId;
+  String? _localTrackingChildId;
 
   bool _localTracking = false;
 
@@ -392,26 +393,124 @@ class LocationProvider with ChangeNotifier {
   }
 
   Future<void> startLocalTracking(String childId) async {
+    final normalizedChildId = childId.trim();
+    if (normalizedChildId.isEmpty) {
+      _error = 'Select a child before starting location tracking.';
+      notifyListeners();
+      return;
+    }
+
+    if (_localTracking &&
+        _localTrackingChildId == normalizedChildId &&
+        _locationService.isTracking) {
+      return;
+    }
+
+    if (_locationService.isTracking) {
+      await _locationService.stopTracking();
+    }
+
     _localTracking = true;
+    _localTrackingChildId = normalizedChildId;
+    _error = null;
     notifyListeners();
-    await _locationService.startTracking(onLocationUpdate: (Position position) {
-      _liveLocation = LocationModel(
+    final started = await _locationService.startTracking(
+        onLocationUpdate: (Position position) {
+      final location = LocationModel(
         id: '',
-        childId: childId,
+        childId: normalizedChildId,
         latitude: position.latitude,
         longitude: position.longitude,
         speed: position.speed,
         battery: 0,
         recordedAt: position.timestamp.millisecondsSinceEpoch,
       );
+      _liveLocation = location;
       notifyListeners();
+
+      unawaited(_uploadLocalTrackingLocation(location));
     });
+
+    if (!started) {
+      _localTracking = false;
+      _localTrackingChildId = null;
+      _error = 'Location permission is required to start live tracking.';
+      notifyListeners();
+    }
   }
 
   Future<void> stopLocalTracking() async {
     _localTracking = false;
+    _localTrackingChildId = null;
     await _locationService.stopTracking();
     notifyListeners();
+  }
+
+  Future<bool> sendSosForChild(
+    String childId, {
+    String? message,
+  }) async {
+    final normalizedChildId = childId.trim();
+    if (normalizedChildId.isEmpty) {
+      _error = 'Select a child before sending SOS.';
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      LocationModel? location = _liveLocation;
+      if (location == null || location.childId != normalizedChildId) {
+        final currentPosition = await _locationService.getCurrentLocation();
+        if (currentPosition != null) {
+          location = LocationModel(
+            id: '',
+            childId: normalizedChildId,
+            latitude: currentPosition.latitude,
+            longitude: currentPosition.longitude,
+            speed: currentPosition.speed,
+            battery: 0,
+            recordedAt: currentPosition.timestamp.millisecondsSinceEpoch,
+          );
+          _liveLocation = location;
+          notifyListeners();
+        }
+      }
+
+      await _apiService.sendSosAlert(
+        childId: normalizedChildId,
+        latitude: location?.latitude,
+        longitude: location?.longitude,
+        message: message,
+      );
+
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (error) {
+      _error = _formatError(error);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> _uploadLocalTrackingLocation(LocationModel location) async {
+    try {
+      await _apiService.updateLocation(
+        childId: location.childId,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        speed: location.speed,
+        battery: location.battery,
+        source: 'mobile_app',
+        recordedAt: location.recordedAt,
+      );
+    } catch (error) {
+      _error = _formatError(error);
+      notifyListeners();
+      debugPrint(
+        '[LocationProvider.localTracking] upload failed childId=${location.childId} error=$error',
+      );
+    }
   }
 
   @override

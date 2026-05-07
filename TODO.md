@@ -1,11 +1,13 @@
-# Search Feature Implementation Progress
+# Deployment TODO
 
-✅ Step 1: Added search TextField and client-side filtering to AdminUsersScreen.dart (fixed compilation issues)
+## Plan Steps
+- [x] User confirmed edit plan
+- [ ] Create TODO.md with steps
+- [x] Edit child_tracker/lib/utils/constants.dart (API base URL + Maps key)
+- [x] Verify edit successful
+- [ ] cd child_tracker && flutter pub get
+- [ ] Instructions for running backend & app on phone
+- [ ] Complete task
 
-✅ Step 2: Added search TextField and client-side filtering to AdminChildrenScreen.dart (fixed compilation issues)
+## Current Progress: File edits complete. Run flutter pub get, start backend node server.js, then flutter run on phone.
 
-✅ Step 3: Test search functionality in Flutter admin panel - Navigate to Admin Dashboard → User Management / Child Management, type names to filter.
-
-**Task Complete!**
-
-Run `flutter hot reload` or restart Flutter app to test. Search works client-side on loaded lists (name/email for users, name for children). Backend unaffected.

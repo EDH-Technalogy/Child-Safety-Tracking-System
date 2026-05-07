@@ -11,6 +11,7 @@ import '../providers/auth_provider.dart';
 import '../providers/child_provider.dart';
 import '../services/admin_api_service.dart';
 import '../services/image_service.dart';
+import '../utils/auth_validation.dart';
 import '../utils/constants.dart';
 import '../utils/localization_helpers.dart';
 import '../utils/photo_provider.dart';
@@ -783,11 +784,12 @@ class _SharedChildFormScreenState extends State<SharedChildFormScreen> {
                             prefixIcon: const Icon(Icons.child_care),
                           ),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return l10n.pleaseEnterChildName;
-                            }
-                            return null;
-                          },
+                              return validateFullNameInput(
+                                value,
+                                requiredMessage: l10n.pleaseEnterChildName,
+                                invalidMessage: l10n.pleaseEnterChildName,
+                              );
+                            },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -798,14 +800,11 @@ class _SharedChildFormScreenState extends State<SharedChildFormScreen> {
                             prefixIcon: const Icon(Icons.cake),
                           ),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return l10n.pleaseEnterChildAge;
-                            }
-                            final age = int.tryParse(value);
-                            if (age == null || age < 0 || age > 18) {
-                              return l10n.pleaseEnterValidAge;
-                            }
-                            return null;
+                            return validateAgeInput(
+                              value,
+                              requiredMessage: l10n.pleaseEnterChildAge,
+                              invalidMessage: l10n.pleaseEnterValidAge,
+                            );
                           },
                         ),
                         const SizedBox(height: 32),
@@ -859,12 +858,14 @@ class _SharedChildFormScreenState extends State<SharedChildFormScreen> {
                                       prefixIcon: const Icon(Icons.qr_code),
                                     ),
                                     validator: (value) {
-                                      if (_registerDevice &&
-                                          (value == null ||
-                                              value.trim().isEmpty)) {
-                                        return l10n.enterDeviceId;
+                                      if (!_registerDevice) {
+                                        return null;
                                       }
-                                      return null;
+                                      return validateImeiInput(
+                                        value,
+                                        requiredMessage: l10n.enterDeviceId,
+                                        invalidMessage: l10n.enterDeviceId,
+                                      );
                                     },
                                   ),
                                   const SizedBox(height: 16),

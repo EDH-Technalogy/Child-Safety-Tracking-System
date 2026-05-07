@@ -263,29 +263,40 @@ class _AlertCard extends StatelessWidget {
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _getAlertTitle(l10n),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: alert.isRead
-                                ? FontWeight.normal
-                                : FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            _getAlertTitle(l10n),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: alert.isRead
+                                  ? FontWeight.normal
+                                  : FontWeight.bold,
+                            ),
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: _getAlertColor().withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            localizeAlertTypeLabel(l10n, alert.type),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: _getAlertColor(),
-                              fontWeight: FontWeight.bold,
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _getAlertColor().withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              localizeAlertTypeLabel(l10n, alert.type),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _getAlertColor(),
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -345,10 +356,14 @@ class _AlertCard extends StatelessWidget {
                           Icon(Icons.location_on,
                               size: 14, color: Colors.grey[500]),
                           const SizedBox(width: 4),
-                          Text(
-                            alert.zoneName!,
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[500]),
+                          Expanded(
+                            child: Text(
+                              alert.zoneName!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[500]),
+                            ),
                           ),
                         ],
                       ),

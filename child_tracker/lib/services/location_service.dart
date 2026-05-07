@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
+
 import 'notification_service.dart';
 
 class LocationService {
@@ -32,12 +34,17 @@ class LocationService {
     return true;
   }
 
-  Future<void> startTracking(
-      {required Function(Position) onLocationUpdate}) async {
-    if (_trackingEnabled) return;
+  Future<bool> startTracking({
+    required Function(Position) onLocationUpdate,
+  }) async {
+    if (_trackingEnabled) {
+      return true;
+    }
 
     final hasPermission = await requestLocationPermission();
-    if (!hasPermission) return;
+    if (!hasPermission) {
+      return false;
+    }
 
     _trackingEnabled = true;
     _positionStream = Geolocator.getPositionStream(
@@ -48,8 +55,12 @@ class LocationService {
     ).listen((Position position) {
       onLocationUpdate(position);
       _notificationService.sendLocationUpdateNotification(
-          position.latitude, position.longitude);
+        position.latitude,
+        position.longitude,
+      );
     });
+
+    return true;
   }
 
   Future<void> stopTracking() async {

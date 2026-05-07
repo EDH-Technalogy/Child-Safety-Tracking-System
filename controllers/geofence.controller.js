@@ -319,6 +319,8 @@ exports.createSafeZone = async (req, res, next) => {
       latitude,
       longitude,
       radius,
+      initialAlertType: null,
+      initialAlertId: null,
     });
 
     res.status(201).json({

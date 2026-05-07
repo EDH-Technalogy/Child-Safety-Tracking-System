@@ -96,6 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -181,6 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           return validateGmailEmailInput(
                             value,
                             requiredMessage: l10n.emailRequired,
+                            invalidMessage: l10n.enterValidEmail,
                           );
                         },
                       ),
@@ -227,10 +229,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               horizontal: 20, vertical: 20),
                         ),
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return l10n.passwordRequired;
-                          }
-                          return null;
+                          return validateStrongPasswordInput(
+                            value,
+                            requiredMessage: l10n.passwordRequired,
+                          );
                         },
                       ),
                       const SizedBox(height: 16),

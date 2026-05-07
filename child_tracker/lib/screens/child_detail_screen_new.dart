@@ -7,6 +7,7 @@ import '../providers/location_provider.dart';
 import '../providers/alert_provider.dart';
 import '../providers/geofence_provider.dart';
 import '../utils/constants.dart';
+import '../utils/localization_helpers.dart';
 import '../utils/timestamp_utils.dart';
 
 class ChildDetailScreen extends StatefulWidget {
@@ -186,13 +187,14 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   }
 
   Widget _buildUnavailableMapState() {
+    final l10n = context.l10n;
     return Container(
       color: Colors.grey[100],
       alignment: Alignment.center,
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: const [
+        children: [
           Icon(
             Icons.location_off,
             size: 44,
@@ -200,7 +202,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           ),
           SizedBox(height: 12),
           Text(
-            'No live location available for this child',
+            l10n.noLiveLocationAvailableForChild,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
@@ -209,7 +211,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            'The map will appear when the linked device sends valid GPS data.',
+            l10n.mapAppearsWhenGpsAvailable,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textSecondary,
@@ -240,8 +242,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
 
     if (location == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No live location available for this child'),
+        SnackBar(
+          content: Text(context.l10n.noLiveLocationAvailableForChild),
         ),
       );
       return;

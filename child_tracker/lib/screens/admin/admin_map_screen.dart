@@ -308,13 +308,14 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
   }
 
   Widget _buildUnavailableMapState() {
+    final l10n = context.l10n;
     return Container(
       color: Colors.grey[100],
       alignment: Alignment.center,
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: const [
+        children: [
           Icon(
             Icons.location_off,
             size: 44,
@@ -322,7 +323,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
           ),
           SizedBox(height: 12),
           Text(
-            'No live location available for this child',
+            l10n.noLiveLocationAvailableForChild,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
@@ -331,7 +332,7 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            'The map will appear when the linked device sends valid GPS data.',
+            l10n.mapAppearsWhenGpsAvailable,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textSecondary,
@@ -529,10 +530,9 @@ class _AdminMapScreenState extends State<AdminMapScreen> {
                       mapToolbarEnabled: false,
                       compassEnabled: true,
                     ),
-                    fallbackBuilder: (_) => const GoogleMapUnavailableState(
-                      title: 'Map unavailable',
-                      message:
-                          'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.',
+                    fallbackBuilder: (_) => GoogleMapUnavailableState(
+                      title: l10n.mapUnavailableTitle,
+                      message: l10n.mapUnavailableMessage,
                     ),
                   )
                 else

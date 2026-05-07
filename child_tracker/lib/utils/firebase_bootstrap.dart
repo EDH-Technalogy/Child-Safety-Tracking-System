@@ -17,11 +17,9 @@ class FirebaseBootstrap {
 
   static Future<void> _initialize() async {
     try {
-      if (kIsWeb) {
-        await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
-      } else {
-        await Firebase.initializeApp();
-      }
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
     } on FirebaseException catch (error) {
       _initialization = null;
       throw StateError(_formatError(error));

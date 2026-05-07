@@ -1,15 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationService {
   static const String _notificationKey = 'notification_enabled';
-  static const String _generalChannelId = 'child_tracker_general_v1';
+  static const String _generalChannelId = 'child_tracker_general_v2';
   static const String _generalChannelName = 'General Notifications';
   static const String _generalChannelDescription =
       'Standard app notifications for child tracking updates.';
-  static const String _safeZoneChannelId = 'safe_zone_alarm_v2';
+  static const String _safeZoneChannelId = 'safe_zone_alarm_v3';
   static const String _safeZoneChannelName = 'Safe Zone Alarm Alerts';
   static const String _safeZoneChannelDescription =
       'Audible alerts for safe zone exits and other critical child events.';
@@ -145,6 +146,30 @@ class NotificationService {
 
   bool get enabled => _enabled;
 
+  Future<void> updateAppIconBadge(int count) async {
+    if (kIsWeb) {
+      return;
+    }
+
+    try {
+      final supported = await FlutterAppBadger.isAppBadgeSupported();
+      if (!supported) {
+        return;
+      }
+
+      if (count <= 0) {
+        await FlutterAppBadger.removeBadge();
+        return;
+      }
+
+      await FlutterAppBadger.updateBadgeCount(count);
+    } catch (error) {
+      debugPrint(
+        '[NotificationService.updateAppIconBadge] skipped count=$count error=$error',
+      );
+    }
+  }
+
   Future<void> sendNotification({
     required String title,
     required String body,
@@ -200,7 +225,13 @@ class NotificationService {
             sound: const RawResourceAndroidNotificationSound(
               _safeZoneAlarmSoundName,
             ),
+            styleInformation: BigTextStyleInformation(body),
             enableVibration: true,
+            visibility: NotificationVisibility.public,
+            ticker: title,
+            channelShowBadge: true,
+            fullScreenIntent: true,
+            autoCancel: true,
             vibrationPattern: Int64List.fromList(<int>[
               0,
               450,
@@ -212,13 +243,18 @@ class NotificationService {
             category: AndroidNotificationCategory.alarm,
             audioAttributesUsage: AudioAttributesUsage.alarm,
           )
-        : const AndroidNotificationDetails(
+        : AndroidNotificationDetails(
             _generalChannelId,
             _generalChannelName,
             channelDescription: _generalChannelDescription,
             importance: Importance.high,
             priority: Priority.high,
             playSound: true,
+            styleInformation: BigTextStyleInformation(body),
+            visibility: NotificationVisibility.public,
+            ticker: title,
+            channelShowBadge: true,
+            autoCancel: true,
             category: AndroidNotificationCategory.message,
             audioAttributesUsage: AudioAttributesUsage.notification,
           );

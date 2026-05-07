@@ -63,6 +63,11 @@ function asMap(value) {
   return value && typeof value === "object" ? value : {};
 }
 
+function maxTimestamp(...values) {
+  const normalized = values.filter((value) => value !== null);
+  return normalized.length > 0 ? Math.max(...normalized) : null;
+}
+
 function computeDeviceConnectivityStatus(rawTimestamp, now = Date.now()) {
   const latestTimestamp = normalizeEpochMillisecondsOrNull(rawTimestamp);
   const { onlineThresholdMs, delayedThresholdMs } = getDeviceStatusThresholds();
@@ -206,10 +211,19 @@ function buildStatusMetadata({
   const trackingNodeMap = asMap(trackingNode);
   const childNodeMap = asMap(childNode);
   const statusNode = asMap(trackingNodeMap.status);
-  const heartbeatTimestamp =
-    normalizeEpochMillisecondsOrNull(statusNode.lastSeen) ??
-    normalizeEpochMillisecondsOrNull(statusNode.updatedAt) ??
-    liveTimestamp;
+  const statusLastSeen =
+    normalizeEpochMillisecondsOrNull(statusNode.lastSeen);
+  const statusUpdatedAt =
+    normalizeEpochMillisecondsOrNull(statusNode.updatedAt);
+  const statusLastOfflineAt =
+    normalizeEpochMillisecondsOrNull(statusNode.lastOfflineAt);
+  const statusLastOnlineAt =
+    normalizeEpochMillisecondsOrNull(statusNode.lastOnlineAt);
+  const heartbeatTimestamp = maxTimestamp(
+    statusLastSeen,
+    statusUpdatedAt,
+    liveTimestamp
+  );
   const computedStatus = computeDeviceConnectivityStatus(heartbeatTimestamp, now);
 
   const connection =
@@ -228,16 +242,26 @@ function buildStatusMetadata({
       : statusNode.online === true
         ? "online"
         : "");
-  const resolvedStatus =
-    explicitConnectionState === "offline"
+  const hasFreshLiveLocation =
+    liveTimestamp !== null &&
+    computedStatus.latestTimestamp !== null &&
+    liveTimestamp === computedStatus.latestTimestamp &&
+    (computedStatus.status === "online" || computedStatus.status === "delayed");
+  const staleOfflineFlag =
+    explicitConnectionState === "offline" &&
+    hasFreshLiveLocation &&
+    (statusLastOfflineAt === null || liveTimestamp >= statusLastOfflineAt);
+  const resolvedStatus = staleOfflineFlag
+    ? computedStatus.status
+    : explicitConnectionState === "offline"
       ? "offline"
       : computedStatus.status;
 
   const timestamps = [
-    normalizeEpochMillisecondsOrNull(statusNode.lastSeen),
-    normalizeEpochMillisecondsOrNull(statusNode.updatedAt),
-    normalizeEpochMillisecondsOrNull(statusNode.lastOfflineAt),
-    normalizeEpochMillisecondsOrNull(statusNode.lastOnlineAt),
+    statusLastSeen,
+    statusUpdatedAt,
+    statusLastOfflineAt,
+    statusLastOnlineAt,
     normalizeEpochMillisecondsOrNull(connection.updated_at),
     normalizeEpochMillisecondsOrNull(connection.time),
     normalizeEpochMillisecondsOrNull(deviceStatus.updated_at),
@@ -260,6 +284,7 @@ function buildStatusMetadata({
       childStatus.status?.toString().trim() ||
       null,
     latestSignal:
+      (staleOfflineFlag ? "fresh_live_location_overrode_stale_offline_flag" : null) ||
       computedStatus.reason ||
       connection.reason?.toString().trim() ||
       deviceStatus.reason?.toString().trim() ||

@@ -13,6 +13,8 @@ let isInitialized = false;
 let rootChildAddedHandler = null;
 let rootChildChangedHandler = null;
 let rootChildRemovedHandler = null;
+let rootListenerStartedAt = 0;
+const knownRootFlatAlertIds = new Set();
 
 const childAlertListeners = new Map();
 const inflightAlerts = new Set();
@@ -36,6 +38,10 @@ function parseTimestamp(value) {
   }
 
   return 0;
+}
+
+function isRecentEnough(timestamp, startedAt, windowMs = 5000) {
+  return timestamp > 0 && timestamp >= startedAt - windowMs;
 }
 
 function extractMessage(payload = {}) {
@@ -168,6 +174,54 @@ async function logFlatRootAlert(snapshot) {
 
 function normalizeInitialStatus(payload = {}) {
   return payload.isRead === true ? "read" : "unread";
+}
+
+function normalizeTrackingIdentifier(value) {
+  return value?.toString().trim() || "";
+}
+
+async function resolveChildIdForFlatIngress(payload = {}, fallbackIdentifier = "") {
+  const explicitChildId = normalizeChildId(payload.child_id || payload.childId);
+  if (explicitChildId) {
+    return explicitChildId;
+  }
+
+  const trackingKey = normalizeTrackingIdentifier(
+    payload.tracking_key ||
+      payload.trackingKey ||
+      payload.imei ||
+      payload.device_id ||
+      payload.deviceId ||
+      fallbackIdentifier
+  );
+
+  if (!trackingKey) {
+    return "";
+  }
+
+  const registrySnapshot = await realtimeDB
+    .ref(`device_registry_by_tracking_key/${trackingKey}`)
+    .once("value");
+  const registryData = registrySnapshot.val() || {};
+  const registryChildId = normalizeChildId(registryData.child_id);
+  if (registryChildId) {
+    return registryChildId;
+  }
+
+  const deviceSnapshot = await realtimeDB
+    .ref(`device_registry/${trackingKey}`)
+    .once("value");
+  const deviceData = deviceSnapshot.val() || {};
+  return normalizeChildId(deviceData.child_id);
+}
+
+function isMirroredFlatAlertPayload(payload = {}, alertId = "") {
+  return (
+    normalizeAlertId(payload.alert_id) === normalizeAlertId(alertId) &&
+    Boolean(normalizeChildId(payload.child_id || payload.childId)) &&
+    Boolean(payload.user_id || payload.parent_user_id) &&
+    Boolean(payload.status || payload.isRead === true || payload.is_read === true)
+  );
 }
 
 async function updateIngressStatus(snapshot, fields = {}) {
@@ -409,23 +463,110 @@ async function processSosIngressAlert(childId, snapshot) {
   }
 }
 
-function attachChildListener(childId) {
+async function processFlatRootIngressAlert(snapshot, { isNewEvent = false } = {}) {
+  const alertId = normalizeAlertId(snapshot.key);
+  const payload = snapshot.val();
+  if (!alertId || !looksLikeSingleAlertPayload(payload)) {
+    return;
+  }
+
+  const data = isPlainObject(payload) ? payload : {};
+  if (
+    data.processed_at ||
+    data.rejected_at ||
+    data.server_status === "processed" ||
+    data.server_status === "rejected" ||
+    data.source_live_ingress === true ||
+    data.ingress_alert_id ||
+    isMirroredFlatAlertPayload(data, alertId)
+  ) {
+    return;
+  }
+
+  const createdAt = parseTimestamp(data.timestamp || data.created_at);
+  if (!isRecentEnough(createdAt, rootListenerStartedAt)) {
+    knownRootFlatAlertIds.add(alertId);
+    console.info("[sos-alert-live-listener.flat] ignored stale flat alert", {
+      alertId,
+      path: `/alerts_live/${alertId}`,
+      createdAt,
+      rootListenerStartedAt,
+    });
+    return;
+  }
+
+  const resolvedChildId = await resolveChildIdForFlatIngress(data, alertId);
+  if (!resolvedChildId) {
+    console.info("[sos-alert-live-listener.flat] unresolved child", {
+      alertId,
+      path: `/alerts_live/${alertId}`,
+      hasChildId: Boolean(normalizeChildId(data.child_id || data.childId)),
+      hasTrackingKey: Boolean(
+        normalizeTrackingIdentifier(
+          data.tracking_key ||
+            data.trackingKey ||
+            data.imei ||
+            data.device_id ||
+            data.deviceId
+        )
+      ),
+    });
+    return;
+  }
+
+  await processSosIngressAlert(resolvedChildId, snapshot);
+}
+
+async function attachChildListener(childId) {
   const normalizedChildId = normalizeChildId(childId);
   if (!normalizedChildId || childAlertListeners.has(normalizedChildId)) {
     return;
   }
 
   const ref = realtimeDB.ref(`alerts_live/${normalizedChildId}`);
+  const initialSnapshot = await ref.once("value");
+  const knownIds = new Set();
+  const initialData = initialSnapshot.val() || {};
+  Object.entries(initialData).forEach(([alertId, payload]) => {
+    if (looksLikeSingleAlertPayload(payload)) {
+      knownIds.add(normalizeAlertId(alertId));
+    }
+  });
+  const listenerStartedAt = Date.now();
   const handler = (snapshot) => {
+    const alertId = normalizeAlertId(snapshot.key);
+    if (knownIds.has(alertId)) {
+      return;
+    }
+
+    const payload = snapshot.val();
+    const createdAt = parseTimestamp(payload?.timestamp || payload?.created_at);
+    if (!isRecentEnough(createdAt, listenerStartedAt)) {
+      knownIds.add(alertId);
+      console.info("[sos-alert-live-listener.child] ignored stale child alert", {
+        childId: normalizedChildId,
+        alertId,
+        createdAt,
+        listenerStartedAt,
+      });
+      return;
+    }
+
     void processSosIngressAlert(normalizedChildId, snapshot);
   };
 
   ref.on("child_added", handler);
-  childAlertListeners.set(normalizedChildId, { ref, handler });
+  childAlertListeners.set(normalizedChildId, {
+    ref,
+    handler,
+    knownIds,
+    listenerStartedAt,
+  });
 
   console.info("[sos-alert-live-listener.attach]", {
     childId: normalizedChildId,
     path: `/alerts_live/${normalizedChildId}`,
+    knownCount: knownIds.size,
   });
 }
 
@@ -440,27 +581,43 @@ function detachChildListener(childId) {
   childAlertListeners.delete(normalizedChildId);
 }
 
-function initSosAlertLiveListener() {
+async function initSosAlertLiveListener() {
   if (isInitialized) {
     return;
   }
 
   isInitialized = true;
   const rootRef = realtimeDB.ref("alerts_live");
+  const initialRootSnapshot = await rootRef.once("value");
+  const initialRootData = initialRootSnapshot.val() || {};
+  knownRootFlatAlertIds.clear();
+  Object.entries(initialRootData).forEach(([alertId, payload]) => {
+    if (looksLikeSingleAlertPayload(payload)) {
+      knownRootFlatAlertIds.add(normalizeAlertId(alertId));
+    }
+  });
+  rootListenerStartedAt = Date.now();
 
   rootChildAddedHandler = (snapshot) => {
+    const alertId = normalizeAlertId(snapshot.key);
+    if (knownRootFlatAlertIds.has(alertId)) {
+      return;
+    }
     void logFlatRootAlert(snapshot);
+    void processFlatRootIngressAlert(snapshot, { isNewEvent: true });
     console.info("[sos-alert-live-listener] direct Flutter path only", {
-      key: normalizeAlertId(snapshot.key),
+      key: alertId,
       path: `/alerts_live/${snapshot.key}`,
       isFlatAlert: looksLikeSingleAlertPayload(snapshot.val()),
     });
   };
 
   rootChildChangedHandler = (snapshot) => {
+    const alertId = normalizeAlertId(snapshot.key);
     void logFlatRootAlert(snapshot);
+    void processFlatRootIngressAlert(snapshot, { isNewEvent: false });
     console.info("[sos-alert-live-listener] direct Flutter path changed", {
-      key: normalizeAlertId(snapshot.key),
+      key: alertId,
       path: `/alerts_live/${snapshot.key}`,
       isFlatAlert: looksLikeSingleAlertPayload(snapshot.val()),
     });
@@ -478,7 +635,10 @@ function initSosAlertLiveListener() {
   rootRef.on("child_changed", rootChildChangedHandler);
   rootRef.on("child_removed", rootChildRemovedHandler);
 
-  console.info("[sos-alert-live-listener] initialized path=/alerts_live");
+  console.info("[sos-alert-live-listener] initialized path=/alerts_live", {
+    knownRootFlatAlerts: knownRootFlatAlertIds.size,
+    rootListenerStartedAt,
+  });
 }
 
 module.exports = {

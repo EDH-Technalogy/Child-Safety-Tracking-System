@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -27,40 +29,59 @@ class ActivityScreen extends StatefulWidget {
 class _ActivityScreenState extends State<ActivityScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  Timer? _refreshTimer;
   bool _accessDenied = false;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadData();
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _loadData(showLoading: false),
+    );
   }
 
-  Future<void> _loadData() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final childProvider = Provider.of<ChildProvider>(context, listen: false);
-
-    if (!_canAccessSelectedChild(authProvider, childProvider)) {
-      if (mounted) {
-        setState(() {
-          _accessDenied = true;
-        });
-      }
+  Future<void> _loadData({bool showLoading = true}) async {
+    if (_isRefreshing) {
       return;
     }
 
-    if (mounted && _accessDenied) {
-      setState(() {
-        _accessDenied = false;
-      });
-    }
+    _isRefreshing = true;
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final childProvider = Provider.of<ChildProvider>(context, listen: false);
 
-    final activityProvider =
-        Provider.of<ActivityProvider>(context, listen: false);
-    await Future.wait([
-      activityProvider.getActivityLogs(widget.childId),
-      activityProvider.getLast24HourSummary(widget.childId),
-    ]);
+    try {
+      if (!_canAccessSelectedChild(authProvider, childProvider)) {
+        if (mounted) {
+          setState(() {
+            _accessDenied = true;
+          });
+        }
+        return;
+      }
+
+      if (mounted && _accessDenied) {
+        setState(() {
+          _accessDenied = false;
+        });
+      }
+
+      final activityProvider =
+          Provider.of<ActivityProvider>(context, listen: false);
+      if (!showLoading && activityProvider.isLoading) {
+        return;
+      }
+
+      await Future.wait([
+        activityProvider.getActivityLogs(widget.childId),
+        activityProvider.getLast24HourSummary(widget.childId),
+      ]);
+    } finally {
+      _isRefreshing = false;
+    }
   }
 
   bool _canAccessSelectedChild(
@@ -90,6 +111,7 @@ class _ActivityScreenState extends State<ActivityScreen>
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }

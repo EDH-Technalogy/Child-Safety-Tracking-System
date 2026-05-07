@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "ps",
   "appTitle": "ماشوم تعقیبونکی",
   "login": "ننوتل",
@@ -501,4 +501,66 @@
   "todayLocationUpdates": "د نن د ځای تازه‌کول",
   "last7Days": "وروستۍ ۷ ورځې",
   "geofenceBreachesToday": "د نن جيوفنس سرغړونې"
+  ,"mapUnavailableTitle": "نقشه شتون نه لري",
+  "mapUnavailableMessage": "Google Maps اوس په دې براوزر کې چمتو نه دی. د وېب نقشې سکرېپټ او API key امستنې وګورئ.",
+  "noLiveLocationAvailableForChild": "د دې ماشوم لپاره ژوندی موقعیت نشته",
+  "mapAppearsWhenGpsAvailable": "نقشه هغه وخت ښکاري کله چې تړلې وسیله سم GPS معلومات واستوي.",
+  "noLiveLocationOrSafeZoneAvailable": "ژوندی موقعیت یا خوندي سیمه نشته",
+  "addChildToStartTrackingAndSafeZones": "د ژوندۍ څارنې او خوندي سیمو د څار پیل لپاره یو ماشوم اضافه کړئ.",
+  "mapAppearsWhenLiveDataOrSafeZoneSaved": "نقشه هغه وخت ښکاري کله چې ماشوم ژوندی معلومات واستوي یا خوندي سیمه خوندي شي.",
+  "childMapTemporarilyUnavailable": "د ماشوم نقشه لنډمهاله شتون نه لري.",
+  "mapMode": "د نقشې حالت",
+  "mapTypeNormal": "عادي",
+  "mapTypeSatellite": "سپوږمکۍ",
+  "mapTypeTerrain": "ځمکنی",
+  "mapTypeDefault": "اصلي",
+  "mapTypeThreeDimensionalLike": "۳ بعدي ته ورته",
+  "insideSafeZoneNamed": "د {name} دننه",
+  "@insideSafeZoneNamed": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "outsideByDistance": "د {distance} په اندازه بهر",
+  "@outsideByDistance": {
+    "placeholders": {
+      "distance": {}
+    }
+  },
+  "outsideSafeZones": "له خوندي سیمو بهر",
+  "noLiveData": "ژوندی معلومات نشته",
+  "moving": "په خوځښت کې",
+  "stationary": "ولاړ",
+  "insideSafeZone": "د خوندي سیمې دننه",
+  "outsideSafeZone": "له خوندي سیمې بهر",
+  "changeMapStyle": "د نقشې بڼه بدله کړئ",
+  "savedCenterHint": "خوندي شوی مرکز. په نقشه ټک وکړئ یا د ځای یو عمل وکاروئ، بیا یې د بدلولو لپاره خوندي کړئ.",
+  "previewCenterHint": "یوازې مخکتنه. د خوندي کولو مخکې په نقشه ټک وکړئ یا د مرکز ټاکلو لپاره د ځای یو عمل وکاروئ.",
+  "chooseNewCenterOrKeepSaved": "یو نوی مرکز وټاکئ او خوندي یې کړئ، یا اوسنی خوندي شوی مرکز همداسې پرېږدئ.",
+  "previousSavedLocation": "مخکینی خوندي شوی موقعیت",
+  "currentLiveLocation": "اوسنی ژوندی موقعیت",
+  "customLocationFromMap": "له نقشې څخه ځانګړی موقعیت",
+  "previewingSavedLocationInstructions": "یو خوندي شوی موقعیت مخکتنه کېږي. په نقشه ټک وکړئ، نښه راکاږئ، یا د خوندي کولو مخکې د ځای عمل تایید کړئ.",
+  "previewingLiveLocationInstructions": "د ماشوم اوسنی ژوندی موقعیت مخکتنه کېږي. د نوي مرکز د ټاکلو لپاره د عمل تڼۍ یا پر نقشه ټک کاروئ.",
+  "pendingCenterChange": "بدلون انتظار باسي: د خوندي سیمې مرکز د نوي کولو لپاره خوندي یې کړئ.",
+  "savedCenterLoaded": "خوندي شوی مرکز له ډیټابېس څخه پورته شو.",
+  "previewOnlyChooseLocation": "یوازې مخکتنه: دا ځای په څرګنده وټاکئ، بیا یې د ساتلو لپاره خوندي کړئ.",
+  "noCenterSelectedYet": "لا تر اوسه کوم مرکز نه دی ټاکل شوی.",
+  "unknownTime": "نامعلوم وخت",
+  "safeZoneCenterTitle": "د خوندي سیمې مرکز",
+  "noPreviousSavedLocations": "لا تر اوسه د دې ماشوم لپاره کوم مخکینی خوندي شوی موقعیت نشته.",
+  "refreshSavedLocations": "خوندي شوي موقعیتونه تازه کړئ",
+  "savedLocations": "خوندي شوي موقعیتونه",
+  "useSelectedSavedLocation": "ټاکل شوی خوندي شوی موقعیت وکاروئ",
+  "savedLocationPreviewHint": "له دې لست څخه ټاکل یوازې ځای مخکتنه کوي. مرکز هغه وخت بدلېږي چې پورته تڼۍ وکاروئ او بیا خوندي کړئ.",
+  "useCurrentLiveLocation": "اوسنی ژوندی موقعیت وکاروئ",
+  "latestLiveUpdateUseButton": "وروستی ژوندی تازه کول: {time}. که غواړئ دا د مرکز په توګه وټاکئ، پورته تڼۍ وکاروئ.",
+  "@latestLiveUpdateUseButton": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "liveLocationPreviewHint": "دا برخه د مخکتنې لپاره وروستی ژوندی موقعیت ښيي. دا یوازې هغه وخت د خوندي سیمې مرکز ګرځي چې یې وټاکئ او خوندي یې کړئ.",
+  "customLocationPanelHint": "د نقشې پر هر ځای ټک وکړئ یا نښه راکش کړئ تر څو د خوندي سیمې مرکز په دقیق ډول هغه ځای کې کېږدئ چې غواړئ. خوندي شوی مرکز تر هغه نه بدلېږي څو Save یا Update ونه ټکوئ.",
+  "chooseCenterToPreviewSafeZone": "یو ژوندی، خوندي شوی، یا ځانګړی مرکز وټاکئ تر څو په نقشه کې د خوندي سیمې مخکتنه ووینئ."
 }

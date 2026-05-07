@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "fa",
   "appTitle": "ردیاب کودک",
   "login": "ورود",
@@ -501,4 +501,66 @@
   "todayLocationUpdates": "به‌روزرسانی‌های موقعیت امروز",
   "last7Days": "۷ روز اخیر",
   "geofenceBreachesToday": "نقض‌های ژئوفنس امروز"
+  ,"mapUnavailableTitle": "نقشه در دسترس نیست",
+  "mapUnavailableMessage": "Google Maps در این مرورگر در حال حاضر آماده نیست. تنظیمات اسکریپت و API key نقشه وب را بررسی کنید.",
+  "noLiveLocationAvailableForChild": "برای این کودک موقعیت زنده موجود نیست",
+  "mapAppearsWhenGpsAvailable": "نقشه وقتی نمایش داده می‌شود که دستگاه متصل داده GPS معتبر ارسال کند.",
+  "noLiveLocationOrSafeZoneAvailable": "هیچ موقعیت زنده یا منطقه امنی موجود نیست",
+  "addChildToStartTrackingAndSafeZones": "برای شروع ردیابی زنده و پایش مناطق امن یک کودک اضافه کنید.",
+  "mapAppearsWhenLiveDataOrSafeZoneSaved": "نقشه زمانی نمایش داده می‌شود که کودک داده زنده ارسال کند یا یک منطقه امنی ذخیره شود.",
+  "childMapTemporarilyUnavailable": "نقشه کودک موقتاً در دسترس نیست.",
+  "mapMode": "حالت نقشه",
+  "mapTypeNormal": "عادی",
+  "mapTypeSatellite": "ماهواره‌ای",
+  "mapTypeTerrain": "عوارض",
+  "mapTypeDefault": "پیش‌فرض",
+  "mapTypeThreeDimensionalLike": "شبیه ۳ بعدی",
+  "insideSafeZoneNamed": "داخل {name}",
+  "@insideSafeZoneNamed": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "outsideByDistance": "به اندازه {distance} بیرون",
+  "@outsideByDistance": {
+    "placeholders": {
+      "distance": {}
+    }
+  },
+  "outsideSafeZones": "بیرون از مناطق امن",
+  "noLiveData": "داده زنده‌ای موجود نیست",
+  "moving": "در حال حرکت",
+  "stationary": "ثابت",
+  "insideSafeZone": "داخل منطقه امن",
+  "outsideSafeZone": "بیرون منطقه امن",
+  "changeMapStyle": "تغییر سبک نقشه",
+  "savedCenterHint": "مرکز ذخیره‌شده. روی نقشه ضربه بزنید یا از یک اقدام مکان استفاده کنید، سپس برای تغییر آن ذخیره کنید.",
+  "previewCenterHint": "فقط پیش‌نمایش. پیش از ذخیره روی نقشه ضربه بزنید یا از یک اقدام مکان برای تنظیم مرکز استفاده کنید.",
+  "chooseNewCenterOrKeepSaved": "یک مرکز جدید انتخاب و ذخیره کنید، یا مرکز ذخیره‌شده فعلی را نگه دارید.",
+  "previousSavedLocation": "موقعیت ذخیره‌شده قبلی",
+  "currentLiveLocation": "موقعیت زنده کنونی",
+  "customLocationFromMap": "موقعیت سفارشی از نقشه",
+  "previewingSavedLocationInstructions": "در حال پیش‌نمایش یک موقعیت ذخیره‌شده. روی نقشه ضربه بزنید، نشانگر را بکشید، یا پیش از ذخیره کردن یک اقدام مکان را تایید کنید.",
+  "previewingLiveLocationInstructions": "در حال پیش‌نمایش موقعیت زنده کنونی کودک. برای تنظیم یک مرکز جدید پیش از ذخیره از دکمه اقدام یا ضربه روی نقشه استفاده کنید.",
+  "pendingCenterChange": "تغییر در انتظار: برای به‌روزرسانی مرکز منطقه امن ذخیره کنید.",
+  "savedCenterLoaded": "مرکز ذخیره‌شده از پایگاه داده بارگیری شد.",
+  "previewOnlyChooseLocation": "فقط پیش‌نمایش: این مکان را به‌صورت صریح انتخاب کنید، سپس برای نگه داشتن آن ذخیره کنید.",
+  "noCenterSelectedYet": "هنوز هیچ مرکزی انتخاب نشده است.",
+  "unknownTime": "زمان نامشخص",
+  "safeZoneCenterTitle": "مرکز منطقه امن",
+  "noPreviousSavedLocations": "هنوز هیچ موقعیت ذخیره‌شده قبلی برای این کودک موجود نیست.",
+  "refreshSavedLocations": "بازنگری موقعیت‌های ذخیره‌شده",
+  "savedLocations": "موقعیت‌های ذخیره‌شده",
+  "useSelectedSavedLocation": "از موقعیت ذخیره‌شده انتخاب‌شده استفاده کنید",
+  "savedLocationPreviewHint": "انتخاب از این فهرست فقط مکان را پیش‌نمایش می‌کند. مرکز پس از فشردن دکمه بالا و سپس ذخیره تغییر می‌کند.",
+  "useCurrentLiveLocation": "از موقعیت زنده کنونی استفاده کنید",
+  "latestLiveUpdateUseButton": "آخرین به‌روزرسانی زنده: {time}. اگر می‌خواهید آن را به‌عنوان مرکز تنظیم کنید از دکمه بالا استفاده کنید.",
+  "@latestLiveUpdateUseButton": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "liveLocationPreviewHint": "این بخش آخرین موقعیت زنده را برای پیش‌نمایش نشان می‌دهد. تنها پس از انتخاب آن و ذخیره کردن، به مرکز منطقه امن تبدیل می‌شود.",
+  "customLocationPanelHint": "در هر جای نقشه ضربه بزنید یا نشانگر را بکشید تا مرکز منطقه امن را دقیقاً همان جایی که می‌خواهید قرار دهید. مرکز ذخیره‌شده تا زمانی که ذخیره یا به‌روزرسانی را فشار ندهید تغییر نمی‌کند.",
+  "chooseCenterToPreviewSafeZone": "یک مرکز زنده، ذخیره‌شده یا سفارشی انتخاب کنید تا پیش‌نمایش منطقه امن را روی نقشه ببینید."
 }

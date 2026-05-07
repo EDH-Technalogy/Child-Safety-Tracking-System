@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/location_provider.dart';
 import '../utils/constants.dart';
@@ -556,6 +557,9 @@ class _HistoryEventTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final offlineSummary = _offlineLocationSummary();
+    final onlineSummary = _onlineLocationSummary();
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
@@ -587,6 +591,20 @@ class _HistoryEventTile extends StatelessWidget {
                 _formatTimestamp(event.timestamp),
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
+              if (offlineSummary != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '${l10n.offline}: $offlineSummary',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+              if (onlineSummary != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  '${l10n.online}: $onlineSummary',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
             ],
           ),
           trailing:
@@ -608,6 +626,56 @@ class _HistoryEventTile extends StatelessWidget {
       default:
         return false;
     }
+  }
+
+  String? _offlineLocationSummary() {
+    final lastKnownAddress = _readString(
+      event.metadata,
+      ['lastKnownAddress', 'locationText'],
+    );
+    if (lastKnownAddress != null && lastKnownAddress.isNotEmpty) {
+      return lastKnownAddress;
+    }
+
+    final lastKnownLat = _readDouble(event.metadata, ['lastKnownLat']);
+    final lastKnownLng = _readDouble(event.metadata, ['lastKnownLng']);
+    if (lastKnownLat != null && lastKnownLng != null) {
+      return _formatCoordinates(lastKnownLat, lastKnownLng);
+    }
+
+    if (event.type.toUpperCase() == 'DEVICE_DISCONNECTED' ||
+        event.type.toUpperCase() == 'DEVICE_OFFLINE') {
+      if (event.latitude != null && event.longitude != null) {
+        return _formatCoordinates(event.latitude!, event.longitude!);
+      }
+    }
+
+    return null;
+  }
+
+  String? _onlineLocationSummary() {
+    final reconnectedAddress = _readString(
+      event.metadata,
+      ['reconnectedAddress', 'locationText'],
+    );
+    if (reconnectedAddress != null && reconnectedAddress.isNotEmpty) {
+      return reconnectedAddress;
+    }
+
+    final reconnectedLat = _readDouble(event.metadata, ['reconnectedLat']);
+    final reconnectedLng = _readDouble(event.metadata, ['reconnectedLng']);
+    if (reconnectedLat != null && reconnectedLng != null) {
+      return _formatCoordinates(reconnectedLat, reconnectedLng);
+    }
+
+    if (event.type.toUpperCase() == 'DEVICE_RECONNECTED' ||
+        event.type.toUpperCase() == 'DEVICE_ONLINE') {
+      if (event.latitude != null && event.longitude != null) {
+        return _formatCoordinates(event.latitude!, event.longitude!);
+      }
+    }
+
+    return null;
   }
 
   void _showEventDetails(BuildContext context) {
@@ -634,8 +702,19 @@ class _HistoryEventTile extends StatelessWidget {
           event.metadata,
           ['durationOfflineMs'],
         );
-        final lastKnownLat = _readDouble(event.metadata, ['lastKnownLat']);
-        final lastKnownLng = _readDouble(event.metadata, ['lastKnownLng']);
+        final offlineEventType = event.type.toUpperCase();
+        final lastKnownLat =
+            _readDouble(event.metadata, ['lastKnownLat']) ??
+                ((offlineEventType == 'DEVICE_DISCONNECTED' ||
+                        offlineEventType == 'DEVICE_OFFLINE')
+                    ? event.latitude
+                    : null);
+        final lastKnownLng =
+            _readDouble(event.metadata, ['lastKnownLng']) ??
+                ((offlineEventType == 'DEVICE_DISCONNECTED' ||
+                        offlineEventType == 'DEVICE_OFFLINE')
+                    ? event.longitude
+                    : null);
         final lastKnownAccuracy = _readDouble(
           event.metadata,
           ['lastKnownAccuracy'],
@@ -644,8 +723,18 @@ class _HistoryEventTile extends StatelessWidget {
           event.metadata,
           ['lastKnownAddress'],
         );
-        final reconnectedLat = _readDouble(event.metadata, ['reconnectedLat']);
-        final reconnectedLng = _readDouble(event.metadata, ['reconnectedLng']);
+        final reconnectedLat =
+            _readDouble(event.metadata, ['reconnectedLat']) ??
+                ((offlineEventType == 'DEVICE_RECONNECTED' ||
+                        offlineEventType == 'DEVICE_ONLINE')
+                    ? event.latitude
+                    : null);
+        final reconnectedLng =
+            _readDouble(event.metadata, ['reconnectedLng']) ??
+                ((offlineEventType == 'DEVICE_RECONNECTED' ||
+                        offlineEventType == 'DEVICE_ONLINE')
+                    ? event.longitude
+                    : null);
         final reconnectedAccuracy = _readDouble(
           event.metadata,
           ['reconnectedAccuracy'],
@@ -754,6 +843,19 @@ class _HistoryEventTile extends StatelessWidget {
                           label: 'Address',
                           value: lastKnownAddress,
                         ),
+                      if (lastKnownLat != null && lastKnownLng != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openMapLocation(
+                              context,
+                              latitude: lastKnownLat,
+                              longitude: lastKnownLng,
+                            ),
+                            icon: const Icon(Icons.map_outlined),
+                            label: const Text('Open Offline Location'),
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -798,6 +900,19 @@ class _HistoryEventTile extends StatelessWidget {
                           label: 'Address',
                           value: reconnectedAddress,
                         ),
+                      if (reconnectedLat != null && reconnectedLng != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openMapLocation(
+                              context,
+                              latitude: reconnectedLat,
+                              longitude: reconnectedLng,
+                            ),
+                            icon: const Icon(Icons.map_outlined),
+                            label: const Text('Open Online Location'),
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -820,6 +935,27 @@ class _HistoryEventTile extends StatelessWidget {
         );
       },
     );
+  }
+
+  static Future<void> _openMapLocation(
+    BuildContext context, {
+    required double latitude,
+    required double longitude,
+  }) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
+    );
+
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open map location.')),
+      );
+    }
   }
 
   static int? _readTimestamp(Map<String, dynamic> metadata, List<String> keys) {

@@ -3075,6 +3075,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Geofence Breaches Today'**
   String get geofenceBreachesToday;
+
+  /// No description provided for @mapUnavailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Map unavailable'**
+  String get mapUnavailableTitle;
+
+  /// No description provided for @mapUnavailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Maps is not ready in this browser right now. Check the web Maps script and API key configuration.'**
+  String get mapUnavailableMessage;
+
+  /// No description provided for @noLiveLocationAvailableForChild.
+  ///
+  /// In en, this message translates to:
+  /// **'No live location available for this child'**
+  String get noLiveLocationAvailableForChild;
+
+  /// No description provided for @mapAppearsWhenGpsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The map will appear when the linked device sends valid GPS data.'**
+  String get mapAppearsWhenGpsAvailable;
+
+  /// No description provided for @noLiveLocationOrSafeZoneAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No live location or safe zone available'**
+  String get noLiveLocationOrSafeZoneAvailable;
+
+  /// No description provided for @addChildToStartTrackingAndSafeZones.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a child to start live tracking and safe zone monitoring.'**
+  String get addChildToStartTrackingAndSafeZones;
+
+  /// No description provided for @mapAppearsWhenLiveDataOrSafeZoneSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'The map will appear once the child sends live data or a safe zone is saved.'**
+  String get mapAppearsWhenLiveDataOrSafeZoneSaved;
+
+  /// No description provided for @childMapTemporarilyUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The child map is temporarily unavailable.'**
+  String get childMapTemporarilyUnavailable;
+
+  /// No description provided for @mapMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Map mode'**
+  String get mapMode;
+
+  /// No description provided for @mapTypeNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get mapTypeNormal;
+
+  /// No description provided for @mapTypeSatellite.
+  ///
+  /// In en, this message translates to:
+  /// **'Satellite'**
+  String get mapTypeSatellite;
+
+  /// No description provided for @mapTypeTerrain.
+  ///
+  /// In en, this message translates to:
+  /// **'Terrain'**
+  String get mapTypeTerrain;
+
+  /// No description provided for @mapTypeDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get mapTypeDefault;
+
+  /// No description provided for @mapTypeThreeDimensionalLike.
+  ///
+  /// In en, this message translates to:
+  /// **'3D-like'**
+  String get mapTypeThreeDimensionalLike;
+
+  /// No description provided for @insideSafeZoneNamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside {name}'**
+  String insideSafeZoneNamed(Object name);
+
+  /// No description provided for @outsideByDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside by {distance}'**
+  String outsideByDistance(Object distance);
+
+  /// No description provided for @outsideSafeZones.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside safe zones'**
+  String get outsideSafeZones;
+
+  /// No description provided for @noLiveData.
+  ///
+  /// In en, this message translates to:
+  /// **'No live data'**
+  String get noLiveData;
+
+  /// No description provided for @moving.
+  ///
+  /// In en, this message translates to:
+  /// **'Moving'**
+  String get moving;
+
+  /// No description provided for @stationary.
+  ///
+  /// In en, this message translates to:
+  /// **'Stationary'**
+  String get stationary;
+
+  /// No description provided for @insideSafeZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside safe zone'**
+  String get insideSafeZone;
+
+  /// No description provided for @outsideSafeZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside safe zone'**
+  String get outsideSafeZone;
+
+  /// No description provided for @changeMapStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change map style'**
+  String get changeMapStyle;
+
+  /// No description provided for @savedCenterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved center. Tap the map or use a location action, then save to change it.'**
+  String get savedCenterHint;
+
+  /// No description provided for @previewCenterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview only. Tap the map or use a location action to set the center before saving.'**
+  String get previewCenterHint;
+
+  /// No description provided for @chooseNewCenterOrKeepSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a new center and save, or keep the existing saved center.'**
+  String get chooseNewCenterOrKeepSaved;
+
+  /// No description provided for @previousSavedLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous saved location'**
+  String get previousSavedLocation;
+
+  /// No description provided for @currentLiveLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Current live location'**
+  String get currentLiveLocation;
+
+  /// No description provided for @customLocationFromMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom location from map'**
+  String get customLocationFromMap;
+
+  /// No description provided for @previewingSavedLocationInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Previewing a saved location. Tap the map, drag the marker, or confirm a location action before saving a new center.'**
+  String get previewingSavedLocationInstructions;
+
+  /// No description provided for @previewingLiveLocationInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Previewing the child\'s current live location. Use the action button or tap the map to set a new center before saving.'**
+  String get previewingLiveLocationInstructions;
+
+  /// No description provided for @pendingCenterChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending change: save to update the safe zone center.'**
+  String get pendingCenterChange;
+
+  /// No description provided for @savedCenterLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved center loaded from the database.'**
+  String get savedCenterLoaded;
+
+  /// No description provided for @previewOnlyChooseLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview only: choose this location explicitly, then save to keep it.'**
+  String get previewOnlyChooseLocation;
+
+  /// No description provided for @noCenterSelectedYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No center selected yet.'**
+  String get noCenterSelectedYet;
+
+  /// No description provided for @unknownTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown time'**
+  String get unknownTime;
+
+  /// No description provided for @safeZoneCenterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe zone center'**
+  String get safeZoneCenterTitle;
+
+  /// No description provided for @noPreviousSavedLocations.
+  ///
+  /// In en, this message translates to:
+  /// **'No previous saved locations are available for this child yet.'**
+  String get noPreviousSavedLocations;
+
+  /// No description provided for @refreshSavedLocations.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh saved locations'**
+  String get refreshSavedLocations;
+
+  /// No description provided for @savedLocations.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved locations'**
+  String get savedLocations;
+
+  /// No description provided for @useSelectedSavedLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Use selected saved location'**
+  String get useSelectedSavedLocation;
+
+  /// No description provided for @savedLocationPreviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Picking from this list only previews the location. The center changes after you press the button above and then save.'**
+  String get savedLocationPreviewHint;
+
+  /// No description provided for @useCurrentLiveLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Use current live location'**
+  String get useCurrentLiveLocation;
+
+  /// No description provided for @latestLiveUpdateUseButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest live update: {time}. Use the button above if you want to set it as the center.'**
+  String latestLiveUpdateUseButton(Object time);
+
+  /// No description provided for @liveLocationPreviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This shows the latest live location for preview. It only becomes the safe zone center after you choose it and save.'**
+  String get liveLocationPreviewHint;
+
+  /// No description provided for @customLocationPanelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap anywhere on the map or drag the marker to place the safe zone center exactly where you want it. The saved center stays unchanged until you press Save or Update.'**
+  String get customLocationPanelHint;
+
+  /// No description provided for @chooseCenterToPreviewSafeZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a live, saved, or custom center to preview the safe zone on the map.'**
+  String get chooseCenterToPreviewSafeZone;
 }
 
 class _AppLocalizationsDelegate

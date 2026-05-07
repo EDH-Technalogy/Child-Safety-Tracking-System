@@ -34,7 +34,9 @@ class AdminApiService {
         const Duration(milliseconds: ApiConfig.connectionTimeout),
       );
     } on TimeoutException {
-      throw Exception('Request timed out while trying to $action');
+      throw Exception(
+        'Request timed out while trying to $action. Backend URL: $baseUrl. ${ApiConfig.backendSetupHint}',
+      );
     } catch (e) {
       final message = e.toString();
       if (e is http.ClientException ||
@@ -43,7 +45,7 @@ class AdminApiService {
           message.contains('SocketException') ||
           message.contains('Connection refused')) {
         throw Exception(
-          'Unable to reach backend server. Check API URL, backend server, and CORS settings.',
+          'Unable to reach backend server at $baseUrl. ${ApiConfig.backendSetupHint}',
         );
       }
       throw Exception('Failed to $action: $message');

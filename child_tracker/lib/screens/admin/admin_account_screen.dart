@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/image_service.dart';
 import '../../services/admin_api_service.dart';
+import '../../utils/auth_validation.dart';
 import '../../utils/camera_capture_helper.dart';
 import '../../utils/constants.dart';
 import '../../utils/localization_helpers.dart';
@@ -544,10 +545,11 @@ class _AdminAccountScreenState extends State<AdminAccountScreen> {
                                     prefixIcon: const Icon(Icons.person),
                                   ),
                                   validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return l10n.enterName;
-                                    }
-                                    return null;
+                                    return validateFullNameInput(
+                                      value,
+                                      requiredMessage: l10n.enterName,
+                                      invalidMessage: l10n.enterName,
+                                    );
                                   },
                                 ),
                                 const SizedBox(height: 16),
@@ -559,13 +561,11 @@ class _AdminAccountScreenState extends State<AdminAccountScreen> {
                                     prefixIcon: const Icon(Icons.email),
                                   ),
                                   validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return l10n.emailRequired;
-                                    }
-                                    if (!value.contains('@')) {
-                                      return l10n.enterValidEmail;
-                                    }
-                                    return null;
+                                    return validateGmailEmailInput(
+                                      value,
+                                      requiredMessage: l10n.emailRequired,
+                                      invalidMessage: l10n.enterValidEmail,
+                                    );
                                   },
                                 ),
                                 const SizedBox(height: 16),

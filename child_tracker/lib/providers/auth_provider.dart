@@ -1,11 +1,10 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/admin_api_service.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../services/realtime_database_auth_service.dart';
-import '../services/sos_alert_debug_logger.dart';
 import '../models/user_model.dart';
 import '../utils/constants.dart';
 import '../utils/session_token_store.dart';
@@ -15,6 +14,7 @@ class AuthProvider with ChangeNotifier {
 
   final ApiService _apiService = ApiService();
   final AdminApiService _adminApiService = AdminApiService();
+  final NotificationService _notificationService = NotificationService();
 
   UserModel? _user;
   String? _error;
@@ -129,7 +129,7 @@ class AuthProvider with ChangeNotifier {
     _user = null;
     _error = null;
     SessionTokenStore.clear();
-    await SOSAlertDebugLogger.stop();
+    await _notificationService.updateAppIconBadge(0);
     await RealtimeDatabaseAuthService.reset();
   }
 
@@ -224,7 +224,6 @@ class AuthProvider with ChangeNotifier {
     SessionTokenStore.currentToken =
         normalizedToken.isNotEmpty ? normalizedToken : null;
     RealtimeDatabaseAuthService.invalidateCachedSignIn();
-    unawaited(SOSAlertDebugLogger.start());
 
     if (kDebugMode) {
       debugPrint(

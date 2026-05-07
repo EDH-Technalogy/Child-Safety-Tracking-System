@@ -1,5 +1,4 @@
-import 'dart:async';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -35,7 +34,6 @@ import 'screens/admin/admin_login_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/edit_child_screen.dart';
 import 'services/notification_service.dart';
-import 'services/sos_alert_debug_logger.dart';
 import 'utils/constants.dart';
 
 Future<void> main() async {
@@ -47,9 +45,21 @@ Future<void> main() async {
   // );
   // Firebase.init commented to avoid errors until configured
   // await Firebase.initializeApp();
-  final localeProvider = await LocaleProvider.load();
-  await NotificationService().init();
-  unawaited(SOSAlertDebugLogger.start());
+  LocaleProvider? localeProvider;
+
+  try {
+    localeProvider = await LocaleProvider.load();
+  } catch (error) {
+    debugPrint('[main] LocaleProvider.load failed: $error');
+    localeProvider = LocaleProvider(loadSavedLocale: false);
+  }
+
+  try {
+    await NotificationService().init();
+  } catch (error) {
+    debugPrint('[main] NotificationService.init failed: $error');
+  }
+
   runApp(MyApp(localeProvider: localeProvider));
 }
 
@@ -80,7 +90,7 @@ class MyApp extends StatelessWidget {
         builder: (context, localeProvider, child) {
           return MaterialApp(
             onGenerateTitle: (context) =>
-                AppLocalizations.of(context)!.appTitle,
+                AppLocalizations.of(context)?.appTitle ?? 'Child Tracker',
             debugShowCheckedModeBanner: false,
             locale: localeProvider.locale,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -95,7 +105,7 @@ class MyApp extends StatelessWidget {
                 textDirection: localeProvider.isRtl
                     ? TextDirection.rtl
                     : TextDirection.ltr,
-                child: child!,
+                child: child ?? const SizedBox.shrink(),
               );
             },
             theme: ThemeData(

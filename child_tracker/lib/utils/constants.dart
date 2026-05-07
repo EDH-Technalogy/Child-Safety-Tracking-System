@@ -37,10 +37,22 @@ class ApiConfig {
       final host = requestedHost == 'localhost' ? '127.0.0.1' : requestedHost;
       return '$scheme://$host:3000/api'; // Flutter Web / LAN browser
     } else if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:3000/api'; // Android Emulator
+      return 'http://10.0.2.2:3000/api'; // Android emulator -> host machine
     } else {
       return 'http://127.0.0.1:3000/api'; // Desktop / simulator fallback
     }
+  }
+
+  static String get backendSetupHint {
+    if (kIsWeb) {
+      return 'Start the backend on this computer and make sure port 3000 is reachable from the browser.';
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'If you are using an Android emulator, keep the backend on your computer and use 10.0.2.2. If you are using a physical phone, run Flutter with --dart-define=API_BASE_URL=http://YOUR_COMPUTER_IP:3000/api.';
+    }
+
+    return 'Start the backend on this computer and make sure port 3000 is available.';
   }
 
   static String get authBaseUrl {
@@ -81,7 +93,7 @@ class AppConstants {
   static const String aboutCopyrightText = '© 2026 All Rights Reserved.';
 
   static const String googleMapsApiKey =
-      'AIzaSyDwcvvpzgOthoJ_RkIn_m8-ESRRQSMV0dw';
+      'AIzaSyBv8adVhfT-6wDSPZI3yPYeAgYbDxffm_0';
   static const String firebaseDatabaseUrl = String.fromEnvironment(
     'FIREBASE_DATABASE_URL',
     defaultValue: 'https://child-safety-tracking-default-rtdb.firebaseio.com',
