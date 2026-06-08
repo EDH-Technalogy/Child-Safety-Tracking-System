@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Child Safety GPS Tracking System
 
 A modern, mobile-responsive **Child Safety, GPS Tracking, Safe Zone, Alert, Reporting, and Administration System** built with a Flutter frontend and a Node.js/Firebase backend.
@@ -256,3 +257,7 @@ Final Year Project
 ## License
 
 This project is currently marked as **ISC** in `package.json`.
+=======
+# Child-Safety-Tracking-System
+The Child Safety Tracking System is a  application designed to help parents and guardians monitor and protect children. The system provides real-time GPS tracking, location history, geofencing with instant notifications, SOS emergency alerts, and secure communication features.
+>>>>>>> 9c8228abce59f1066c626f03c3fb1f297f2b946f
