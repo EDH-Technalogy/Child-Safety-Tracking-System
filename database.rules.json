@@ -96,6 +96,15 @@
         }
       }
     },
+    "device_status_logs": {
+      "$childId": {
+        ".read": "auth != null && (auth.token.role == 'admin' || root.child('device_registry_by_child').child($childId).child('user_id').val() == auth.uid)",
+        ".indexOn": ["timestamp"],
+        "$logId": {
+          ".write": "auth != null && auth.token.role == 'admin'"
+        }
+      }
+    },
     "location_daily_index": {
       ".read": "auth != null && auth.token.role == 'admin'",
       ".write": "auth != null && auth.token.role == 'admin'"

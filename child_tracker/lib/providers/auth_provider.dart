@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/admin_api_service.dart';
 import '../services/api_service.dart';
+import '../services/fcm_service.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_database_auth_service.dart';
 import '../models/user_model.dart';
@@ -15,6 +18,7 @@ class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final AdminApiService _adminApiService = AdminApiService();
   final NotificationService _notificationService = NotificationService();
+  final FcmService _fcmService = FcmService();
 
   UserModel? _user;
   String? _error;
@@ -224,6 +228,7 @@ class AuthProvider with ChangeNotifier {
     SessionTokenStore.currentToken =
         normalizedToken.isNotEmpty ? normalizedToken : null;
     RealtimeDatabaseAuthService.invalidateCachedSignIn();
+    _scheduleFcmSync();
 
     if (kDebugMode) {
       debugPrint(
@@ -316,6 +321,7 @@ class AuthProvider with ChangeNotifier {
         await _persistSession(prefs, validatedUserData, token);
         _user = UserModel.fromJson(validatedUserData);
         _error = null;
+        _scheduleFcmSync();
 
         if (kDebugMode) {
           debugPrint(
@@ -348,6 +354,7 @@ class AuthProvider with ChangeNotifier {
         }
 
         _error = null;
+        _scheduleFcmSync();
         notifyListeners();
         return _user != null;
       }
@@ -692,6 +699,13 @@ class AuthProvider with ChangeNotifier {
     }
 
     try {
+      final currentUserId = _user?.id ?? '';
+      final currentRole = _user?.role ?? '';
+      await _fcmService.unregisterForUser(
+        userId: currentUserId,
+        role: currentRole,
+      );
+
       if (_user != null) {
         if (isAdmin) {
           await _adminApiService.logout().timeout(const Duration(seconds: 2));
@@ -719,5 +733,33 @@ class AuthProvider with ChangeNotifier {
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
+  }
+
+  void _scheduleFcmSync() {
+    final userId = _user?.id ?? '';
+    final role = _user?.role ?? '';
+    if (userId.trim().isEmpty) {
+      return;
+    }
+
+    unawaited(_syncFcmInBackground(userId: userId, role: role));
+  }
+
+  Future<void> _syncFcmInBackground({
+    required String userId,
+    required String role,
+  }) async {
+    try {
+      await _fcmService
+          .syncForAuthenticatedUser(
+            userId: userId,
+            role: role,
+          )
+          .timeout(const Duration(seconds: 6));
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[AuthProvider._syncFcmInBackground] skipped: $error');
+      }
+    }
   }
 }

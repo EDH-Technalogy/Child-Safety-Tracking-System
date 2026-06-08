@@ -41,13 +41,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
     // Mark alerts as read AFTER the first frame renders so the user
     // actually sees the unread alerts before the badge is cleared.
     // Non-blocking — the API call runs in the background.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final provider = Provider.of<AlertProvider>(context, listen: false);
-      if (provider.unreadCountForChild(widget.childId) > 0) {
-        provider.markAllAsRead(widget.childId);
-      }
-    });
+    return;
   }
 
   Future<void> _refreshAlerts() async {
@@ -304,9 +298,7 @@ class _AlertCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      alert.message.trim().isEmpty
-                          ? l10n.noMessage
-                          : localizeRawMessage(l10n, alert.message),
+                      _buildAlertMessage(l10n),
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey[600],
@@ -472,6 +464,54 @@ class _AlertCard extends StatelessWidget {
 
   String _getAlertTitle(AppLocalizations l10n) {
     return localizeAlertTypeLabel(l10n, alert.type);
+  }
+
+  String _buildAlertMessage(AppLocalizations l10n) {
+    final localizedMessage = alert.message.trim().isEmpty
+        ? ''
+        : localizeRawMessage(l10n, alert.message);
+    final normalizedType = alert.type.trim().toUpperCase();
+
+    if (normalizedType == 'OUT_ZONE' ||
+        normalizedType == 'ZONE_EXIT' ||
+        normalizedType == 'SAFE_ZONE_EXIT') {
+      final zone = (alert.zoneName ?? '').trim();
+      final location = (alert.locationText ?? '').trim();
+      if (zone.isNotEmpty && location.isNotEmpty) {
+        return '${l10n.childOutOfSafeZone}: $zone • $location';
+      }
+      if (zone.isNotEmpty) {
+        return '${l10n.childOutOfSafeZone}: $zone';
+      }
+      if (location.isNotEmpty) {
+        return '${l10n.childOutOfSafeZone}: $location';
+      }
+      return l10n.childOutOfSafeZone;
+    }
+
+    if (normalizedType == 'IN_ZONE' ||
+        normalizedType == 'ZONE_ENTER' ||
+        normalizedType == 'ZONE_ENTRY' ||
+        normalizedType == 'SAFE_ZONE_ENTER') {
+      final zone = (alert.zoneName ?? '').trim();
+      final location = (alert.locationText ?? '').trim();
+      if (zone.isNotEmpty && location.isNotEmpty) {
+        return '${l10n.childBackInSafeZone}: $zone • $location';
+      }
+      if (zone.isNotEmpty) {
+        return '${l10n.childBackInSafeZone}: $zone';
+      }
+      if (location.isNotEmpty) {
+        return '${l10n.childBackInSafeZone}: $location';
+      }
+      return l10n.childBackInSafeZone;
+    }
+
+    if (localizedMessage.isNotEmpty) {
+      return localizedMessage;
+    }
+
+    return l10n.noMessage;
   }
 
   String _formatTimestamp(int timestamp) {

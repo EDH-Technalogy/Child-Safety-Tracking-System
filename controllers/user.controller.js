@@ -129,6 +129,20 @@ async function logUserAudit(entry) {
   return safeWriteAuditLog(entry);
 }
 
+function normalizeTokenList(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => item?.toString().trim() || "")
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return [value.trim()];
+  }
+
+  return [];
+}
+
 function buildUserResponse(userId, userData = {}) {
   const fullName = userData.fullName || userData.name || "";
   return {
@@ -274,6 +288,84 @@ exports.getFirebaseToken = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+exports.registerFcmToken = async (req, res) => {
+  try {
+    ensureCanManageUserRecord(req, req.params.id);
+
+    const token = req.body?.token?.toString().trim() || "";
+    if (!token) {
+      throw createHttpError(400, "token is required");
+    }
+
+    const userRef = firestore.collection("users").doc(req.params.id);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      throw createHttpError(404, "User not found");
+    }
+
+    const userData = userDoc.data() || {};
+    const existingTokens = normalizeTokenList(
+      userData.fcm_tokens ||
+        userData.fcmTokens ||
+        userData.notification_tokens ||
+        userData.notificationTokens
+    );
+    const nextTokens = Array.from(new Set([...existingTokens, token]));
+
+    await userRef.update({
+      fcm_tokens: nextTokens,
+      updated_at: Date.now(),
+    });
+
+    res.json({
+      message: "FCM token registered successfully",
+      token_count: nextTokens.length,
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+};
+
+exports.unregisterFcmToken = async (req, res) => {
+  try {
+    ensureCanManageUserRecord(req, req.params.id);
+
+    const token = req.body?.token?.toString().trim() || "";
+    if (!token) {
+      throw createHttpError(400, "token is required");
+    }
+
+    const userRef = firestore.collection("users").doc(req.params.id);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      throw createHttpError(404, "User not found");
+    }
+
+    const userData = userDoc.data() || {};
+    const existingTokens = normalizeTokenList(
+      userData.fcm_tokens ||
+        userData.fcmTokens ||
+        userData.notification_tokens ||
+        userData.notificationTokens
+    );
+    const nextTokens = existingTokens.filter((item) => item !== token);
+
+    await userRef.update({
+      fcm_tokens: nextTokens,
+      updated_at: Date.now(),
+    });
+
+    res.json({
+      message: "FCM token removed successfully",
+      token_count: nextTokens.length,
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
   }
 };
 

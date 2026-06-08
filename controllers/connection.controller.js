@@ -5,6 +5,7 @@ const {
 } = require("../utils/child-access");
 const { getTrackingContextForChild } = require("../utils/live-tracking");
 const { appendChildLog } = require("../utils/child-logs");
+const { upsertDeviceStatusCard } = require("../utils/device-status");
 
 function parseOptionalCoordinate(value) {
   const number = Number(value);
@@ -74,11 +75,17 @@ exports.updateConnection = async (req, res, next) => {
     });
 
     if (previousStatus !== status) {
+      const placeName =
+        req.body.place_name?.toString().trim() ||
+        req.body.location_text?.toString().trim() ||
+        null;
+
       await firestore.collection("connection_logs").add({
         child_id: childId,
         status,
         latitude,
         longitude,
+        place_name: placeName,
         tracking_key: trackingKey,
         previous_status: previousStatus || null,
         event_time: time,
@@ -91,12 +98,20 @@ exports.updateConnection = async (req, res, next) => {
         parentUserId:
           trackingContext?.childData?.user_id?.toString().trim() || "",
         type: historyType,
+        title:
+          historyType === "DEVICE_ONLINE"
+            ? "Device reconnected"
+            : historyType === "DEVICE_OFFLINE"
+              ? "Device disconnected"
+              : "Device status",
         message:
           historyType === "DEVICE_ONLINE"
             ? "Device connection restored."
             : historyType === "DEVICE_OFFLINE"
               ? "Device connection lost."
               : `Device status changed to ${status}.`,
+        latitude: latitude,
+        longitude: longitude,
         timestamp: time,
         metadata: {
           source: "connection_update",
@@ -104,9 +119,46 @@ exports.updateConnection = async (req, res, next) => {
           status,
           latitude,
           longitude,
+          placeName,
+          locationText: placeName,
+          ...(historyType === "DEVICE_ONLINE"
+            ? {
+                reconnectedLat: latitude,
+                reconnectedLng: longitude,
+                reconnectedAddress: placeName,
+                reconnectedTimestamp: time,
+              }
+            : {}),
+          ...(historyType === "DEVICE_OFFLINE"
+            ? {
+                lastKnownLat: latitude,
+                lastKnownLng: longitude,
+                lastKnownAddress: placeName,
+                lastKnownTimestamp: time,
+              }
+            : {}),
         },
       });
     }
+
+    await upsertDeviceStatusCard({
+      childId,
+      trackingKey,
+      childName: trackingContext?.childData?.name?.toString().trim() || "",
+      deviceName:
+        trackingContext?.deviceData?.name?.toString().trim() ||
+        trackingContext?.deviceData?.imei?.toString().trim() ||
+        trackingKey,
+      status,
+      latitude,
+      longitude,
+      timestamp: time,
+      heartbeatAt: time,
+      placeName: req.body.place_name ?? req.body.location_text ?? null,
+      source: "connection_update",
+      writeTransitionLog: true,
+      previousStatusHint: previousStatus,
+    });
 
     console.info("[connection.update]", {
       childId,

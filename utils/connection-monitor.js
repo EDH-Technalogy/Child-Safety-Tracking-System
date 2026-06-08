@@ -5,6 +5,8 @@ const {
 } = require("./connection-events");
 const { normalizeEpochMillisecondsOrNull } = require("./live-timestamp");
 const { tryNormalizeTrackingKey } = require("./tracking-key-normalizer");
+const { getTrackingContextForChild } = require("./live-tracking");
+const { upsertDeviceStatusCard } = require("./device-status");
 
 let monitorIntervalHandle = null;
 let sweepInProgress = false;
@@ -86,6 +88,8 @@ async function evaluateTrackedDevice(device) {
 
     transitionContext = {
       previousLastSeen: currentLastSeen,
+      previousConnectionState:
+        currentConnectionState || (currentStatus.online === true ? "online" : "unknown"),
       childId:
         currentStatus.child_id?.toString().trim() || device.childId,
       trackingKey:
@@ -138,6 +142,28 @@ async function evaluateTrackedDevice(device) {
     lastKnownAddress: transitionContext.lastKnownAddress,
     offlineThresholdMs,
     source: "connection_monitor",
+  });
+
+  const trackingContext = await getTrackingContextForChild(
+    transitionContext.childId
+  );
+  await upsertDeviceStatusCard({
+    childId: transitionContext.childId,
+    trackingKey: transitionContext.trackingKey,
+    childName: trackingContext?.childData?.name?.toString().trim() || "",
+    deviceName:
+      trackingContext?.deviceData?.name?.toString().trim() ||
+      trackingContext?.deviceData?.imei?.toString().trim() ||
+      transitionContext.trackingKey,
+    status: "offline",
+    latitude: transitionContext.lastKnownLat,
+    longitude: transitionContext.lastKnownLng,
+    timestamp: now,
+    heartbeatAt: transitionContext.previousLastSeen,
+    placeName: transitionContext.lastKnownAddress,
+    source: "connection_monitor",
+    writeTransitionLog: true,
+    previousStatusHint: transitionContext.previousConnectionState,
   });
 
   console.info("[connection-monitor.offline-transition]", {

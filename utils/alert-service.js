@@ -6,6 +6,7 @@ const {
   createSystemActor,
   safeWriteAuditLogWithId,
 } = require("./audit-log");
+const { sendAlertPush } = require("./push-notification-service");
 
 function isFiniteNumber(value) {
   return Number.isFinite(Number(value));
@@ -189,7 +190,6 @@ async function createAlertRecord({
   const realtimeUpdates = {
     [`alerts_by_child/${childId}/${resolvedAlertId}`]: livePayload,
     [`alerts_live/${childId}/${resolvedAlertId}`]: livePayload,
-    [`alerts_live/${resolvedAlertId}`]: livePayload,
     [`admin_alerts/${resolvedAlertId}`]: adminLivePayload,
   };
 
@@ -273,6 +273,15 @@ async function createAlertRecord({
         realtimePath: `admin_alerts/${resolvedAlertId}`,
       },
     });
+
+    await sendAlertPush({
+      userId: childData.user_id || "",
+      childId,
+      childName: childData.name || "",
+      alertId: resolvedAlertId,
+      type: normalizedType,
+      message,
+    });
   }
 
   console.info("[alerts.createAlertRecord]", {
@@ -307,12 +316,30 @@ function buildAlertDedupeKey({ type, zoneName, extraFields = {} }) {
   const eventKey = normalizeDedupeValue(
     extraFields.event_key || extraFields.eventKey
   );
+  const deviceTimestamp = normalizeDedupeValue(
+    extraFields.device_timestamp || extraFields.deviceTimestamp
+  );
+  const trackingKey = normalizeDedupeValue(
+    extraFields.tracking_key || extraFields.trackingKey
+  );
   const safeZoneId = normalizeDedupeValue(
     extraFields.safe_zone_id || extraFields.safeZoneId
   );
   const normalizedZoneName = normalizeDedupeValue(zoneName);
 
   if (normalizedType === "SOS") {
+    if (eventKey) {
+      return `sos|${eventKey}`;
+    }
+
+    if (deviceTimestamp) {
+      return `sos|${deviceTimestamp}`;
+    }
+
+    if (trackingKey) {
+      return `sos|${trackingKey}`;
+    }
+
     return "sos";
   }
 

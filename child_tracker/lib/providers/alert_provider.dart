@@ -6,7 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/alert_model.dart';
+import '../models/child_model.dart';
 import '../services/api_service.dart';
+import '../services/device_live_tracking_service.dart';
 import '../services/notification_service.dart';
 import '../services/realtime_database_auth_service.dart';
 import '../utils/constants.dart';
@@ -28,6 +30,8 @@ class _LiveAlertScope {
 
 class AlertProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final DeviceLiveTrackingService _deviceLiveTrackingService =
+      DeviceLiveTrackingService();
   final NotificationService _notificationService = NotificationService();
 
   final Map<String, String> _monitorOwners = <String, String>{};
@@ -35,10 +39,10 @@ class AlertProvider with ChangeNotifier {
       <String, Set<String>>{};
   final Set<String> _knownAlertIds = <String>{};
   final Set<String> _backgroundKnownAlertIds = <String>{};
-  final Set<String> _handledAlertIds = <String>{};
+  final Map<String, int> _handledAlertKeys = <String, int>{};
   final Set<String> _rootSosAlertIds = <String>{};
+  final Map<String, String> _legacyAlertPathsById = <String, String>{};
   final Map<String, int> _unreadCountsByChild = <String, int>{};
-  Timer? _backgroundAlertPollTimer;
 
   List<AlertModel> _alerts = [];
   int _unreadCount = 0;
@@ -50,14 +54,12 @@ class AlertProvider with ChangeNotifier {
   StreamSubscription<DatabaseEvent>? _backgroundLiveAlertSubscription;
   StreamSubscription<DatabaseEvent>? _liveAlertChangedSubscription;
   StreamSubscription<DatabaseEvent>? _liveAlertRemovedSubscription;
-  StreamSubscription<DatabaseEvent>? _sosRootAlertSubscription;
-  StreamSubscription<DatabaseEvent>? _sosRootAlertChangedSubscription;
-  StreamSubscription<DatabaseEvent>? _sosRootAlertRemovedSubscription;
+  StreamSubscription<DatabaseEvent>? _legacyDeviceAlertSubscription;
   String? _liveAlertPath;
+  String? _legacyDeviceAlertPath;
   String? _backgroundLiveAlertPath;
-  String? _sosRootListeningChildId;
-  int _sosRootListenerStartedAt = 0;
   int _lastForegroundMonitoringStartedAt = 0;
+  static const int _alertNotificationDedupeWindowMs = 15000;
 
   List<AlertModel> get alerts => _alerts;
   int get unreadCount => _unreadCount;
@@ -68,6 +70,33 @@ class AlertProvider with ChangeNotifier {
   String? get monitoredChildId => _monitoredChildId;
 
   String _childAlertsPath(String childId) => 'alerts_live/$childId';
+
+  Future<String?> _legacyDeviceAlertPathForChild(String childId) async {
+    try {
+      final response = await _apiService.getChildWithDevice(childId);
+      final devicePayload = response['device'];
+      if (devicePayload is! Map) {
+        return null;
+      }
+
+      final device = DeviceModel.fromJson(
+        Map<String, dynamic>.from(devicePayload),
+      );
+      final trackingKey = _deviceLiveTrackingService.resolveRealtimeTrackingKey(
+        device,
+      );
+      if (trackingKey.trim().isEmpty) {
+        return null;
+      }
+
+      return 'alerts_live/$trackingKey';
+    } catch (error) {
+      debugPrint(
+        '[AlertProvider.legacy] failed to resolve device alert path for childId=$childId error=$error',
+      );
+      return null;
+    }
+  }
 
   Future<List<AlertModel>> _fetchAlerts(String childId) async {
     final apiAlerts = <AlertModel>[];
@@ -88,62 +117,40 @@ class AlertProvider with ChangeNotifier {
       rawValue: snapshot.value,
       childIdFallback: childId,
     );
-    final rootSosAlerts = await _fetchRootSosAlertsForChild(
-      database,
-      childId,
+    final legacyAlerts = await _fetchLegacyDeviceAlerts(
+      database: database,
+      childId: childId,
     );
 
     return _mergeAndSortAlerts([
       ...apiAlerts,
-      ...rootSosAlerts,
       ...childAlerts,
+      ...legacyAlerts,
     ]);
   }
 
-  Future<List<AlertModel>> _fetchRootSosAlertsForChild(
-    FirebaseDatabase database,
-    String childId,
-  ) async {
-    final normalizedChildId = childId.trim();
-
-    try {
-      final snapshot = await database.ref('alerts_live').get();
-      final data = _asMap(snapshot.value);
-      final alerts = <AlertModel>[];
-
-      for (final entry in data.entries) {
-        final alertData = _asMap(entry.value);
-        if (!_isRootIngressSosPayload(entry.key, alertData)) {
-          continue;
-        }
-
-        final explicitChildId =
-            (alertData['child_id'] ?? alertData['childId'] ?? '')
-                .toString()
-                .trim();
-        if (explicitChildId != normalizedChildId) {
-          continue;
-        }
-
-        final alert = _alertFromLivePayload(
-          rawKey: entry.key,
-          rawValue: entry.value,
-          childIdFallback: normalizedChildId,
-        );
-
-        if (alert == null) {
-          continue;
-        }
-
-        _rootSosAlertIds.add(alert.id);
-        alerts.add(alert);
-      }
-
-      return alerts;
-    } catch (error) {
-      debugPrint('[AlertProvider.sos] root fetch skipped: $error');
+  Future<List<AlertModel>> _fetchLegacyDeviceAlerts({
+    required FirebaseDatabase database,
+    required String childId,
+  }) async {
+    final legacyPath = await _legacyDeviceAlertPathForChild(childId);
+    if (legacyPath == null || legacyPath == _childAlertsPath(childId)) {
       return const <AlertModel>[];
     }
+
+    final snapshot = await database.ref(legacyPath).get();
+    final alert = _legacySingleAlertFromPayload(
+      rawPath: legacyPath,
+      rawValue: snapshot.value,
+      childIdFallback: childId,
+    );
+    if (alert == null) {
+      return const <AlertModel>[];
+    }
+
+    _legacyAlertPathsById[alert.id] = legacyPath;
+    _rootSosAlertIds.add(alert.id);
+    return <AlertModel>[alert];
   }
 
   List<AlertModel> _mergeAndSortAlerts(Iterable<AlertModel> alerts) {
@@ -390,7 +397,6 @@ class AlertProvider with ChangeNotifier {
 
     final activeChildIds =
         _backgroundMonitorOwners.values.expand((childSet) => childSet).toSet();
-    _startBackgroundAlertPolling();
     debugPrint(
       '[AlertProvider.background] sync owner=$ownerId childIds=${activeChildIds.join(",")} listeners=${_backgroundLiveAlertSubscription == null ? 0 : 1}',
     );
@@ -406,7 +412,6 @@ class AlertProvider with ChangeNotifier {
     _backgroundLiveAlertSubscription = null;
     _backgroundLiveAlertPath = null;
     _backgroundKnownAlertIds.clear();
-    _stopBackgroundAlertPolling();
     if (_monitoredChildId == null) {
       _unreadCountsByChild.clear();
       _totalUnreadCount = 0;
@@ -437,7 +442,10 @@ class AlertProvider with ChangeNotifier {
     }
 
     return _LiveAlertScope(
-      path: 'alerts/$userId',
+      // Listen to the root live-alert stream so both mirrored child alerts
+      // and legacy flat `alerts_live/{childOrTrackingKey}` payloads can
+      // reach the app in background.
+      path: 'alerts_live',
       role: 'user',
       userId: userId,
     );
@@ -458,16 +466,11 @@ class AlertProvider with ChangeNotifier {
     required String label,
   }) async {
     final snapshot = await ref.get();
-    final data = _asMap(snapshot.value);
-    for (final entry in data.entries) {
-      final candidate = _alertFromLivePayload(
-        rawKey: entry.key,
-        rawValue: entry.value,
-      );
-      if (candidate != null) {
-        knownIds.add(candidate.id);
-      }
-    }
+    final alerts = _alertsFromRealtimePayload(
+      rawValue: snapshot.value,
+      childIdFallback: '',
+    );
+    knownIds.addAll(alerts.map((alert) => alert.id));
 
     debugPrint(
       '[AlertProvider.$label] primed path=/${ref.path} known=${knownIds.length}',
@@ -482,7 +485,6 @@ class AlertProvider with ChangeNotifier {
 
     final path = _childAlertsPath(childId);
     if (_liveAlertSubscription != null && _liveAlertPath == path) {
-      await _ensureRootSosAlertListener(childId);
       return;
     }
 
@@ -592,130 +594,105 @@ class AlertProvider with ChangeNotifier {
         },
       );
 
-      await _ensureRootSosAlertListener(childId);
+      await _ensureLegacyDeviceAlertListener(
+        database: database,
+        childId: childId,
+        listenerStartedAt: listenerStartedAt,
+      );
     } catch (error) {
       debugPrint('[AlertProvider.live] failed path=/$path error=$error');
     }
   }
 
-  Future<void> _ensureRootSosAlertListener(String childId) async {
-    final normalizedChildId = childId.trim();
-    if (normalizedChildId.isEmpty) {
+  Future<void> _ensureLegacyDeviceAlertListener({
+    required FirebaseDatabase database,
+    required String childId,
+    required int listenerStartedAt,
+  }) async {
+    final legacyPath = await _legacyDeviceAlertPathForChild(childId);
+    if (legacyPath == null || legacyPath == _childAlertsPath(childId)) {
+      await _legacyDeviceAlertSubscription?.cancel();
+      _legacyDeviceAlertSubscription = null;
+      _legacyDeviceAlertPath = null;
       return;
     }
 
-    if (_sosRootAlertSubscription != null &&
-        _sosRootListeningChildId == normalizedChildId) {
+    if (_legacyDeviceAlertSubscription != null &&
+        _legacyDeviceAlertPath == legacyPath) {
       return;
     }
 
-    await _stopRootSosAlertListener();
+    await _legacyDeviceAlertSubscription?.cancel();
+    _legacyDeviceAlertSubscription = null;
+    _legacyDeviceAlertPath = legacyPath;
 
-    try {
-      final database = await _database();
-      final ref = database.ref('alerts_live');
-      _sosRootListeningChildId = normalizedChildId;
-      _sosRootListenerStartedAt = DateTime.now().millisecondsSinceEpoch;
-      final existingRootAlerts = await _fetchRootSosAlertsForChild(
-        database,
-        normalizedChildId,
-      );
-      _knownAlertIds.addAll(existingRootAlerts.map((alert) => alert.id));
-
-      debugPrint('[AlertProvider.sos] Listening to SOS alerts...');
-
-      _sosRootAlertSubscription = ref.onChildAdded.listen(
-        (event) => _handleRootSosEvent(
-          event,
-          normalizedChildId,
-          isNewEvent: true,
-        ),
-        onError: (error) {
-          debugPrint('[AlertProvider.sos] listener error: $error');
-        },
-      );
-
-      _sosRootAlertChangedSubscription = ref.onChildChanged.listen(
-        (event) => _handleRootSosEvent(
-          event,
-          normalizedChildId,
-          isNewEvent: false,
-        ),
-        onError: (error) {
-          debugPrint('[AlertProvider.sos] update error: $error');
-        },
-      );
-
-      _sosRootAlertRemovedSubscription = ref.onChildRemoved.listen(
-        (event) {
-          final alertId = event.snapshot.key;
-          if (alertId == null) {
-            return;
-          }
-
-          _alerts.removeWhere((alert) => alert.id == alertId);
-          _knownAlertIds.remove(alertId);
-          _rootSosAlertIds.remove(alertId);
-          _applyAlerts(_alerts, childId: normalizedChildId);
-          notifyListeners();
-        },
-        onError: (error) {
-          debugPrint('[AlertProvider.sos] delete error: $error');
-        },
-      );
-    } catch (error) {
-      debugPrint('[AlertProvider.sos] failed path=/alerts_live error=$error');
-    }
-  }
-
-  void _handleRootSosEvent(
-    DatabaseEvent event,
-    String childId, {
-    required bool isNewEvent,
-  }) {
-    final data = _asMap(event.snapshot.value);
-    if (!_isRootIngressSosPayload(event.snapshot.key, data)) {
-      return;
-    }
-
-    final explicitChildId =
-        (data['child_id'] ?? data['childId'] ?? '').toString().trim();
-    if (explicitChildId != childId) {
-      return;
-    }
-
-    final alert = _alertFromLivePayload(
-      rawKey: event.snapshot.key,
-      rawValue: event.snapshot.value,
-      childIdFallback: childId,
+    final ref = database.ref(legacyPath);
+    debugPrint(
+      '[AlertProvider.legacy] listening to legacy alert path for childId=$childId path=/$legacyPath',
     );
 
-    if (alert == null) {
-      return;
-    }
+    _legacyDeviceAlertSubscription = ref.onValue.listen(
+      (event) {
+        final alert = _legacySingleAlertFromPayload(
+          rawPath: legacyPath,
+          rawValue: event.snapshot.value,
+          childIdFallback: childId,
+        );
+        String? previousAlertIdForPath;
+        for (final entry in _legacyAlertPathsById.entries) {
+          if (entry.value == legacyPath) {
+            previousAlertIdForPath = entry.key;
+            break;
+          }
+        }
 
-    final index = _alerts.indexWhere((item) => item.id == alert.id);
-    final alreadyKnown = _knownAlertIds.contains(alert.id);
+        if (alert == null) {
+          if (previousAlertIdForPath != null) {
+            _legacyAlertPathsById.remove(previousAlertIdForPath);
+            _rootSosAlertIds.remove(previousAlertIdForPath);
+            _knownAlertIds.remove(previousAlertIdForPath);
+            _alerts.removeWhere((item) => item.id == previousAlertIdForPath);
+            _applyAlerts(_alerts, childId: childId);
+            notifyListeners();
+          }
+          return;
+        }
 
-    if (index == -1) {
-      _alerts.insert(0, alert);
-    } else {
-      _alerts[index] = alert;
-    }
+        _legacyAlertPathsById[alert.id] = legacyPath;
+        _rootSosAlertIds.add(alert.id);
 
-    _alerts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    _knownAlertIds.add(alert.id);
-    _rootSosAlertIds.add(alert.id);
-    _applyAlerts(_alerts, childId: childId);
-    notifyListeners();
+        final alreadyKnown = _knownAlertIds.contains(alert.id);
+        final index = _alerts.indexWhere((item) => item.id == alert.id);
+        if (index == -1) {
+          if (previousAlertIdForPath != null &&
+              previousAlertIdForPath != alert.id) {
+            _alerts.removeWhere((item) => item.id == previousAlertIdForPath);
+            _knownAlertIds.remove(previousAlertIdForPath);
+            _rootSosAlertIds.remove(previousAlertIdForPath);
+            _legacyAlertPathsById.remove(previousAlertIdForPath);
+          }
+          _alerts.insert(0, alert);
+        } else {
+          _alerts[index] = alert;
+        }
 
-    final shouldPlaySound = isNewEvent &&
-        !alreadyKnown &&
-        alert.createdAt >= _sosRootListenerStartedAt - 5000;
-    if (shouldPlaySound) {
-      debugPrint('[AlertProvider.sos] SOS received: ${alert.message}');
-      unawaited(_handleRealtimeAlert(alert, playSound: true));
-    }
+        _alerts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _knownAlertIds.add(alert.id);
+        _applyAlerts(_alerts, childId: childId);
+        notifyListeners();
+
+        final isFreshAlert =
+            !alreadyKnown && alert.createdAt >= listenerStartedAt - 5000;
+        if (isFreshAlert) {
+          unawaited(_handleRealtimeAlert(alert, playSound: true));
+        }
+      },
+      onError: (error) {
+        debugPrint(
+          '[AlertProvider.legacy] listener error path=/$legacyPath error=$error',
+        );
+      },
+    );
   }
 
   bool _looksLikeSingleAlertPayload(Map<String, dynamic> data) {
@@ -728,36 +705,6 @@ class AlertProvider with ChangeNotifier {
         data.containsKey('created_at') ||
         data.containsKey('isRead') ||
         data.containsKey('is_read');
-  }
-
-  bool _isMirroredRootAlertPayload(String? rawKey, Map<String, dynamic> data) {
-    final key = (rawKey ?? '').trim();
-    final alertId = (data['alert_id'] ?? '').toString().trim();
-    final childId = (data['child_id'] ?? data['childId'] ?? '').toString().trim();
-    final hasMirrorFields = (data['user_id'] ?? data['parent_user_id'] ?? '')
-            .toString()
-            .trim()
-            .isNotEmpty &&
-        ((data['status'] ?? '').toString().trim().isNotEmpty ||
-            data['isRead'] == true ||
-            data['is_read'] == true);
-
-    return key.isNotEmpty &&
-        alertId == key &&
-        childId.isNotEmpty &&
-        hasMirrorFields;
-  }
-
-  bool _isRootIngressSosPayload(String? rawKey, Map<String, dynamic> data) {
-    if (!_looksLikeSingleAlertPayload(data)) {
-      return false;
-    }
-
-    if (_isMirroredRootAlertPayload(rawKey, data)) {
-      return false;
-    }
-
-    return _inferAlertType(data) == 'SOS';
   }
 
   String _inferAlertType(Map<String, dynamic> data) {
@@ -806,6 +753,49 @@ class AlertProvider with ChangeNotifier {
     return '';
   }
 
+  AlertModel? _legacySingleAlertFromPayload({
+    required String rawPath,
+    required Object? rawValue,
+    required String childIdFallback,
+  }) {
+    final data = _asMap(rawValue);
+    if (!_looksLikeSingleAlertPayload(data)) {
+      return null;
+    }
+
+    final createdAt = _parseInt(data['created_at']) > 0
+        ? _parseInt(data['created_at'])
+        : _parseInt(data['timestamp']);
+    if (createdAt <= 0) {
+      return null;
+    }
+
+    final isRead = data['is_read'] == true || data['isRead'] == true;
+    final status =
+        (data['status'] ?? (isRead ? 'read' : 'unread')).toString().trim();
+    final deviceKey = rawPath.split('/').last.trim();
+    final childId =
+        (data['child_id'] ?? data['childId'] ?? childIdFallback).toString();
+    final type = _inferAlertType(data).isEmpty ? 'SOS' : _inferAlertType(data);
+    final message = (data['message'] ?? 'Child is in danger!').toString();
+    final alertId = 'legacy:$deviceKey:$createdAt';
+
+    return AlertModel.fromJson({
+      'id': alertId,
+      'child_id': childId,
+      'child_name': (data['child_name'] ?? '').toString(),
+      'type': type,
+      'message': message,
+      'created_at': createdAt,
+      'status': status,
+      'is_read': isRead,
+      'zone_name': data['zone_name'],
+      'location_text': data['location_text'],
+      'latitude': data['latitude'],
+      'longitude': data['longitude'],
+    });
+  }
+
   Future<void> _ensureBackgroundLiveAlertListener() async {
     final scope = await _resolveLiveAlertScope();
     if (scope == null) {
@@ -842,7 +832,7 @@ class AlertProvider with ChangeNotifier {
               .expand((childSet) => childSet)
               .toSet();
           final previousIds = Set<String>.from(_backgroundKnownAlertIds);
-          final alerts = _alertsFromRealtimePayload(
+          final alerts = _mergeAndSortAlerts(_alertsFromRealtimePayload(
             rawValue: event.snapshot.value,
             childIdFallback: '',
           ).where((alert) {
@@ -850,7 +840,7 @@ class AlertProvider with ChangeNotifier {
               return true;
             }
             return activeChildIds.contains(alert.childId);
-          }).toList();
+          }).toList());
           final newAlerts =
               alerts.where((alert) => !previousIds.contains(alert.id)).toList();
 
@@ -884,23 +874,14 @@ class AlertProvider with ChangeNotifier {
     await _liveAlertSubscription?.cancel();
     await _liveAlertChangedSubscription?.cancel();
     await _liveAlertRemovedSubscription?.cancel();
-    await _stopRootSosAlertListener();
+    await _legacyDeviceAlertSubscription?.cancel();
     _liveAlertSubscription = null;
     _liveAlertChangedSubscription = null;
     _liveAlertRemovedSubscription = null;
+    _legacyDeviceAlertSubscription = null;
     _liveAlertPath = null;
-  }
-
-  Future<void> _stopRootSosAlertListener() async {
-    await _sosRootAlertSubscription?.cancel();
-    await _sosRootAlertChangedSubscription?.cancel();
-    await _sosRootAlertRemovedSubscription?.cancel();
-    _sosRootAlertSubscription = null;
-    _sosRootAlertChangedSubscription = null;
-    _sosRootAlertRemovedSubscription = null;
-    _sosRootListeningChildId = null;
-    _sosRootListenerStartedAt = 0;
-    _rootSosAlertIds.clear();
+    _legacyDeviceAlertPath = null;
+    _legacyAlertPathsById.clear();
   }
 
   AlertModel? _alertFromLivePayload({
@@ -913,9 +894,10 @@ class AlertProvider with ChangeNotifier {
       return null;
     }
 
-    final createdAt = _parseInt(data['created_at']) > 0
-        ? _parseInt(data['created_at'])
-        : _parseInt(data['timestamp']);
+    final createdAt = _normalizeAlertTimestamp(
+      data['created_at'],
+      data['timestamp'],
+    );
     final type = _inferAlertType(data);
     if (createdAt <= 0) {
       return null;
@@ -933,7 +915,8 @@ class AlertProvider with ChangeNotifier {
 
     return AlertModel.fromJson({
       'id': alertId,
-      'child_id': (data['child_id'] ?? childIdFallback ?? '').toString(),
+      'child_id':
+          (data['child_id'] ?? childIdFallback ?? rawKey ?? '').toString(),
       'child_name': (data['child_name'] ?? '').toString(),
       'type': type,
       'message': (data['message'] ?? '').toString(),
@@ -952,17 +935,33 @@ class AlertProvider with ChangeNotifier {
     String? childIdFallback,
   }) {
     final data = _asMap(rawValue);
-    final alerts = data.entries
-        .map(
-          (entry) => _alertFromLivePayload(
-            rawKey: entry.key,
-            rawValue: entry.value,
-            childIdFallback: childIdFallback,
-          ),
-        )
-        .whereType<AlertModel>()
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final alerts = <AlertModel>[];
+
+    for (final entry in data.entries) {
+      final directAlert = _alertFromLivePayload(
+        rawKey: entry.key,
+        rawValue: entry.value,
+        childIdFallback: childIdFallback ?? entry.key,
+      );
+      if (directAlert != null) {
+        alerts.add(directAlert);
+        continue;
+      }
+
+      final nestedItems = _asMap(entry.value);
+      for (final nestedEntry in nestedItems.entries) {
+        final nestedAlert = _alertFromLivePayload(
+          rawKey: nestedEntry.key,
+          rawValue: nestedEntry.value,
+          childIdFallback: entry.key,
+        );
+        if (nestedAlert != null) {
+          alerts.add(nestedAlert);
+        }
+      }
+    }
+
+    alerts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return alerts;
   }
@@ -993,6 +992,28 @@ class AlertProvider with ChangeNotifier {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  int _normalizeAlertTimestamp(Object? createdAt, Object? timestamp) {
+    final normalizedCreatedAt = _parseInt(createdAt);
+    if (normalizedCreatedAt > 0) {
+      return normalizedCreatedAt;
+    }
+
+    final normalizedTimestamp = _parseInt(timestamp);
+    if (normalizedTimestamp <= 0) {
+      return 0;
+    }
+
+    if (normalizedTimestamp < 1000000000) {
+      return DateTime.now().millisecondsSinceEpoch;
+    }
+
+    if (normalizedTimestamp < 1000000000000) {
+      return normalizedTimestamp * 1000;
+    }
+
+    return normalizedTimestamp;
+  }
+
   bool _isAudibleAlert(AlertModel alert) {
     switch (alert.type.trim().toUpperCase()) {
       case 'SOS':
@@ -1019,10 +1040,7 @@ class AlertProvider with ChangeNotifier {
       return;
     }
 
-    if (!_handledAlertIds.add(alert.id)) {
-      debugPrint(
-        '[AlertProvider.monitor] sound skipped alert=${alert.id} reason=already_handled',
-      );
+    if (!_shouldHandleAlertNotification(alert)) {
       return;
     }
 
@@ -1042,6 +1060,7 @@ class AlertProvider with ChangeNotifier {
         childName: alert.childName,
         body: alert.message,
         payload: payload,
+        semanticDedupeKey: _semanticNotificationKey(alert),
       );
       return;
     }
@@ -1054,6 +1073,7 @@ class AlertProvider with ChangeNotifier {
         childName: alert.childName,
         body: alert.message,
         payload: payload,
+        semanticDedupeKey: _semanticNotificationKey(alert),
       );
       return;
     }
@@ -1063,6 +1083,7 @@ class AlertProvider with ChangeNotifier {
       childName: alert.childName,
       body: alert.message,
       payload: payload,
+      semanticDedupeKey: _semanticNotificationKey(alert),
     );
   }
 
@@ -1108,7 +1129,9 @@ class AlertProvider with ChangeNotifier {
 
     try {
       final database = await _database();
-      await database.ref('alerts_live/$alertId').update({
+      final alertPath =
+          _legacyAlertPathsById[alertId] ?? 'alerts_live/$alertId';
+      await database.ref(alertPath).update({
         'isRead': true,
         'is_read': true,
         'status': 'read',
@@ -1127,9 +1150,11 @@ class AlertProvider with ChangeNotifier {
         continue;
       }
 
-      updates['alerts_live/${alert.id}/isRead'] = true;
-      updates['alerts_live/${alert.id}/is_read'] = true;
-      updates['alerts_live/${alert.id}/status'] = 'read';
+      final alertPath =
+          _legacyAlertPathsById[alert.id] ?? 'alerts_live/${alert.id}';
+      updates['$alertPath/isRead'] = true;
+      updates['$alertPath/is_read'] = true;
+      updates['$alertPath/status'] = 'read';
     }
 
     if (updates.isEmpty) {
@@ -1153,8 +1178,11 @@ class AlertProvider with ChangeNotifier {
 
     try {
       final database = await _database();
-      await database.ref('alerts_live/$alertId').remove();
+      final alertPath =
+          _legacyAlertPathsById[alertId] ?? 'alerts_live/$alertId';
+      await database.ref(alertPath).remove();
       _rootSosAlertIds.remove(alertId);
+      _legacyAlertPathsById.remove(alertId);
       return true;
     } catch (error) {
       debugPrint('[AlertProvider.sos] direct delete skipped: $error');
@@ -1203,10 +1231,9 @@ class AlertProvider with ChangeNotifier {
       final alertScreenActive = _monitorOwners.keys.any(
         (ownerId) => ownerId == 'alerts_screen:$normalizedChildId',
       );
-      final withinImplicitOpenWindow =
-          DateTime.now().millisecondsSinceEpoch -
-                  _lastForegroundMonitoringStartedAt <
-              2000;
+      final withinImplicitOpenWindow = DateTime.now().millisecondsSinceEpoch -
+              _lastForegroundMonitoringStartedAt <
+          2000;
       if (alertScreenActive &&
           normalizedChildId == _monitoredChildId &&
           withinImplicitOpenWindow) {
@@ -1301,63 +1328,78 @@ class AlertProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void _startBackgroundAlertPolling() {
-    if (_backgroundAlertPollTimer != null) {
-      return;
-    }
+  String _semanticNotificationKey(AlertModel alert) {
+    final type = _normalizedNotificationType(alert.type);
+    final normalizedMessage =
+        alert.message.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    final normalizedZoneName =
+        (alert.zoneName ?? '').trim().toLowerCase().replaceAll(' ', '_');
+    final latBucket = (((alert.latitude ?? 0) * 1000).round()).toString();
+    final lonBucket = (((alert.longitude ?? 0) * 1000).round()).toString();
+    final timeBucket =
+        (alert.createdAt ~/ _alertNotificationDedupeWindowMs).toString();
 
-    _backgroundAlertPollTimer = Timer.periodic(
-      const Duration(seconds: 15),
-      (_) => unawaited(_pollBackgroundAlerts()),
-    );
+    return [
+      type,
+      alert.childId.trim(),
+      normalizedZoneName,
+      latBucket,
+      lonBucket,
+      normalizedMessage,
+      timeBucket,
+    ].join('|');
   }
 
-  void _stopBackgroundAlertPolling() {
-    _backgroundAlertPollTimer?.cancel();
-    _backgroundAlertPollTimer = null;
+  String _normalizedNotificationType(String rawType) {
+    switch (rawType.trim().toUpperCase()) {
+      case 'IN_ZONE':
+      case 'SAFE_ZONE_ENTER':
+      case 'ZONE_ENTER':
+        return 'SAFE_ZONE_ENTER';
+      case 'OUT_ZONE':
+      case 'SAFE_ZONE_EXIT':
+      case 'ZONE_EXIT':
+      case 'SAFE_ZONE_BREACH':
+        return 'SAFE_ZONE_EXIT';
+      default:
+        return rawType.trim().toUpperCase();
+    }
   }
 
-  Future<void> _pollBackgroundAlerts() async {
-    final scope = await _resolveLiveAlertScope();
-    if (scope == null) {
-      return;
+  bool _shouldHandleAlertNotification(AlertModel alert) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final expiredKeys = _handledAlertKeys.entries
+        .where(
+          (entry) => now - entry.value >= _alertNotificationDedupeWindowMs,
+        )
+        .map((entry) => entry.key)
+        .toList();
+
+    for (final key in expiredKeys) {
+      _handledAlertKeys.remove(key);
     }
 
-    final activeChildIds =
-        _backgroundMonitorOwners.values.expand((childSet) => childSet).toSet();
-    if (activeChildIds.isEmpty) {
-      return;
-    }
+    final candidateKeys = <String>{
+      'id:${alert.id}',
+      'semantic:${_semanticNotificationKey(alert)}',
+    };
 
-    try {
-      final previousIds = Set<String>.from(_backgroundKnownAlertIds);
-      final mergedAlerts = <AlertModel>[];
-
-      for (final childId in activeChildIds) {
-        final alerts = await _fetchAlerts(childId);
-        mergedAlerts.addAll(alerts);
+    for (final key in candidateKeys) {
+      final previousTimestamp = _handledAlertKeys[key];
+      if (previousTimestamp != null &&
+          now - previousTimestamp < _alertNotificationDedupeWindowMs) {
+        debugPrint(
+          '[AlertProvider.monitor] sound skipped alert=${alert.id} reason=recent_duplicate key=$key',
+        );
+        return false;
       }
-
-      final dedupedAlerts = _mergeAndSortAlerts(mergedAlerts);
-      final newAlerts = dedupedAlerts.where((alert) {
-        if (alert.isRead) {
-          return false;
-        }
-        return !previousIds.contains(alert.id);
-      }).toList();
-
-      _backgroundKnownAlertIds
-        ..clear()
-        ..addAll(dedupedAlerts.map((alert) => alert.id));
-      _applyAggregateAlerts(dedupedAlerts);
-      notifyListeners();
-
-      for (final alert in newAlerts) {
-        unawaited(_handleRealtimeAlert(alert, playSound: !scope.isAdmin));
-      }
-    } catch (error) {
-      debugPrint('[AlertProvider.background] poll failed: $error');
     }
+
+    for (final key in candidateKeys) {
+      _handledAlertKeys[key] = now;
+    }
+
+    return true;
   }
 
   void clearError() {
@@ -1369,7 +1411,6 @@ class AlertProvider with ChangeNotifier {
   void dispose() {
     _stopLiveAlertListener();
     _backgroundLiveAlertSubscription?.cancel();
-    _stopBackgroundAlertPolling();
     super.dispose();
   }
 }

@@ -24,6 +24,7 @@ const {
 } = require("../utils/location-history");
 const { listChildLogs } = require("../utils/child-logs");
 const { recordDeviceReconnected } = require("../utils/connection-events");
+const { upsertDeviceStatusCard } = require("../utils/device-status");
 
 const SOS_ALERT_COOLDOWN_MS = 60000;
 
@@ -85,17 +86,61 @@ async function handleSosTrigger({
   latitude,
   longitude,
   locationText,
+  trackingKey,
+  isPressed,
+  eventTimestamp,
 }) {
   const sosStateRef = realtimeDB.ref(`live_tracking/${childId}/sos_state`);
   const sosStateSnapshot = await sosStateRef.once("value");
   const sosState = sosStateSnapshot.val() || {};
   const now = Date.now();
+  const normalizedEventTimestamp = normalizeEpochMillisecondsOrNull(
+    eventTimestamp
+  );
+  const previousPressed = sosState.last_input_active === true;
+
+  if (!isPressed) {
+    await sosStateRef.update({
+      last_input_active: false,
+      last_input_at: normalizedEventTimestamp || now,
+      updated_at: now,
+    });
+    return;
+  }
+
+  const sameEventTimestamp =
+    normalizedEventTimestamp &&
+    Number(sosState.last_event_timestamp || 0) === normalizedEventTimestamp;
+
+  if (previousPressed || sameEventTimestamp) {
+    await sosStateRef.update({
+      last_input_active: true,
+      last_input_at: normalizedEventTimestamp || now,
+      updated_at: now,
+      last_location_text: locationText,
+      latitude,
+      longitude,
+    });
+
+    console.info("[location.handleSosTrigger] skipped non-rising-edge", {
+      childId,
+      previousPressed,
+      sameEventTimestamp,
+      eventTimestamp: normalizedEventTimestamp || null,
+    });
+
+    return;
+  }
 
   if (
     sosState.last_alert_at &&
     now - Number(sosState.last_alert_at) < SOS_ALERT_COOLDOWN_MS
   ) {
     await sosStateRef.update({
+      last_input_active: true,
+      last_input_at: normalizedEventTimestamp || now,
+      last_event_timestamp:
+        normalizedEventTimestamp || Number(sosState.last_event_timestamp || 0),
       updated_at: now,
       last_location_text: locationText,
       latitude,
@@ -120,10 +165,20 @@ async function handleSosTrigger({
       type: "SOS",
       locationText,
     }),
+    extraFields: {
+      event_key: normalizedEventTimestamp
+        ? `sos:${normalizedEventTimestamp}`
+        : "",
+      device_timestamp: normalizedEventTimestamp || now,
+      tracking_key: trackingKey || "",
+    },
   });
 
   await sosStateRef.set({
     last_alert_at: now,
+    last_input_active: true,
+    last_input_at: normalizedEventTimestamp || now,
+    last_event_timestamp: normalizedEventTimestamp || now,
     last_location_text: locationText,
     latitude,
     longitude,
@@ -200,6 +255,7 @@ exports.updateLocation = async (req, res, next) => {
 
     const statusRef = realtimeDB.ref(statusPath);
     let reconnectContext = null;
+    let previousConnectionState = null;
     const statusTransaction = await statusRef.transaction((currentValue) => {
       const currentStatus =
         currentValue && typeof currentValue === "object" ? currentValue : {};
@@ -213,6 +269,7 @@ exports.updateLocation = async (req, res, next) => {
         (currentStatus.deviceStatus?.toString().trim().toLowerCase() === "offline"
           ? "offline"
           : "");
+      previousConnectionState = currentConnectionState || "unknown";
 
       if (currentConnectionState === "offline") {
         reconnectContext = {
@@ -272,6 +329,25 @@ exports.updateLocation = async (req, res, next) => {
       });
     }
 
+    await upsertDeviceStatusCard({
+      childId,
+      trackingKey,
+      childName: trackingContext?.childData?.name?.toString().trim() || "",
+      deviceName:
+        trackingContext?.deviceData?.name?.toString().trim() ||
+        trackingContext?.deviceData?.imei?.toString().trim() ||
+        trackingKey,
+      status: "online",
+      latitude,
+      longitude,
+      timestamp: heartbeatAt,
+      heartbeatAt,
+      placeName: locationText,
+      source: "location_update",
+      writeTransitionLog: true,
+      previousStatusHint: previousConnectionState,
+    });
+
     console.info("[location.updateLocation.rtdb-write]", {
       childId,
       accessMode: accessResult.mode,
@@ -328,14 +404,15 @@ exports.updateLocation = async (req, res, next) => {
       req.body.emergency
     );
 
-    if (sosTriggered) {
-      await handleSosTrigger({
-        childId,
-        latitude,
-        longitude,
-        locationText,
-      });
-    }
+    await handleSosTrigger({
+      childId,
+      latitude,
+      longitude,
+      locationText,
+      trackingKey,
+      isPressed: sosTriggered,
+      eventTimestamp: req.body.sos_timestamp ?? req.body.sosTimestamp ?? recordedAt,
+    });
 
     res.json({ message: "Location Updated Successfully" });
   } catch (error) {

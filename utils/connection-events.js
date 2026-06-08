@@ -6,8 +6,8 @@ const { getTrackingContextForChild } = require("./live-tracking");
 const { normalizeEpochMillisecondsOrNull } = require("./live-timestamp");
 const { buildDateKey } = require("./location-history");
 
-const DEFAULT_DEVICE_OFFLINE_THRESHOLD_MS = 3 * 60 * 1000;
-const DEFAULT_DEVICE_MONITOR_INTERVAL_MS = 60 * 1000;
+const DEFAULT_DEVICE_OFFLINE_THRESHOLD_MS = 30 * 1000;
+const DEFAULT_DEVICE_MONITOR_INTERVAL_MS = 30 * 1000;
 
 function readPositiveIntegerEnv(name, fallback) {
   const value = Number(process.env[name]);

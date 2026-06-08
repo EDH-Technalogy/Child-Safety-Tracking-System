@@ -18,6 +18,8 @@ router.post("/verify-otp-reset", user.verifyOtpAndResetPassword);
 
 // Firebase custom token for Realtime Database listeners
 router.get("/firebase-token", requireAuthenticatedAccess, user.getFirebaseToken);
+router.post("/:id/fcm-token", requireAuthenticatedAccess, user.registerFcmToken);
+router.delete("/:id/fcm-token", requireAuthenticatedAccess, user.unregisterFcmToken);
 
 // Profile routes (Flutter calls: /api/users/{userId})
 router.get("/:id", requireAuthenticatedAccess, user.getProfile);

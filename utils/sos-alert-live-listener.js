@@ -1,4 +1,5 @@
 const { admin, firestore, realtimeDB } = require("../firebase");
+const { tryNormalizeTrackingKey } = require("./tracking-key-normalizer");
 const {
   buildLocationText,
   createAlertRecord,
@@ -212,7 +213,68 @@ async function resolveChildIdForFlatIngress(payload = {}, fallbackIdentifier = "
     .ref(`device_registry/${trackingKey}`)
     .once("value");
   const deviceData = deviceSnapshot.val() || {};
-  return normalizeChildId(deviceData.child_id);
+  const registryResolvedChildId = normalizeChildId(deviceData.child_id);
+  if (registryResolvedChildId) {
+    return registryResolvedChildId;
+  }
+
+  const directDeviceDoc = await firestore
+    .collection("devices")
+    .doc(trackingKey)
+    .get();
+  if (directDeviceDoc.exists) {
+    const firestoreChildId = normalizeChildId(directDeviceDoc.data()?.child_id);
+    if (firestoreChildId) {
+      return firestoreChildId;
+    }
+  }
+
+  const normalizedTrackingKey = tryNormalizeTrackingKey(trackingKey);
+  const imeiCandidates = [trackingKey, normalizedTrackingKey].filter(Boolean);
+  for (const imeiCandidate of imeiCandidates) {
+    const deviceByImeiSnapshot = await firestore
+      .collection("devices")
+      .where("imei", "==", imeiCandidate)
+      .limit(1)
+      .get();
+    if (!deviceByImeiSnapshot.empty) {
+      const firestoreChildId = normalizeChildId(
+        deviceByImeiSnapshot.docs[0].data()?.child_id
+      );
+      if (firestoreChildId) {
+        return firestoreChildId;
+      }
+    }
+  }
+
+  const allDevicesSnapshot = await firestore.collection("devices").get();
+  for (const deviceDoc of allDevicesSnapshot.docs) {
+    const deviceData = deviceDoc.data() || {};
+    const candidateValues = [
+      deviceDoc.id,
+      deviceData.imei,
+      deviceData.tracking_key,
+      deviceData.live_tracking_key,
+    ]
+      .map((value) => value?.toString().trim() || "")
+      .filter(Boolean);
+
+    const normalizedCandidates = new Set(
+      candidateValues.flatMap((value) => [value, tryNormalizeTrackingKey(value)]),
+    );
+
+    if (
+      normalizedCandidates.has(trackingKey) ||
+      (normalizedTrackingKey && normalizedCandidates.has(normalizedTrackingKey))
+    ) {
+      const firestoreChildId = normalizeChildId(deviceData.child_id);
+      if (firestoreChildId) {
+        return firestoreChildId;
+      }
+    }
+  }
+
+  return "";
 }
 
 function isMirroredFlatAlertPayload(payload = {}, alertId = "") {
@@ -224,12 +286,70 @@ function isMirroredFlatAlertPayload(payload = {}, alertId = "") {
   );
 }
 
+function shouldReuseIngressKeyAsAlertId(payload = {}) {
+  const explicitAlertId = normalizeAlertId(payload.alert_id || payload.id);
+  if (explicitAlertId) {
+    return true;
+  }
+
+  const hasMirrorFields =
+    Boolean(normalizeChildId(payload.child_id || payload.childId)) &&
+    Boolean(payload.user_id || payload.parent_user_id) &&
+    Boolean(
+      payload.status || payload.isRead === true || payload.is_read === true
+    );
+
+  return hasMirrorFields;
+}
+
 async function updateIngressStatus(snapshot, fields = {}) {
   const updates = {
     updated_at: Date.now(),
     ...fields,
   };
   await snapshot.ref.update(updates);
+}
+
+async function claimSosIngressEvent({
+  childId,
+  eventKey,
+  eventTimestamp,
+  trackingKey,
+}) {
+  const stateRef = realtimeDB.ref(`live_tracking/${childId}/sos_state`);
+  const snapshot = await stateRef.once("value");
+  const state = snapshot.val() || {};
+  const normalizedEventKey = eventKey?.toString().trim() || "";
+  const normalizedTrackingKey = trackingKey?.toString().trim() || "";
+  const normalizedEventTimestamp = parseTimestamp(eventTimestamp);
+
+  const isDuplicateEventKey =
+    normalizedEventKey &&
+    state.last_ingress_event_key?.toString().trim() === normalizedEventKey;
+  const isDuplicateEventTimestamp =
+    normalizedEventTimestamp > 0 &&
+    Number(state.last_ingress_event_timestamp || 0) ===
+      normalizedEventTimestamp;
+
+  if (isDuplicateEventKey || isDuplicateEventTimestamp) {
+    await stateRef.update({
+      last_input_active: true,
+      last_input_at: normalizedEventTimestamp || Date.now(),
+      updated_at: Date.now(),
+    });
+    return false;
+  }
+
+  await stateRef.update({
+    last_input_active: true,
+    last_input_at: normalizedEventTimestamp || Date.now(),
+    last_ingress_event_key: normalizedEventKey || null,
+    last_ingress_event_timestamp: normalizedEventTimestamp || null,
+    tracking_key: normalizedTrackingKey || null,
+    updated_at: Date.now(),
+  });
+
+  return true;
 }
 
 async function lookupParentNotificationTokens(userId) {
@@ -262,57 +382,6 @@ async function lookupParentNotificationTokens(userId) {
   }
 
   return [];
-}
-
-async function sendOptionalAlertPush({ userId, childId, childName, type, message }) {
-  const tokens = await lookupParentNotificationTokens(userId);
-  if (tokens.length === 0) {
-    return;
-  }
-
-  try {
-    const multicastMessage = {
-      tokens,
-      notification: {
-        title: alertTitle(type),
-        body: message,
-      },
-      data: {
-        type: type || "SOS",
-        childId: childId || "",
-        childName: childName || "",
-      },
-      android: {
-        priority: "high",
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-          },
-        },
-      },
-    };
-
-    const response = await admin.messaging().sendEachForMulticast(
-      multicastMessage
-    );
-
-    console.info("[sos-alert-live-listener.fcm]", {
-      userId,
-      childId,
-      type,
-      tokenCount: tokens.length,
-      successCount: response.successCount,
-      failureCount: response.failureCount,
-    });
-  } catch (error) {
-    console.error("[sos-alert-live-listener.fcm] failed", {
-      userId,
-      childId,
-      reason: error.message,
-    });
-  }
 }
 
 async function processSosIngressAlert(childId, snapshot) {
@@ -387,6 +456,37 @@ async function processSosIngressAlert(childId, snapshot) {
     const childData = childDoc.data() || {};
     const createdAt = parseTimestamp(payload.timestamp || payload.created_at) || Date.now();
 
+    const incomingEventKey =
+      payload.event_key?.toString().trim() ||
+      payload.eventKey?.toString().trim() ||
+      (createdAt > 0 ? `sos:${createdAt}` : alertId);
+    const trackingKey =
+      payload.trackingKey?.toString().trim() ||
+      payload.tracking_key?.toString().trim() ||
+      "";
+
+    const isFreshIngressEvent = await claimSosIngressEvent({
+      childId: normalizedChildId,
+      eventKey: incomingEventKey,
+      eventTimestamp: createdAt,
+      trackingKey,
+    });
+
+    if (!isFreshIngressEvent) {
+      await updateIngressStatus(snapshot, {
+        processed_at: Date.now(),
+        server_status: "duplicate",
+        persisted_alert_id: alertId,
+        child_id: normalizedChildId,
+        type: alertType,
+        created_at: createdAt,
+        sos: false,
+        is_sos: false,
+        emergency: false,
+      });
+      return;
+    }
+
     const createdAlert = await createAlertRecord({
       childId: normalizedChildId,
       type: alertType,
@@ -395,20 +495,16 @@ async function processSosIngressAlert(childId, snapshot) {
       locationText,
       latitude,
       longitude,
-      alertId,
+      alertId: shouldReuseIngressKeyAsAlertId(payload)
+        ? alertId
+        : `${alertId}_${createdAt}`,
       createdAt,
       initialStatus: normalizeInitialStatus(payload),
       extraFields: {
         source_live_ingress: true,
         ingress_alert_id: alertId,
-        event_key:
-          payload.event_key?.toString().trim() ||
-          payload.eventKey?.toString().trim() ||
-          "",
-        tracking_key:
-          payload.trackingKey?.toString().trim() ||
-          payload.tracking_key?.toString().trim() ||
-          "",
+        event_key: incomingEventKey,
+        tracking_key: trackingKey,
         device_timestamp: createdAt,
       },
     });
@@ -418,17 +514,18 @@ async function processSosIngressAlert(childId, snapshot) {
       server_status: "processed",
       persisted_alert_id: createdAlert.alertId,
       child_id: normalizedChildId,
-      type: alertType,
-      created_at: createdAt,
-      isRead: payload.isRead === true,
-    });
-
-    await sendOptionalAlertPush({
-      userId: childData.user_id || "",
-      childId: normalizedChildId,
-      childName: childData.name || "",
+      user_id: childData.user_id || "",
+      child_name: childData.name || "",
       type: alertType,
       message,
+      created_at: createdAt,
+      timestamp: createdAt,
+      status: payload.isRead === true ? "read" : "unread",
+      isRead: payload.isRead === true,
+      is_read: payload.isRead === true,
+      sos: false,
+      is_sos: false,
+      emergency: false,
     });
 
     console.info("[sos-alert-live-listener.processed]", {
@@ -570,6 +667,27 @@ async function attachChildListener(childId) {
   });
 }
 
+async function attachKnownChildListenersFromDevices() {
+  const devicesSnapshot = await firestore.collection("devices").get();
+  const childIds = new Set();
+
+  for (const deviceDoc of devicesSnapshot.docs) {
+    const deviceData = deviceDoc.data() || {};
+    const childId = normalizeChildId(deviceData.child_id);
+    if (childId) {
+      childIds.add(childId);
+    }
+  }
+
+  for (const childId of childIds) {
+    await attachChildListener(childId);
+  }
+
+  console.info("[sos-alert-live-listener.devices]", {
+    attachedChildListeners: childIds.size,
+  });
+}
+
 function detachChildListener(childId) {
   const normalizedChildId = normalizeChildId(childId);
   const entry = childAlertListeners.get(normalizedChildId);
@@ -596,10 +714,28 @@ async function initSosAlertLiveListener() {
       knownRootFlatAlertIds.add(normalizeAlertId(alertId));
     }
   });
+  const childIdsToAttach = Object.entries(initialRootData)
+    .filter(([, payload]) => isPlainObject(payload) && !looksLikeSingleAlertPayload(payload))
+    .map(([childId]) => normalizeChildId(childId))
+    .filter(Boolean);
   rootListenerStartedAt = Date.now();
+
+  for (const childId of childIdsToAttach) {
+    await attachChildListener(childId);
+  }
+  await attachKnownChildListenersFromDevices();
 
   rootChildAddedHandler = (snapshot) => {
     const alertId = normalizeAlertId(snapshot.key);
+    const value = snapshot.val();
+    if (isPlainObject(value) && !looksLikeSingleAlertPayload(value)) {
+      void attachChildListener(alertId);
+      console.info("[sos-alert-live-listener] attached child path from root add", {
+        childId: alertId,
+        path: `/alerts_live/${snapshot.key}`,
+      });
+      return;
+    }
     if (knownRootFlatAlertIds.has(alertId)) {
       return;
     }
@@ -614,6 +750,11 @@ async function initSosAlertLiveListener() {
 
   rootChildChangedHandler = (snapshot) => {
     const alertId = normalizeAlertId(snapshot.key);
+    const value = snapshot.val();
+    if (isPlainObject(value) && !looksLikeSingleAlertPayload(value)) {
+      void attachChildListener(alertId);
+      return;
+    }
     void logFlatRootAlert(snapshot);
     void processFlatRootIngressAlert(snapshot, { isNewEvent: false });
     console.info("[sos-alert-live-listener] direct Flutter path changed", {

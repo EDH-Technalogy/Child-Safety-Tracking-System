@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -108,6 +111,11 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
         widget.initialZone!.longitude,
       );
     }
+    _previewCenter = _savedCenter ??
+        const LatLng(
+          AppConstants.defaultLatitude,
+          AppConstants.defaultLongitude,
+        );
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadChildContext();
@@ -195,33 +203,32 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
   }
 
   Future<void> _bootstrapCenterSelection() async {
-    await _loadSavedLocations();
-
     if (widget.isEditMode && _savedCenter != null) {
       _animateToCenter(_savedCenter!);
       return;
     }
 
+    _rebuildMapArtifacts();
+    unawaited(_hydrateInitialCenter());
+  }
+
+  Future<void> _hydrateInitialCenter() async {
     final loadedLiveLocation = await _useCurrentLiveLocation(
       showFeedback: false,
       animate: false,
       applyAsSelection: false,
+      showLoadingIndicator: false,
     );
-    if (loadedLiveLocation) {
+    if (loadedLiveLocation || !mounted) {
       return;
     }
 
-    if (_savedLocationOptions.isNotEmpty) {
-      _applySavedLocation(
-        _savedLocationOptions.first,
-        animate: false,
-        applyAsSelection: false,
-      );
-      return;
+    if (_centerSource == _SafeZoneCenterSource.currentLiveLocation) {
+      setState(() {
+        _centerSource = _SafeZoneCenterSource.customMap;
+      });
     }
-
-    _centerSource = _SafeZoneCenterSource.customMap;
-    await _useDeviceLocationAsCustomFallback();
+    await _useDeviceLocationAsCustomFallback(showLoadingIndicator: false);
   }
 
   Future<void> _loadSavedLocations() async {
@@ -304,8 +311,9 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
     required bool showFeedback,
     bool animate = true,
     bool applyAsSelection = true,
+    bool showLoadingIndicator = true,
   }) async {
-    if (mounted) {
+    if (mounted && showLoadingIndicator) {
       setState(() {
         _isLoadingLocation = true;
       });
@@ -323,6 +331,12 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
         response['recorded_at'] ?? response['timestamp'],
       );
       _liveLocationError = null;
+
+      if (!applyAsSelection &&
+          _centerSource != _SafeZoneCenterSource.currentLiveLocation) {
+        return false;
+      }
+
       final applyCenter =
           applyAsSelection ? _applyManualCenterSelection : _setPreviewCenter;
       applyCenter(
@@ -346,7 +360,7 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
       }
       return false;
     } finally {
-      if (mounted) {
+      if (mounted && showLoadingIndicator) {
         setState(() {
           _isLoadingLocation = false;
         });
@@ -354,10 +368,14 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
     }
   }
 
-  Future<void> _useDeviceLocationAsCustomFallback() async {
-    setState(() {
-      _isLoadingLocation = true;
-    });
+  Future<void> _useDeviceLocationAsCustomFallback({
+    bool showLoadingIndicator = true,
+  }) async {
+    if (showLoadingIndicator) {
+      setState(() {
+        _isLoadingLocation = true;
+      });
+    }
 
     try {
       var permission = await Geolocator.checkPermission();
@@ -367,7 +385,7 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        if (mounted) {
+        if (mounted && showLoadingIndicator) {
           setState(() {
             _isLoadingLocation = false;
           });
@@ -393,7 +411,7 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
     } catch (_) {
       // Keep the map usable even if device geolocation is unavailable.
     } finally {
-      if (mounted) {
+      if (mounted && showLoadingIndicator) {
         setState(() {
           _isLoadingLocation = false;
         });
@@ -1090,213 +1108,209 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
           ),
         ],
       ),
-      body: Consumer<GeofenceProvider>(
-        builder: (context, geofenceProvider, child) {
-          final displayedCenter = _displayedCenter;
-          return Column(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Stack(
-                  children: [
-                    if (displayedCenter != null)
-                      GoogleMapAvailabilityGuard(
-                        mapBuilder: (_) => GoogleMap(
-                          onMapCreated: (controller) {
-                            _mapController = controller;
-                            _animateToCenter(displayedCenter);
-                          },
-                          onCameraMove: (position) {
-                            _lastMapZoom = position.zoom;
-                          },
-                          onTap: _onMapTap,
-                          initialCameraPosition: CameraPosition(
-                            target: displayedCenter,
-                            zoom: 16,
+      body: Column(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Stack(
+              children: [
+                if (_displayedCenter != null)
+                  GoogleMapAvailabilityGuard(
+                    mapBuilder: (_) => GoogleMap(
+                      onMapCreated: (controller) {
+                        _mapController = controller;
+                        _animateToCenter(_displayedCenter!);
+                      },
+                      onCameraMove: (position) {
+                        _lastMapZoom = position.zoom;
+                      },
+                      onTap: _onMapTap,
+                      initialCameraPosition: CameraPosition(
+                        target: _displayedCenter!,
+                        zoom: 16,
+                      ),
+                      mapType: _activeMapType,
+                      markers: _markers,
+                      circles: _circles,
+                      gestureRecognizers:
+                          <Factory<OneSequenceGestureRecognizer>>{
+                        Factory<OneSequenceGestureRecognizer>(
+                          () => EagerGestureRecognizer(),
+                        ),
+                      },
+                      myLocationEnabled: false,
+                      myLocationButtonEnabled: false,
+                      zoomControlsEnabled: false,
+                      mapToolbarEnabled: false,
+                      compassEnabled: true,
+                      buildingsEnabled: true,
+                      rotateGesturesEnabled: true,
+                      tiltGesturesEnabled: true,
+                    ),
+                    fallbackBuilder: (_) => GoogleMapUnavailableState(
+                      title: l10n.mapUnavailableTitle,
+                      message: l10n.mapUnavailableMessage,
+                    ),
+                  )
+                else
+                  Container(
+                    color: Colors.grey[100],
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.location_off,
+                          size: 42,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          l10n.noData,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
                           ),
-                          mapType: _activeMapType,
-                          markers: _markers,
-                          circles: _circles,
-                          myLocationEnabled: true,
-                          myLocationButtonEnabled: false,
-                          zoomControlsEnabled: false,
-                          mapToolbarEnabled: false,
-                          compassEnabled: true,
-                          buildingsEnabled: true,
-                          rotateGesturesEnabled: true,
-                          tiltGesturesEnabled: true,
                         ),
-                        fallbackBuilder: (_) => GoogleMapUnavailableState(
-                          title: l10n.mapUnavailableTitle,
-                          message: l10n.mapUnavailableMessage,
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.chooseCenterToPreviewSafeZone,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      )
-                    else
-                      Container(
-                        color: Colors.grey[100],
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.location_off,
-                              size: 42,
-                              color: AppColors.textSecondary,
+                      ],
+                    ),
+                  ),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  right: 8,
+                  child: Card(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.touch_app,
+                            color: AppColors.primaryColor,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _mapInstructionText(),
+                              style: TextStyle(fontSize: 13),
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              l10n.noData,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: PopupMenuButton<_SafeZoneMapViewMode>(
+                      tooltip: 'Change map style',
+                      initialValue: _mapViewMode,
+                      onSelected: _setMapViewMode,
+                      itemBuilder: (context) => _SafeZoneMapViewMode.values
+                          .map(
+                            (mode) => PopupMenuItem<_SafeZoneMapViewMode>(
+                              value: mode,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (mode == _mapViewMode)
+                                    const Padding(
+                                      padding: EdgeInsets.only(right: 8),
+                                      child: Icon(Icons.check, size: 18),
+                                    )
+                                  else
+                                    const SizedBox(width: 26),
+                                  Text(_mapViewLabel(mode)),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
+                          )
+                          .toList(),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.layers_outlined, size: 18),
+                            const SizedBox(width: 8),
                             Text(
-                              l10n.chooseCenterToPreviewSafeZone,
-                              textAlign: TextAlign.center,
+                              _mapViewLabel(_mapViewMode),
                               style: const TextStyle(
-                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    if (_isLoadingLocation)
-                      Container(
-                        color: Colors.black26,
-                        child: const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      right: 8,
-                      child: Card(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.touch_app,
-                                color: AppColors.primaryColor,
-                                size: 20,
-                              ),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _mapInstructionText(),
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ),
-                    Positioned(
-                      bottom: 16,
-                      left: 16,
-                      child: Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: PopupMenuButton<_SafeZoneMapViewMode>(
-                          tooltip: 'Change map style',
-                          initialValue: _mapViewMode,
-                          onSelected: _setMapViewMode,
-                          itemBuilder: (context) => _SafeZoneMapViewMode.values
-                              .map(
-                                (mode) => PopupMenuItem<_SafeZoneMapViewMode>(
-                                  value: mode,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (mode == _mapViewMode)
-                                        const Padding(
-                                          padding: EdgeInsets.only(right: 8),
-                                          child: Icon(Icons.check, size: 18),
-                                        )
-                                      else
-                                        const SizedBox(width: 26),
-                                      Text(_mapViewLabel(mode)),
-                                    ],
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.layers_outlined, size: 18),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _mapViewLabel(_mapViewMode),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          FloatingActionButton(
-                            heroTag: 'safe_zone_zoom_in',
-                            mini: true,
-                            onPressed: () {
-                              _mapController?.animateCamera(
-                                CameraUpdate.zoomIn(),
-                              );
-                            },
-                            child: const Icon(Icons.add),
-                          ),
-                          const SizedBox(height: 8),
-                          FloatingActionButton(
-                            heroTag: 'safe_zone_zoom_out',
-                            mini: true,
-                            onPressed: () {
-                              _mapController?.animateCamera(
-                                CameraUpdate.zoomOut(),
-                              );
-                            },
-                            child: const Icon(Icons.remove),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              Expanded(
-                flex: 3,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FloatingActionButton(
+                        heroTag: 'safe_zone_zoom_in',
+                        mini: true,
+                        onPressed: () {
+                          _mapController?.animateCamera(
+                            CameraUpdate.zoomIn(),
+                          );
+                        },
+                        child: const Icon(Icons.add),
+                      ),
+                      const SizedBox(height: 8),
+                      FloatingActionButton(
+                        heroTag: 'safe_zone_zoom_out',
+                        mini: true,
+                        onPressed: () {
+                          _mapController?.animateCamera(
+                            CameraUpdate.zoomOut(),
+                          );
+                        },
+                        child: const Icon(Icons.remove),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                         TextFormField(
                           controller: _nameController,
                           textCapitalization: TextCapitalization.words,
@@ -1548,38 +1562,42 @@ class _AddSafeZoneScreenState extends State<AddSafeZoneScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed:
-                              geofenceProvider.isLoading ? null : _saveSafeZone,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: geofenceProvider.isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
+                        Selector<GeofenceProvider, bool>(
+                          selector: (_, provider) => provider.isLoading,
+                          builder: (context, isSaving, _) {
+                            return ElevatedButton(
+                              onPressed: isSaving ? null : _saveSafeZone,
+                              style: ElevatedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              child: isSaving
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : Text(
+                                      widget.isEditMode
+                                          ? l10n.updateSafeZone
+                                          : l10n.createSafeZone,
+                                      style: const TextStyle(fontSize: 16),
                                     ),
-                                  ),
-                                )
-                              : Text(
-                                  widget.isEditMode
-                                      ? l10n.updateSafeZone
-                                      : l10n.createSafeZone,
-                                  style: const TextStyle(fontSize: 16),
-                                ),
+                            );
+                          },
                         ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }

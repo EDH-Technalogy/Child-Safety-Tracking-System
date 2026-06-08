@@ -8,7 +8,6 @@ import '../l10n/app_localizations.dart';
 import '../providers/geofence_provider.dart';
 import '../providers/location_provider.dart';
 import '../utils/constants.dart';
-import '../utils/localization_helpers.dart';
 import '../utils/timestamp_utils.dart';
 import '../models/geofence_model.dart';
 import '../models/location_model.dart';
@@ -29,6 +28,7 @@ class _SafeZonesScreenState extends State<SafeZonesScreen> {
   final TextEditingController _searchController = TextEditingController();
   GoogleMapController? _mapController;
   String? _lastZoneCheckKey;
+  String? _lastFocusedLiveLocationKey;
   bool _ownsLocationTracking = false;
 
   @override
@@ -133,12 +133,22 @@ class _SafeZonesScreenState extends State<SafeZonesScreen> {
       return;
     }
 
+    final nextKey = [
+      liveLocation.latitude.toStringAsFixed(6),
+      liveLocation.longitude.toStringAsFixed(6),
+      liveLocation.recordedAt,
+    ].join('|');
+    if (_lastFocusedLiveLocationKey == nextKey) {
+      return;
+    }
+
     final locationProvider =
         Provider.of<LocationProvider>(context, listen: false);
     if (locationProvider.isAnimatingLiveLocation) {
       return;
     }
 
+    _lastFocusedLiveLocationKey = nextKey;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _mapController == null) {
         return;

@@ -1,0 +1,3235 @@
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+[realtime-bootstrap.sync] { mirroredDevices: 2, mirroredSafeZones: 2 }
+[geofence-monitor.init] ready {
+  deviceRegistryPath: '/device_registry',
+  safeZonesPath: '/safe_zones'
+}
+[connection-monitor.init] { monitorIntervalMs: 30000, offlineThresholdMs: 30000 }
+[geofence-monitor.attach] {
+  deviceId: 'mcJrFCFSWVV8tWKwBG8w',
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location'
+}
+[geofence-monitor.attach] {
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[geofence-monitor.safe-zone-cache] {
+  childId: '4Pvqc452zILHl7MVNbnJ',
+  zoneCount: 1,
+  zoneIds: [ 's2fe0VR667KuhCHmZ72d' ]
+}
+[geofence-monitor.safe-zone-cache] {
+  childId: '91zWm5AR1hwRnJpDELgS',
+  zoneCount: 2,
+  zoneIds: [ 'AugxZ8TouCNJxHmEaD8n', 'DFsuaTlUI5o85PWhRrYr' ]
+}
+[geofence-monitor.safe-zone-cache] {
+  childId: 'LJb46bTwsjUIUBxnjnC1',
+  zoneCount: 1,
+  zoneIds: [ 'CxRDUz56YKIFMPo4HWvf' ]
+}
+[geofence-monitor.safe-zone-cache] {
+  childId: 'YBygNYk8pkrNpvoPTq4m',
+  zoneCount: 1,
+  zoneIds: [ 'WTgMPMEeQpgqKUEp7RML' ]
+}
+[geofence-monitor.safe-zone-cache] {
+  childId: 'cocNCrX7RNGL9WxcEVxR',
+  zoneCount: 1,
+  zoneIds: [ 'gmt4EUiecDnjzAQKolJX' ]
+}
+[geofence-monitor.safe-zone-cache] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  zoneCount: 1,
+  zoneIds: [ 'Ha8IbmhLlfFi0NHvS8RI' ]
+}
+[geofence-monitor.safe-zone-cache] {
+  childId: 'zmYcTApGWlUOgdbRO7kr',
+  zoneCount: 1,
+  zoneIds: [ 'ZF1rN19BmnumvwZ4Npwm' ]
+}
+[geofence-monitor.location] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  deviceId: 'mcJrFCFSWVV8tWKwBG8w',
+  rtdbPath: '/live_tracking/werwjfbe/location',
+  rawLocation: null
+}
+[geofence-monitor.skip] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  reason: 'invalid_coordinates',
+  rawLocation: null
+}
+[geofence-monitor.location] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[sos-alert-live-listener.attach] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  path: '/alerts_live/qpZznmQ5myQ0c7LFjJcr',
+  knownCount: 162
+}
+[geofence-monitor.skip] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  reason: 'duplicate_location_signature',
+  locationSequence: 1778570221046,
+  locationSignature: '31.637937|65.696682|1778570221046|1778570221046|0.07408|100'
+}
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[sos-alert-live-listener.attach] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  path: '/alerts_live/lw8Gipa4FR2vUAymL4M9',
+  knownCount: 0
+}
+[sos-alert-live-listener.devices] { attachedChildListeners: 2 }
+[sos-alert-live-listener] attached child path from root add {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  path: '/alerts_live/qpZznmQ5myQ0c7LFjJcr'
+}
+[sos-alert-live-listener] initialized path=/alerts_live { knownRootFlatAlerts: 0, rootListenerStartedAt: 1778650257485 }
+Server is running on port 3000
+API Endpoints:
+- POST   /send-otp
+- POST   /verify-otp
+- POST   /auth/signup
+- POST   /api/users/register
+- POST   /api/users/login
+- POST   /auth/verify-otp
+- GET    /api/users/:id
+- PUT    /api/users/:id
+- POST   /api/children/add
+- GET    /api/children/:user_id
+- GET    /api/children/child/:child_id
+- PUT    /api/children/:child_id
+- DELETE /api/children/:child_id
+- POST   /api/devices/register
+- POST   /api/locations/update
+- GET    /api/locations/live/:child_id
+- GET    /api/locations/history/:child_id
+- GET    /api/locations/route/:child_id/:date
+- POST   /api/alerts/send
+- GET    /api/alerts/:child_id
+- POST   /api/geofence/safe-zone
+- GET    /api/geofence/safe-zones/:child_id
+- POST   /api/geofence/check-location
+- POST   /api/admin/login
+- GET    /api/admin/stats/system
+[2026-05-13T05:31:14.686Z] GET / 200 8ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[2026-05-13T05:42:28.696Z] POST /api/users/login 200 2628ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650951841,
+  ageMs: 80730795,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650951843,
+  ageMs: 80730795,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:42:31.845Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2611ms
+[2026-05-13T05:42:32.433Z] GET /api/users/firebase-token 200 353ms
+[2026-05-13T05:42:36.216Z] POST /api/users/L6AwmzClctXaORHiUW03/fcm-token 200 1534ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650961932,
+  ageMs: 80740886,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650961933,
+  ageMs: 80740886,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:42:41.938Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2600ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650964298,
+  ageMs: 80743252,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650964299,
+  ageMs: 80743252,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:42:44.300Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2311ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/alerts/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:42:47.836Z] GET /api/alerts/qpZznmQ5myQ0c7LFjJcr 200 2304ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650970358,
+  ageMs: 80749312,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650970360,
+  ageMs: 80749312,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:42:50.365Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2346ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/alerts/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:42:52.705Z] GET /api/alerts/qpZznmQ5myQ0c7LFjJcr 200 2151ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650975429,
+  ageMs: 80754383,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650975430,
+  ageMs: 80754383,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:42:55.432Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2418ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650978032,
+  ageMs: 80756986,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650978033,
+  ageMs: 80756986,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:42:58.037Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2576ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:42:59.682Z] GET /api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr 200 1581ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650982255,
+  ageMs: 80761209,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650982256,
+  ageMs: 80761209,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:43:02.257Z] GET /api/children/L6AwmzClctXaORHiUW03 200 3178ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650982676,
+  ageMs: 80761630,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650982679,
+  ageMs: 80761630,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:43:02.683Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2894ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/alerts/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:43:09.551Z] GET /api/alerts/qpZznmQ5myQ0c7LFjJcr 200 2344ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650992306,
+  ageMs: 80771260,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778650992307,
+  ageMs: 80771260,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:43:12.308Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2636ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651011737,
+  ageMs: 80790691,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651011739,
+  ageMs: 80790691,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:43:31.741Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2639ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/locations/route/qpZznmQ5myQ0c7LFjJcr/2026-05-13?timezone_offset_minutes=270',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/alerts/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:43:47.331Z] GET /api/alerts/qpZznmQ5myQ0c7LFjJcr 200 2449ms
+[2026-05-13T05:43:47.781Z] GET /api/locations/route/qpZznmQ5myQ0c7LFjJcr/2026-05-13?timezone_offset_minutes=270 200 4578ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651030205,
+  ageMs: 80809159,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651030208,
+  ageMs: 80809159,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:43:50.212Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2579ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651043933,
+  ageMs: 80822887,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651043933,
+  ageMs: 80822887,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:44:03.934Z] GET /api/children/L6AwmzClctXaORHiUW03 200 3744ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651071521,
+  ageMs: 80850475,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651071521,
+  ageMs: 80850475,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:44:31.524Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2400ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651101751,
+  ageMs: 80880705,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651101751,
+  ageMs: 80880705,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:45:01.752Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2676ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651131557,
+  ageMs: 80910511,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651131558,
+  ageMs: 80910511,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:45:31.559Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2477ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651161456,
+  ageMs: 80940410,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651161457,
+  ageMs: 80940410,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:46:01.458Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2376ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651191530,
+  ageMs: 80970484,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651191531,
+  ageMs: 80970484,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:46:31.534Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2456ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651221564,
+  ageMs: 81000518,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651221565,
+  ageMs: 81000518,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:47:01.566Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2457ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651251012,
+  ageMs: 81029966,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651251012,
+  ageMs: 81029966,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:47:31.013Z] GET /api/children/L6AwmzClctXaORHiUW03 200 1862ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651281799,
+  ageMs: 81060753,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651281800,
+  ageMs: 81060753,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:48:01.804Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2545ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651311125,
+  ageMs: 81090079,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651311126,
+  ageMs: 81090079,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:48:31.127Z] GET /api/children/L6AwmzClctXaORHiUW03 200 1996ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651341321,
+  ageMs: 81120275,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651341322,
+  ageMs: 81120275,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:49:01.325Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2127ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:49:10.698Z] GET /api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr 200 1160ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'L6AwmzClctXaORHiUW03',
+  actorRole: 'user',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T05:49:12.225Z] POST /api/geofence/check-location 200 1226ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651353065,
+  ageMs: 81132019,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651353066,
+  ageMs: 81132019,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:49:13.068Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2078ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'L6AwmzClctXaORHiUW03',
+  actorRole: 'user',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T05:49:14.350Z] POST /api/geofence/check-location 200 1222ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'L6AwmzClctXaORHiUW03',
+  actorRole: 'user',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T05:49:18.698Z] POST /api/geofence/check-location 200 2409ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651362237,
+  ageMs: 81141191,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651362238,
+  ageMs: 81141191,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:49:22.242Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 5952ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/alerts/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:49:25.536Z] GET /api/alerts/qpZznmQ5myQ0c7LFjJcr 200 3256ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651368065,
+  ageMs: 81147019,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651368067,
+  ageMs: 81147019,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:49:28.070Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2398ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'L6AwmzClctXaORHiUW03',
+  actorRole: 'user',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T05:49:29.365Z] POST /api/geofence/check-location 200 1274ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651371291,
+  ageMs: 81150245,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651371292,
+  ageMs: 81150245,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:49:31.294Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2200ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[2026-05-13T05:49:59.385Z] GET /api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr 200 995ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651401259,
+  ageMs: 81180213,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651401261,
+  ageMs: 81180215,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651401262,
+  ageMs: 81180213,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651401263,
+  ageMs: 81180215,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:50:01.266Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 1763ms
+[2026-05-13T05:50:01.267Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2190ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'L6AwmzClctXaORHiUW03',
+  actorRole: 'user',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T05:50:02.716Z] POST /api/geofence/check-location 200 1299ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651431174,
+  ageMs: 81210128,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651431175,
+  ageMs: 81210128,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:50:31.177Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2102ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:50:58.117Z] GET /api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr 200 1134ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651460199,
+  ageMs: 81239153,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651460200,
+  ageMs: 81239153,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:51:00.202Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 1921ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651460922,
+  ageMs: 81239876,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651460923,
+  ageMs: 81239876,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:51:00.924Z] GET /api/children/L6AwmzClctXaORHiUW03 200 1839ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'L6AwmzClctXaORHiUW03',
+  actorRole: 'user',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T05:51:01.457Z] POST /api/geofence/check-location 200 1074ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/alerts/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:51:20.517Z] GET /api/alerts/qpZznmQ5myQ0c7LFjJcr 200 2163ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/alerts/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651482844,
+  ageMs: 81261798,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651482845,
+  ageMs: 81261798,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:51:22.846Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2198ms
+[2026-05-13T05:51:23.497Z] GET /api/alerts/qpZznmQ5myQ0c7LFjJcr 200 1938ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651485644,
+  ageMs: 81264598,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651485645,
+  ageMs: 81264598,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:51:25.647Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 1907ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651491347,
+  ageMs: 81270301,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651491349,
+  ageMs: 81270301,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:51:31.351Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2258ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/locations/route/qpZznmQ5myQ0c7LFjJcr/2026-05-13?timezone_offset_minutes=270',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:51:58.807Z] GET /api/locations/route/qpZznmQ5myQ0c7LFjJcr/2026-05-13?timezone_offset_minutes=270 200 4118ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651521301,
+  ageMs: 81300255,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651521302,
+  ageMs: 81300255,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:52:01.303Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2224ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/locations/route/qpZznmQ5myQ0c7LFjJcr/2026-05-13?timezone_offset_minutes=270',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:52:25.684Z] GET /api/locations/route/qpZznmQ5myQ0c7LFjJcr/2026-05-13?timezone_offset_minutes=270 200 4973ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651551039,
+  ageMs: 81329993,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651551040,
+  ageMs: 81329993,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:52:31.042Z] GET /api/children/L6AwmzClctXaORHiUW03 200 1964ms
+[2026-05-13T05:52:55.707Z] GET /api/users/L6AwmzClctXaORHiUW03 200 678ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/L6AwmzClctXaORHiUW03',
+  role: 'user',
+  authType: 'user',
+  authId: 'L6AwmzClctXaORHiUW03',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'owner'
+}
+[2026-05-13T05:52:57.505Z] POST /api/users/L6AwmzClctXaORHiUW03/fcm-token 200 1018ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651578494,
+  ageMs: 81357448,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651578495,
+  ageMs: 81357448,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T05:52:58.498Z] GET /api/children/L6AwmzClctXaORHiUW03 200 2048ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[2026-05-13T05:53:19.914Z] DELETE /api/users/L6AwmzClctXaORHiUW03/fcm-token 200 1114ms
+[2026-05-13T05:53:19.954Z] POST /api/users/logout 200 3ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[2026-05-13T05:53:49.677Z] POST /api/users/login 200 1815ms
+[2026-05-13T05:53:56.877Z] GET /api/admin/stats/daily-active-devices/2026-05-09 200 6893ms
+[2026-05-13T05:53:56.884Z] GET /api/admin/stats/daily-active-devices/2026-05-07 200 6904ms
+[2026-05-13T05:53:56.889Z] GET /api/admin/stats/daily-active-devices/2026-05-11 200 6901ms
+[2026-05-13T05:53:57.028Z] GET /api/admin/stats/daily-active-devices/2026-05-12 200 7035ms
+[2026-05-13T05:53:57.037Z] GET /api/admin/stats/daily-active-devices/2026-05-13 200 7043ms
+[2026-05-13T05:53:57.211Z] GET /api/admin/stats/daily-active-devices/2026-05-10 200 7225ms
+[2026-05-13T05:53:57.218Z] GET /api/admin/stats/daily-active-devices/2026-05-08 200 7236ms
+[2026-05-13T05:53:57.424Z] GET /api/admin/logs?limit=8 200 7448ms
+[2026-05-13T05:53:57.626Z] GET /api/admin/users 200 7674ms
+[2026-05-13T05:53:58.209Z] GET /api/admin/children 200 8252ms
+[geofence.searchSafeZones] {
+  actorId: 'jCS2CESjIp046RqqB2I1',
+  actorRole: 'admin',
+  searchTerm: '',
+  results: 2
+}
+[2026-05-13T05:53:58.546Z] GET /api/geofence/safe-zones 200 8568ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[2026-05-13T05:53:59.112Z] GET /api/admin/alerts 200 9138ms
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651639135,
+  ageMs: 81418089,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.resolve] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location'
+}
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location',
+  rawLocation: {}
+}
+[live-tracking.status] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rawLiveTimestamp: null,
+  now: 1778651639599,
+  ageMs: null,
+  status: 'no_data',
+  reason: 'missing_live_location_timestamp',
+  hasValidLocation: false,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651639783,
+  ageMs: 81418737,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.resolve] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location',
+  rawLocation: {}
+}
+[live-tracking.status] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rawLiveTimestamp: null,
+  now: 1778651640203,
+  ageMs: null,
+  status: 'no_data',
+  reason: 'missing_live_location_timestamp',
+  hasValidLocation: false,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[2026-05-13T05:54:00.205Z] GET /api/admin/devices 200 10250ms
+[2026-05-13T05:54:01.360Z] GET /api/admin/stats/system 200 11411ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[admin.getAdminProfile] request {
+  authId: 'jCS2CESjIp046RqqB2I1',
+  authType: 'admin',
+  collectionName: 'admins'
+}
+[2026-05-13T05:58:42.590Z] GET /api/admin/profile 200 3818ms
+[2026-05-13T05:58:50.364Z] GET /api/admin/logs?limit=8 200 7767ms
+[2026-05-13T05:58:50.396Z] GET /api/admin/stats/daily-active-devices/2026-05-09 200 7766ms
+[2026-05-13T05:58:50.398Z] GET /api/admin/stats/daily-active-devices/2026-05-13 200 7765ms
+[2026-05-13T05:58:50.403Z] GET /api/admin/stats/daily-active-devices/2026-05-11 200 7772ms
+[2026-05-13T05:58:50.626Z] GET /api/admin/users 200 8033ms
+[2026-05-13T05:58:50.639Z] GET /api/admin/stats/daily-active-devices/2026-05-08 200 8010ms
+[2026-05-13T05:58:50.863Z] GET /api/admin/stats/daily-active-devices/2026-05-10 200 8233ms
+[2026-05-13T05:58:50.871Z] GET /api/admin/stats/daily-active-devices/2026-05-07 200 8272ms
+[2026-05-13T05:58:50.874Z] GET /api/admin/stats/daily-active-devices/2026-05-12 200 8242ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651931644,
+  ageMs: 81710598,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.resolve] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location'
+}
+[2026-05-13T05:58:52.642Z] GET /api/admin/alerts 200 10046ms
+[live-tracking.raw-location] {
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location',
+  rawLocation: {}
+}
+[live-tracking.status] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rawLiveTimestamp: null,
+  now: 1778651932645,
+  ageMs: null,
+  status: 'no_data',
+  reason: 'missing_live_location_timestamp',
+  hasValidLocation: false,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[2026-05-13T05:58:52.659Z] GET /api/admin/children 200 10064ms
+[geofence.searchSafeZones] {
+  actorId: 'jCS2CESjIp046RqqB2I1',
+  actorRole: 'admin',
+  searchTerm: '',
+  results: 2
+}
+[2026-05-13T05:58:52.666Z] GET /api/geofence/safe-zones 200 10068ms
+[2026-05-13T05:58:54.726Z] GET /api/admin/stats/system 200 12134ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.resolve] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651935236,
+  ageMs: 81714190,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.raw-location] {
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location',
+  rawLocation: {}
+}
+[live-tracking.status] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rawLiveTimestamp: null,
+  now: 1778651935443,
+  ageMs: null,
+  status: 'no_data',
+  reason: 'missing_live_location_timestamp',
+  hasValidLocation: false,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[2026-05-13T05:58:55.445Z] GET /api/admin/devices 200 12851ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[admin.getAdminProfile] request {
+  authId: 'jCS2CESjIp046RqqB2I1',
+  authType: 'admin',
+  collectionName: 'admins'
+}
+[2026-05-13T05:59:23.947Z] GET /api/admin/profile 200 1515ms
+[2026-05-13T05:59:25.684Z] GET /api/admin/stats/daily-active-devices/2026-05-08 200 1100ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[2026-05-13T05:59:31.749Z] GET /api/admin/stats/daily-active-devices/2026-05-10 200 7155ms
+[2026-05-13T05:59:32.043Z] GET /api/admin/stats/daily-active-devices/2026-05-07 200 7456ms
+[2026-05-13T05:59:32.087Z] GET /api/admin/stats/daily-active-devices/2026-05-13 200 7472ms
+[2026-05-13T05:59:32.092Z] GET /api/admin/stats/daily-active-devices/2026-05-12 200 7495ms
+[2026-05-13T05:59:32.277Z] GET /api/admin/stats/daily-active-devices/2026-05-09 200 7685ms
+[2026-05-13T05:59:32.285Z] GET /api/admin/stats/daily-active-devices/2026-05-11 200 7690ms
+[2026-05-13T05:59:32.958Z] GET /api/admin/logs?limit=8 200 8373ms
+[2026-05-13T05:59:33.910Z] GET /api/admin/users 200 9322ms
+[2026-05-13T05:59:34.493Z] GET /api/admin/children 200 9903ms
+[2026-05-13T05:59:35.016Z] GET /api/admin/alerts 200 10425ms
+[geofence.searchSafeZones] {
+  actorId: 'jCS2CESjIp046RqqB2I1',
+  actorRole: 'admin',
+  searchTerm: '',
+  results: 2
+}
+[2026-05-13T05:59:35.056Z] GET /api/geofence/safe-zones 200 10470ms
+[live-tracking.resolve] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location',
+  rawLocation: {}
+}
+[live-tracking.status] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rawLiveTimestamp: null,
+  now: 1778651976033,
+  ageMs: null,
+  status: 'no_data',
+  reason: 'missing_live_location_timestamp',
+  hasValidLocation: false,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651976300,
+  ageMs: 81755254,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651976303,
+  ageMs: 81755257,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.resolve] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location',
+  rawLocation: {}
+}
+[live-tracking.status] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rawLiveTimestamp: null,
+  now: 1778651976636,
+  ageMs: null,
+  status: 'no_data',
+  reason: 'missing_live_location_timestamp',
+  hasValidLocation: false,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[2026-05-13T05:59:36.638Z] GET /api/admin/devices 200 12049ms
+[2026-05-13T05:59:40.013Z] GET /api/admin/logs?limit=200 200 3884ms
+[2026-05-13T05:59:40.162Z] GET /api/admin/stats/system 200 15575ms
+[live-tracking.resolve] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: 'werwjfbe',
+  rtdbPath: '/live_tracking/werwjfbe/location',
+  rawLocation: {}
+}
+[live-tracking.status] {
+  childId: 'lw8Gipa4FR2vUAymL4M9',
+  trackingKey: 'werwjfbe',
+  rawLiveTimestamp: null,
+  now: 1778651991634,
+  ageMs: null,
+  status: 'no_data',
+  reason: 'missing_live_location_timestamp',
+  hasValidLocation: false,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778651991890,
+  ageMs: 81770844,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[2026-05-13T05:59:51.891Z] GET /api/admin/devices 200 3264ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[2026-05-13T06:00:16.066Z] GET /api/admin/children 200 7638ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[2026-05-13T06:00:26.033Z] GET /api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr 200 1911ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652029011,
+  ageMs: 81807965,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652029011,
+  ageMs: 81807965,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T06:00:29.012Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2826ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[2026-05-13T06:00:29.867Z] GET /api/users/firebase-token 200 780ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'jCS2CESjIp046RqqB2I1',
+  actorRole: 'admin',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T06:00:36.545Z] POST /api/geofence/check-location 200 2370ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'jCS2CESjIp046RqqB2I1',
+  actorRole: 'admin',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T06:00:36.922Z] POST /api/geofence/check-location 200 2745ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652038282,
+  ageMs: 81817236,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652038283,
+  ageMs: 81817236,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T06:00:38.285Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 4106ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'jCS2CESjIp046RqqB2I1',
+  actorRole: 'admin',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T06:00:48.323Z] POST /api/geofence/check-location 200 2056ms
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652049143,
+  ageMs: 81828097,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652049144,
+  ageMs: 81828097,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T06:00:49.145Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2881ms
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/alerts/qpZznmQ5myQ0c7LFjJcr',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[2026-05-13T06:00:58.512Z] GET /api/alerts/qpZznmQ5myQ0c7LFjJcr 200 9100ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652069684,
+  ageMs: 81848638,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652069685,
+  ageMs: 81848638,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T06:01:09.686Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 3028ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652072833,
+  ageMs: 81851787,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652072834,
+  ageMs: 81851787,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T06:01:12.837Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2834ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'jCS2CESjIp046RqqB2I1',
+  actorRole: 'admin',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T06:01:14.422Z] POST /api/geofence/check-location 200 1561ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[child-access.ownership] {
+  method: 'GET',
+  path: '/api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[2026-05-13T06:02:04.176Z] GET /api/geofence/safe-zones/qpZznmQ5myQ0c7LFjJcr 200 1565ms
+[child.ownership] {
+  method: 'GET',
+  path: '/api/children/device/qpZznmQ5myQ0c7LFjJcr',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[live-tracking.resolve] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location'
+}
+[live-tracking.raw-location] {
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rtdbPath: '/live_tracking/9g1RsDLrQOh5yEQCuudJ/location',
+  rawLocation: {
+    battery: 100,
+    latitude: 31.637937333,
+    longitude: 65.696682333,
+    recorded_at: 1778570221046,
+    speed: 0.07408,
+    timestamp: 1778570221046
+  }
+}
+[live-tracking.status] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652126479,
+  ageMs: 81905433,
+  status: 'offline',
+  reason: 'live_location_stale',
+  hasValidLocation: true,
+  onlineThresholdMs: 60000,
+  delayedThresholdMs: 180000
+}
+[child.deviceStatus] computed {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  deviceId: 'shYgi8AgsDG6RTFSIPH8',
+  trackingKey: '9g1RsDLrQOh5yEQCuudJ',
+  rawLiveTimestamp: 1778570221046,
+  now: 1778652126479,
+  ageMs: 81905433,
+  status: 'offline',
+  reason: 'live_location_stale',
+  rawLiveStatus: 'offline'
+}
+[2026-05-13T06:02:06.480Z] GET /api/children/device/qpZznmQ5myQ0c7LFjJcr 200 2287ms
+[child-access.ownership] {
+  method: 'POST',
+  path: '/api/geofence/check-location',
+  role: 'admin',
+  authType: 'admin',
+  authId: 'jCS2CESjIp046RqqB2I1',
+  targetUserId: 'L6AwmzClctXaORHiUW03',
+  result: 'allowed',
+  reason: 'admin'
+}
+[geofence.checkLocation] {
+  childId: 'qpZznmQ5myQ0c7LFjJcr',
+  actorId: 'jCS2CESjIp046RqqB2I1',
+  actorRole: 'admin',
+  latitude: 31.637937333,
+  longitude: 65.696682333,
+  zoneCount: 1
+}
+[2026-05-13T06:02:07.849Z] POST /api/geofence/check-location 200 1338ms
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }
+[connection-monitor.sweep] { devicesChecked: 2, transitions: 0 }

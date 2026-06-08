@@ -37,7 +37,7 @@ class ApiConfig {
       final host = requestedHost == 'localhost' ? '127.0.0.1' : requestedHost;
       return '$scheme://$host:3000/api'; // Flutter Web / LAN browser
     } else if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:3000/api'; // Android emulator -> host machine
+      return 'http://10.200.196.92:3000/api'; // Physical Android device on LAN
     } else {
       return 'http://127.0.0.1:3000/api'; // Desktop / simulator fallback
     }

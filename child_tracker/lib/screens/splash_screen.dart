@@ -22,10 +22,8 @@ class _SplashScreenState extends State<SplashScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     try {
-      await Future.wait([
-        Future.delayed(const Duration(seconds: 2)),
-        authProvider.initializeSession().timeout(const Duration(seconds: 12)),
-      ]);
+      await Future.delayed(const Duration(seconds: 2));
+      await authProvider.initializeSession().timeout(const Duration(seconds: 4));
     } catch (error) {
       debugPrint('[SplashScreen] startup failed, continuing to login: $error');
     }

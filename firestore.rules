@@ -33,6 +33,15 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /device_status_cards/{childId} {
+      allow read: if isAdmin() || (
+        signedIn() &&
+        exists(/databases/$(database)/documents/children/$(childId)) &&
+        get(/databases/$(database)/documents/children/$(childId)).data.user_id == request.auth.uid
+      );
+      allow create, update, delete: if isAdmin();
+    }
+
     match /safe_zones/{zoneId} {
       allow read: if ownsResourceByUserId() || isAdmin();
       allow create, update, delete: if isAdmin();

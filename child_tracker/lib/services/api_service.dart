@@ -641,6 +641,46 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> registerFcmToken({
+    required String userId,
+    required String token,
+  }) async {
+    final response = await _sendRequest(
+      http.post(
+        Uri.parse('$baseUrl${ApiConfig.users}/$userId/fcm-token'),
+        headers: await _buildAuthHeaders(),
+        body: jsonEncode({
+          'token': token,
+        }),
+      ),
+      'register FCM token',
+    );
+
+    return Map<String, dynamic>.from(
+      _decodeResponse(response, 'register FCM token'),
+    );
+  }
+
+  Future<Map<String, dynamic>> unregisterFcmToken({
+    required String userId,
+    required String token,
+  }) async {
+    final response = await _sendRequest(
+      http.delete(
+        Uri.parse('$baseUrl${ApiConfig.users}/$userId/fcm-token'),
+        headers: await _buildAuthHeaders(),
+        body: jsonEncode({
+          'token': token,
+        }),
+      ),
+      'remove FCM token',
+    );
+
+    return Map<String, dynamic>.from(
+      _decodeResponse(response, 'remove FCM token'),
+    );
+  }
+
   // Get Live Location
   Future<Map<String, dynamic>> getLiveLocation(String childId) async {
     try {

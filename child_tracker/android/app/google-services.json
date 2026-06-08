@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "616084029405",
+    "firebase_url": "https://child-safety-tracking-default-rtdb.firebaseio.com",
+    "project_id": "child-safety-tracking",
+    "storage_bucket": "child-safety-tracking.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:616084029405:android:bb537f42bf9ad055674034",
+        "android_client_info": {
+          "package_name": "com.example.child_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmygqZ_pMpCJhdIcv7m5dEhFkpynxH420"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

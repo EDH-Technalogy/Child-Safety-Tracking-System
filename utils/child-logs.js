@@ -18,6 +18,10 @@ function normalizeLogType(type) {
     case "SAFE_ZONE_ENTER":
     case "ZONE_ENTER":
       return "GEOFENCE_RETURN";
+    case "DEVICE_RECONNECTED":
+    case "DEVICE_CONNECTED":
+      return "DEVICE_ONLINE";
+    case "DEVICE_DISCONNECTED":
     case "DEVICE_OFF":
       return "DEVICE_OFFLINE";
     case "LOW_BATTERY":
@@ -163,14 +167,27 @@ function dedupeChildLogs(logs = []) {
   const deduped = [];
 
   for (const log of logs) {
+    const normalizedType = normalizeLogType(log.type);
     const transitionEventId =
       log.metadata?.eventId ||
       log.metadata?.connectionEventId ||
       null;
+    const isConnectionLikeType = [
+      "DEVICE_ONLINE",
+      "DEVICE_OFFLINE",
+      "DEVICE_STATUS",
+    ].includes(normalizedType);
     const dedupeKey = transitionEventId
       ? `connection-event:${transitionEventId}`
+      : isConnectionLikeType
+        ? [
+            "connection",
+            normalizedType,
+            log.timestamp || 0,
+            log.childId || "",
+          ].join("|")
       : [
-          log.type || "",
+          normalizedType,
           log.timestamp || 0,
           log.message || "",
           log.childId || "",
@@ -296,8 +313,32 @@ function buildLegacyLogFromConnection(docId, data = {}) {
       source: "connection_logs_collection",
       previousStatus: data.previous_status || null,
       status,
+      placeName: data.place_name || null,
+      locationText: data.place_name || null,
       latitude: data.latitude ?? null,
       longitude: data.longitude ?? null,
+      ...(type === "DEVICE_ONLINE"
+        ? {
+            reconnectedLat: data.latitude ?? null,
+            reconnectedLng: data.longitude ?? null,
+            reconnectedAddress: data.place_name || null,
+            reconnectedTimestamp:
+              normalizeEpochMillisecondsOrNull(data.event_time) ??
+              normalizeEpochMillisecondsOrNull(data.created_at) ??
+              Date.now(),
+          }
+        : {}),
+      ...(type === "DEVICE_OFFLINE"
+        ? {
+            lastKnownLat: data.latitude ?? null,
+            lastKnownLng: data.longitude ?? null,
+            lastKnownAddress: data.place_name || null,
+            lastKnownTimestamp:
+              normalizeEpochMillisecondsOrNull(data.event_time) ??
+              normalizeEpochMillisecondsOrNull(data.created_at) ??
+              Date.now(),
+          }
+        : {}),
     },
   };
 }
@@ -356,9 +397,9 @@ function normalizeConnectionEvent(id, rawValue = {}, childId = "") {
     parentUserId: source.parentUserId?.toString().trim() || "",
     title:
       source.title?.toString().trim() ||
-      (type === "DEVICE_RECONNECTED"
+      (type === "DEVICE_ONLINE"
         ? "Device reconnected"
-        : type === "DEVICE_DISCONNECTED"
+        : type === "DEVICE_OFFLINE"
           ? "Device disconnected"
           : type),
     message: source.message?.toString().trim() || type,
@@ -435,6 +476,103 @@ async function readConnectionEventsBucket(childId, bucketKey) {
   }
 
   return events;
+}
+
+function normalizeDeviceStatusLog(id, rawValue = {}, childId = "") {
+  const source = rawValue && typeof rawValue === "object" ? rawValue : {};
+  const timestamp =
+    normalizeEpochMillisecondsOrNull(source.timestamp) ??
+    normalizeEpochMillisecondsOrNull(source.created_at) ??
+    normalizeEpochMillisecondsOrNull(source.createdAt);
+
+  if (!timestamp) {
+    return null;
+  }
+
+  const status = source.status?.toString().trim().toLowerCase() || "unknown";
+  const isOnline = ["online", "connected", "active"].includes(status);
+  const isOffline = ["offline", "disconnected", "inactive", "device_off"].includes(
+    status
+  );
+  const type = isOnline
+    ? "DEVICE_ONLINE"
+    : isOffline
+      ? "DEVICE_OFFLINE"
+      : "DEVICE_STATUS";
+  const latitude = Number(source.latitude);
+  const longitude = Number(source.longitude);
+  const placeName = source.place_name?.toString().trim() || source.address?.toString().trim() || null;
+
+  return {
+    id: (source.id ?? id ?? "").toString(),
+    type,
+    childId: source.child_id?.toString().trim() || childId,
+    trackingKey: source.tracking_key?.toString().trim() || "",
+    parentUserId: "",
+    title:
+      source.status_name?.toString().trim() ||
+      (isOnline ? "Online" : isOffline ? "Offline" : "Device Status"),
+    message:
+      type === "DEVICE_ONLINE"
+        ? `Device Online at ${placeName || [latitude, longitude].filter((v) => Number.isFinite(v)).join(", ")}`
+        : type === "DEVICE_OFFLINE"
+          ? `Device Offline at ${placeName || [latitude, longitude].filter((v) => Number.isFinite(v)).join(", ")}`
+          : `Device status changed to ${status}.`,
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null,
+    accuracy: null,
+    timestamp,
+    createdAt:
+      normalizeEpochMillisecondsOrNull(source.created_at) ??
+      normalizeEpochMillisecondsOrNull(source.createdAt) ??
+      timestamp,
+    dateKey: buildDateKey(timestamp),
+    metadata: {
+      source: "device_status_logs",
+      status,
+      statusName: source.status_name?.toString().trim() || null,
+      placeName,
+      locationText: placeName,
+      ...(type === "DEVICE_ONLINE"
+        ? {
+            reconnectedLat: Number.isFinite(latitude) ? latitude : null,
+            reconnectedLng: Number.isFinite(longitude) ? longitude : null,
+            reconnectedAddress: placeName,
+            reconnectedTimestamp: timestamp,
+          }
+        : {}),
+      ...(type === "DEVICE_OFFLINE"
+        ? {
+            lastKnownLat: Number.isFinite(latitude) ? latitude : null,
+            lastKnownLng: Number.isFinite(longitude) ? longitude : null,
+            lastKnownAddress: placeName,
+            lastKnownTimestamp: timestamp,
+          }
+        : {}),
+    },
+  };
+}
+
+async function listDeviceStatusLogsForChild(childId, window) {
+  const snapshot = await realtimeDB.ref(`device_status_logs/${childId}`).once("value");
+  const rawValue = snapshot.val() || {};
+  const logs = [];
+
+  for (const [id, data] of Object.entries(rawValue)) {
+    const normalizedLog = normalizeDeviceStatusLog(id, data, childId);
+    if (!normalizedLog) {
+      continue;
+    }
+
+    if (
+      normalizedLog.timestamp >= window.startTimestamp &&
+      normalizedLog.timestamp <= window.endTimestamp
+    ) {
+      logs.push(normalizedLog);
+    }
+  }
+
+  return logs;
 }
 
 async function listLegacyLogsForChild(childId, window) {
@@ -519,9 +657,18 @@ async function listChildLogs(
         log.timestamp >= window.startTimestamp &&
         log.timestamp <= window.endTimestamp
     );
+  const deviceStatusLogs = await listDeviceStatusLogsForChild(
+    normalizedChildId,
+    window
+  );
 
   const legacyLogs = await listLegacyLogsForChild(normalizedChildId, window);
-  return dedupeChildLogs([...connectionEvents, ...liveLogs, ...legacyLogs]);
+  return dedupeChildLogs([
+    ...deviceStatusLogs,
+    ...connectionEvents,
+    ...liveLogs,
+    ...legacyLogs,
+  ]);
 }
 
 module.exports = {

@@ -1,5 +1,7 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
@@ -34,24 +36,32 @@ import 'screens/admin/admin_login_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/edit_child_screen.dart';
 import 'services/notification_service.dart';
+import 'services/fcm_service.dart';
 import 'utils/constants.dart';
+import 'utils/firebase_bootstrap.dart';
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await FirebaseBootstrap.ensureInitialized();
+  debugPrint(
+    '[main.backgroundMessage] type=${message.data['type']} alertId=${message.data['alertId']}',
+  );
+  await NotificationService().showRemoteMessage(message);
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebase initialization remains disabled until firebase_options.dart
-  // is generated for this project environment.
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // );
-  // Firebase.init commented to avoid errors until configured
-  // await Firebase.initializeApp();
-  LocaleProvider? localeProvider;
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  runApp(const MyApp());
+  unawaited(_initializeStartupServices());
+}
 
+Future<void> _initializeStartupServices() async {
   try {
-    localeProvider = await LocaleProvider.load();
+    await FirebaseBootstrap.ensureInitialized();
   } catch (error) {
-    debugPrint('[main] LocaleProvider.load failed: $error');
-    localeProvider = LocaleProvider(loadSavedLocale: false);
+    debugPrint('[main] FirebaseBootstrap.ensureInitialized failed: $error');
+    return;
   }
 
   try {
@@ -60,7 +70,11 @@ Future<void> main() async {
     debugPrint('[main] NotificationService.init failed: $error');
   }
 
-  runApp(MyApp(localeProvider: localeProvider));
+  try {
+    await FcmService().init();
+  } catch (error) {
+    debugPrint('[main] FcmService.init failed: $error');
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -89,6 +103,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<LocaleProvider>(
         builder: (context, localeProvider, child) {
           return MaterialApp(
+            navigatorKey: NotificationNavigationService.navigatorKey,
             onGenerateTitle: (context) =>
                 AppLocalizations.of(context)?.appTitle ?? 'Child Tracker',
             debugShowCheckedModeBanner: false,
@@ -101,6 +116,7 @@ class MyApp extends StatelessWidget {
               FallbackCupertinoLocalizationsDelegate(),
             ],
             builder: (context, child) {
+              NotificationNavigationService.flushPendingNavigation();
               return Directionality(
                 textDirection: localeProvider.isRtl
                     ? TextDirection.rtl

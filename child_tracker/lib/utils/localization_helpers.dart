@@ -296,6 +296,18 @@ String localizeRawMessage(AppLocalizations l10n, String raw) {
     return l10n.childOutOfSafeZone;
   }
 
+  if (message.startsWith('Safe Zone was exited at')) {
+    return l10n.childOutOfSafeZone;
+  }
+
+  if (message.startsWith('Your child returned to the safe zone at')) {
+    return l10n.childBackInSafeZone;
+  }
+
+  if (message.startsWith('Your child returned to the configured safe zone')) {
+    return l10n.childBackInSafeZone;
+  }
+
   if (message
       .startsWith('Your child has returned to the configured safe zone')) {
     return l10n.childBackInSafeZone;

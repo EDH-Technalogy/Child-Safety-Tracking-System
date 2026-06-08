@@ -27,6 +27,7 @@ class LocationProvider with ChangeNotifier {
   Timer? _markerAnimationTimer;
   bool _isTracking = false;
   bool _isAnimatingLiveLocation = false;
+  bool _isSendingSos = false;
   String? _trackingChildId;
   String? _localTrackingChildId;
 
@@ -457,6 +458,15 @@ class LocationProvider with ChangeNotifier {
       return false;
     }
 
+    if (_isSendingSos) {
+      debugPrint(
+        '[LocationProvider.sos] duplicate send ignored childId=$normalizedChildId',
+      );
+      return true;
+    }
+
+    _isSendingSos = true;
+
     try {
       LocationModel? location = _liveLocation;
       if (location == null || location.childId != normalizedChildId) {
@@ -490,6 +500,8 @@ class LocationProvider with ChangeNotifier {
       _error = _formatError(error);
       notifyListeners();
       return false;
+    } finally {
+      _isSendingSos = false;
     }
   }
 
