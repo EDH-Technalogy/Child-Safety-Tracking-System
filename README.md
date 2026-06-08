@@ -1,17 +1,18 @@
-<<<<<<< HEAD
 # Child Safety GPS Tracking System
 
-A modern, mobile-responsive **Child Safety, GPS Tracking, Safe Zone, Alert, Reporting, and Administration System** built with a Flutter frontend and a Node.js/Firebase backend.
+A modern, mobile-responsive **Child Safety, GPS Tracking, Safe Zone, Alert, Reporting, and Administration System** developed by **EDH-Technalogy**.
 
-This system is designed to help parents, guardians, and administrators monitor children, manage tracking devices, view live locations, define safe zones, receive alerts, and review activity history through one centralized digital platform.
+This system is designed to help parents, guardians, and administrators monitor children, manage tracking devices, view live locations, define safe zones, receive emergency alerts, review location history, and manage safety-related records through one centralized digital platform.
 
 ---
 
-## About The Project
+## About EDH-Technalogy
 
-The **Child Safety GPS Tracking System** is a practical location monitoring and safety management application focused on real-time child tracking, emergency alerts, geofence monitoring, device management, and multilingual access.
+**EDH-Technalogy** is a professional software development team focused on building modern, scalable, and practical digital solutions for organizations, businesses, institutions, and real-world users.
 
-The platform combines a cross-platform Flutter app with a secure Express.js backend and Firebase services for live data, authentication, notifications, storage, and system monitoring.
+We design and develop web applications, mobile applications, business management systems, dashboards, automation tools, AI integrations, tracking systems, and digital platforms that solve real operational problems.
+
+All projects delivered by **EDH-Technalogy** are designed, developed, tested, and maintained with a strong focus on usability, performance, security, maintainability, scalability, and practical business value.
 
 ---
 
@@ -23,7 +24,8 @@ The platform combines a cross-platform Flutter app with a secure Express.js back
 | **App Name** | Child Tracker |
 | **Project Type** | Mobile, Web, and Backend Management System |
 | **Client / Industry** | Child Safety / Family Safety / Location Tracking |
-| **Main Purpose** | Real-time GPS tracking, safe zone monitoring, alerts, and administration |
+| **Main Purpose** | Real-time GPS tracking, safe zone monitoring, emergency alerts, and administration |
+| **Development Team** | EDH-Technalogy |
 | **Frontend** | Flutter / Dart |
 | **Backend** | Node.js / Express.js |
 | **Database & Cloud Services** | Firebase Firestore, Realtime Database, Authentication, Cloud Messaging, and Storage |
@@ -34,27 +36,28 @@ The platform combines a cross-platform Flutter app with a secure Express.js back
 
 ## Problem
 
-Parents and guardians need a reliable way to monitor child safety, track real-time movement, and respond quickly when something unusual happens.
+Parents and guardians need a reliable digital system to monitor child safety, track real-time movement, and respond quickly when something unusual happens.
 
-Manual tracking and disconnected communication create several challenges:
+Manual checking, phone calls, and disconnected communication create several challenges:
 
 - Child location is difficult to monitor in real time
-- Safe zones such as home, school, or family areas are hard to enforce manually
+- Safe zones such as home, school, or family areas are hard to control manually
 - Emergency alerts may not reach guardians quickly enough
 - Location history and route movement are difficult to review
-- Device status, battery state, and connectivity are hard to manage
-- Administrators need a central system to manage users, children, devices, and alerts
-- Multilingual users need an interface that supports local language needs
+- Device battery, connectivity, and online status are hard to manage
+- Parents need instant notifications for unsafe movement or emergency events
+- Administrators need a central system to manage users, children, devices, alerts, and activity logs
+- Multilingual users need an interface that supports local language and right-to-left usage
 
 ---
 
 ## Solution
 
-This project provides a complete digital platform for child safety and GPS tracking.
+**EDH-Technalogy** developed a complete **Child Safety GPS Tracking System** that helps parents, guardians, and administrators manage child safety and location tracking through one organized digital platform.
 
 The system allows users to register, manage child profiles, connect tracking devices, view live locations on Google Maps, create safe zones, receive SOS and geofence alerts, review location history, and manage notification preferences.
 
-The backend supports authentication, location updates, alert processing, geofence monitoring, device status tracking, OTP email verification, audit logs, and admin-level management. The Flutter frontend provides a clean interface for parents and administrators across mobile, web, and desktop targets.
+The backend supports authentication, location updates, alert processing, geofence monitoring, device status tracking, OTP email verification, audit logs, and admin-level management. The Flutter frontend provides a clean, practical, and responsive interface for parents and administrators across mobile, web, and desktop targets.
 
 ---
 
@@ -62,6 +65,7 @@ The backend supports authentication, location updates, alert processing, geofenc
 
 - Secure login and registration system
 - OTP verification and password reset support
+- Google and Facebook social authentication support
 - Parent dashboard and child management
 - Admin dashboard with system statistics
 - User, child, admin, and device management
@@ -105,159 +109,105 @@ The backend supports authentication, location updates, alert processing, geofenc
 
 ---
 
-## Project Structure
-
-```text
-Final-Year-Project3/
-|-- child_tracker/          # Flutter frontend application
-|   |-- lib/
-|   |   |-- models/         # App data models
-|   |   |-- providers/      # State management providers
-|   |   |-- screens/        # User and admin screens
-|   |   |-- services/       # API, Firebase, tracking, and notification services
-|   |   |-- utils/          # Constants and helper utilities
-|   |   `-- widgets/        # Shared UI widgets
-|-- controllers/            # Express controller logic
-|-- routes/                 # Backend API routes
-|-- middleware/             # Auth, logging, and error middleware
-|-- services/               # Backend service helpers
-|-- utils/                  # Backend tracking, notification, and sync utilities
-|-- server.js               # Backend entry point
-|-- package.json            # Backend dependencies and scripts
-`-- README.md
-```
-
----
-
-## Backend Setup
-
-1. Install backend dependencies:
-
-```bash
-npm install
-```
-
-2. Create your environment file:
-
-```bash
-cp .env.example .env
-```
-
-3. Update `.env` with your Firebase, email, and security configuration.
-
-4. Start the backend server:
-
-```bash
-npm start
-```
-
-The backend runs on:
-
-```text
-http://localhost:3000
-```
-
----
-
-## Flutter Frontend Setup
-
-1. Move into the Flutter app:
-
-```bash
-cd child_tracker
-```
-
-2. Install Flutter dependencies:
-
-```bash
-flutter pub get
-```
-
-3. Run the app:
-
-```bash
-flutter run
-```
-
-For a physical Android phone, provide your computer IP address so the app can reach the backend:
-
-```bash
-flutter run --dart-define=API_BASE_URL=http://YOUR_COMPUTER_IP:3000/api
-```
-
----
-
-## Main Backend API Areas
-
-- `/api/users` - user registration, login, profile, and account management
-- `/api/children` - child profile management
-- `/api/devices` - tracking device registration and status management
-- `/api/locations` - live location, history, and route data
-- `/api/alerts` - alerts and SOS events
-- `/api/geofence` - safe zones and geofence checks
-- `/api/activity` - activity records
-- `/api/summary` - dashboard and summary data
-- `/api/settings` - user and system settings
-- `/api/admin` - admin dashboard, users, devices, children, alerts, and logs
-
----
-
 ## Screenshots
 
-| Login Page | User Dashboard | Child Information & Location |
-|------------|----------------|------------------------------|
-| <img src="secreenshots/login-page.jpg" alt="Login page" width="260"> | <img src="secreenshots/drawback-of-user.jpg" alt="User dashboard" width="260"> | <img src="secreenshots/child-information%20and%20location.jpg" alt="Child information and location" width="260"> |
+### Login And User Pages
 
-| Child Location & Safe Zone | Edit Safe Zone | Edit Safe Zone Map |
-|----------------------------|----------------|--------------------|
-| <img src="secreenshots/child_location_and_safe_zone.jpg" alt="Child location and safe zone" width="260"> | <img src="secreenshots/Edit-safe-zone1.jpg" alt="Edit safe zone form" width="260"> | <img src="secreenshots/Edit-safe-zone2.jpg" alt="Edit safe zone map" width="260"> |
+<p align="center">
+  <img src="./secreenshots/login-page.jpg" width="32%" alt="Child Tracker Login Page" />
+  <img src="./secreenshots/drawback-of-user.jpg" width="32%" alt="Child Tracker User Dashboard" />
+  <img src="./secreenshots/child-information%20and%20location.jpg" width="32%" alt="Child Information And Location Page" />
+</p>
 
-| Admin Dashboard | Admin Graphs | User Management |
-|-----------------|--------------|-----------------|
-| <img src="secreenshots/admin%20dashboard.jpg" alt="Admin dashboard" width="260"> | <img src="secreenshots/admin_dashboard_graghp.jpg" alt="Admin dashboard graphs" width="260"> | <img src="secreenshots/user_managment_page.jpg" alt="User management page" width="260"> |
+---
 
-| Child Management | Device Management | Admin Overview |
-|------------------|-------------------|----------------|
-| <img src="secreenshots/child_mangsment_page.jpg" alt="Child management page" width="260"> | <img src="secreenshots/devices_managment_page.jpg" alt="Device management page" width="260"> | <img src="secreenshots/drawback_of_admin.jpg" alt="Admin overview" width="260"> |
+### Location And Safe Zone Pages
+
+<p align="center">
+  <img src="./secreenshots/child_location_and_safe_zone.jpg" width="32%" alt="Child Location And Safe Zone Page" />
+  <img src="./secreenshots/Edit-safe-zone1.jpg" width="32%" alt="Edit Safe Zone Form" />
+  <img src="./secreenshots/Edit-safe-zone2.jpg" width="32%" alt="Edit Safe Zone Map" />
+</p>
+
+---
+
+### Admin Pages
+
+<p align="center">
+  <img src="./secreenshots/admin%20dashboard.jpg" width="32%" alt="Admin Dashboard" />
+  <img src="./secreenshots/admin_dashboard_graghp.jpg" width="32%" alt="Admin Dashboard Graphs" />
+  <img src="./secreenshots/drawback_of_admin.jpg" width="32%" alt="Admin Overview" />
+</p>
+
+<p align="center">
+  <img src="./secreenshots/user_managment_page.jpg" width="32%" alt="User Management Page" />
+  <img src="./secreenshots/child_mangsment_page.jpg" width="32%" alt="Child Management Page" />
+  <img src="./secreenshots/devices_managment_page.jpg" width="32%" alt="Device Management Page" />
+</p>
+
+---
+
+## Role of EDH-Technalogy
+
+This project was fully designed, developed, tested, and maintained by **EDH-Technalogy**.
+
+**EDH-Technalogy** was responsible for:
+
+- Project planning
+- System analysis
+- UI/UX design
+- Mobile app development
+- Web app development
+- Backend API development
+- Firebase integration
+- Database structure and cloud data management
+- GPS tracking and location workflow implementation
+- Safe zone and geofence logic
+- SOS alert and notification workflow
+- Admin dashboard development
+- Multilingual and RTL interface support
+- Testing and debugging
+- Documentation
+- Deployment preparation
+- Project improvement and maintenance
 
 ---
 
 ## Result
 
-The system provides a centralized platform for managing child safety, GPS tracking, safe zones, emergency alerts, device status, activity logs, and administration.
+The system provides a complete digital platform for managing child safety, GPS tracking, safe zones, emergency alerts, device status, location history, activity logs, and administration.
 
 It improves:
 
 - Child location visibility
-- Emergency response awareness
+- Parent and guardian awareness
+- Emergency response speed
 - Safe zone monitoring
-- Device and user management
 - Location history review
-- Parent and administrator coordination
+- Device and user management
+- Administrative control
 - Multilingual accessibility
-- Mobile and web access
+- Desktop, mobile, and web access
+
+The project works across mobile and web-supported environments, making it easier for parents, guardians, and administrators to access and manage safety information from different screen sizes.
 
 ---
 
 ## Project Status
 
-The project is under active development. The main frontend and backend structure is available, with live tracking, alerts, geofencing, admin tools, Firebase integration, and multilingual interface support already included.
+The system is functional and ready for portfolio demonstration.
 
-Further improvements, deployment setup, production security hardening, and public demo access can be added over time.
+Live deployment and public demo access will be added soon.
 
 ---
 
 ## Developed By
 
-**Child Tracker Development Team**  
-Final Year Project
+**EDH-Technalogy**  
+Professional Software Development Team
 
 ---
 
 ## License
 
 This project is currently marked as **ISC** in `package.json`.
-=======
-# Child-Safety-Tracking-System
-The Child Safety Tracking System is a  application designed to help parents and guardians monitor and protect children. The system provides real-time GPS tracking, location history, geofencing with instant notifications, SOS emergency alerts, and secure communication features.
->>>>>>> 9c8228abce59f1066c626f03c3fb1f297f2b946f
